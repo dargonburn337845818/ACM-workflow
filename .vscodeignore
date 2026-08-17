@@ -1,0 +1,17 @@
+# vsce 打包排除清单：只打包编译产物（out/）、media 与文档
+# 隐私关键项（个人数据 / 路径 / 凭证）必须排除：
+.backup/
+cache/
+code/
+records.db
+dist/
+tools/
+tests/
+.git/
+.gitignore
+.vscode/
+src/**
+/*.md
+!README.md
+!LICENSE
+!CHANGELOG.md

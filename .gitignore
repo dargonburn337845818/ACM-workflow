@@ -1,0 +1,30 @@
+# 依赖
+node_modules/
+
+# 编译与打包产物
+out/
+dist/
+*.vsix
+
+# 个人数据与运行时产物（绝不入库）
+*.db
+*.log
+cache/
+code/
+records.db
+.backup/
+.vscode-test/
+.preview/
+
+# 本地预览/测试产物
+.pw-browsers/
+.pw-libs/
+.pw-fonts/
+.pw-fonts-data/
+.npm-cache/
+tools/shots/
+.cph-cookies.txt
+
+# 系统与编辑器
+.DS_Store
+*.suo

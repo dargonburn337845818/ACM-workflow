@@ -1,0 +1,160 @@
+/**
+ * ACM Workflow 冒烟测试（无 VS Code 环境也可运行）：
+ * 对编译产物 out/ 中的纯函数做回归断言。
+ *
+ * 运行：npm test（自动先编译）
+ * 覆盖：URL 解析 / 文件名解析 / 输出比对 / 难度分档 / 造数据确定性 / 知识图谱结构
+ */
+'use strict';
+
+const path = require('path');
+const Module = require('module');
+
+// ===== vscode mock：让依赖 vscode 的模块可在 Node 下加载 =====
+const vscodeMock = require('./mock-vscode');
+const mockPath = require.resolve('./mock-vscode');
+require.cache[mockPath] = { id: mockPath, filename: mockPath, loaded: true, exports: vscodeMock };
+const origResolve = Module._resolveFilename;
+Module._resolveFilename = function (request, ...args) {
+  if (request === 'vscode') return mockPath;
+  return origResolve.call(this, request, ...args);
+};
+
+const root = path.join(__dirname, '..');
+const out = (p) => path.join(root, 'out', p);
+
+let passed = 0;
+let failed = 0;
+function assert(cond, name, extra) {
+  if (cond) { passed++; console.log(`  ✓ ${name}`); }
+  else { failed++; console.error(`  ✗ ${name}${extra ? ' — ' + extra : ''}`); }
+}
+
+console.log('== 1. cfUrl 解析 ==');
+{
+  const { parseCfProblemUrl } = require(out('services/cfUrl.js'));
+  const cases = [
+    ['https://codeforces.com/problemset/problem/1791/E', '1791E'],
+    ['https://codeforces.com/contest/1791/problem/E', '1791E'],
+    ['https://codeforces.com/gym/104053/problem/A', '104053A'],
+    ['https://codeforces.com/problemset/problem/1791/e?locale=en', '1791E'], // 小写+query
+    ['https://codeforces.com/contest/2257/problem/F2/', '2257F2'],           // 尾斜杠
+    ['https://codeforces.com/problemset/problem/1060/E#comment', '1060E'],  // hash
+    ['https://codeforces.com/gym/104053/problem/A?x=1#top', '104053A']
+  ];
+  for (const [url, id] of cases) {
+    try {
+      const p = parseCfProblemUrl(url);
+      assert(p.id === id, `解析 ${url} → ${p.id}`, `期望 ${id}`);
+    } catch (e) { assert(false, `解析 ${url}`, e.message); }
+  }
+  const errCases = [
+    ['https://www.luogu.com.cn/problem/P1001', '仅支持 Codeforces'],
+    ['https://codeforces.com/problemset/problem/ABC', '无法识别的 CF 链接格式'],
+    ['', '链接为空'],
+    ['not a url', '仅支持 Codeforces']
+  ];
+  for (const [url, kind] of errCases) {
+    try { parseCfProblemUrl(url); assert(false, `应报错：${url}`, '未抛异常'); }
+    catch (e) { assert(String(e.message).includes(kind), `报错分类 ${url}`, e.message); }
+  }
+}
+
+console.log('== 2. 文件名 → 题目解析 ==');
+{
+  const { problemFromFileName } = require(out('core/workbench.js'));
+  const cases = [
+    ['/x/P1001.cpp', 'P1001', 'luogu'],
+    ['/x/979E.cpp', '979E', 'codeforces'],
+    ['/Codeforces/154A/Hometask.cpp', '154A', 'codeforces'],
+    ['/Luogu/P1660/solve.cpp', 'P1660', 'luogu'],
+    ['/main.cpp', null, null],
+    ['/USACO10FEB_Chocolate_Buying_S.cpp', null, null]
+  ];
+  for (const [file, id, platform] of cases) {
+    const p = problemFromFileName(file);
+    if (id === null) assert(p === null, `非题目文件 ${file}`);
+    else assert(p && p.id === id && p.platform === platform, `解析 ${file} → ${p.id}`, JSON.stringify(p));
+  }
+}
+
+console.log('== 3. 输出比对（空白容忍） ==');
+{
+  const { normalizeOutput, judge } = require(out('services/runner.js'));
+  assert(normalizeOutput('1 2 3\n') === '1 2 3', 'normalizeOutput 去行尾空白');
+  assert(judge('1 2 3\n', '1 2 3'), 'judge 通过');
+  assert(!judge('1 2', '1 3'), 'judge 拒绝不同输出');
+  assert(!judge(' 1  2\n\n', '1 2'), 'judge 不忽略行首空白（CPH 同规则）');
+}
+
+console.log('== 4. CF 难度分档 ==');
+{
+  const { computeDifficultyBins } = require(out('services/statistics.js'));
+  const mk = (difficulty) => ({ id: 'x', platform: 'codeforces', title: 't', url: 'u', status: 'ac', attempts: 1, updatedAt: 0, difficulty });
+  const bins = computeDifficultyBins([mk(800), mk(1500), mk(3500), mk(undefined)]);
+  assert(bins.total === 4, '总数 4', JSON.stringify(bins));
+  assert(bins.undetermined === 1, '未定分 1');
+  const labeled = bins.bins.filter((b) => b.count > 0).map((b) => b.label);
+  assert(labeled.includes('800') && labeled.includes('1400') && labeled.includes('3000+'), `分档 ${labeled.join(',')}`);
+}
+
+console.log('== 5. 造数据确定性 ==');
+{
+  const { generateInput, mulberry32 } = require(out('services/dataGen.js'));
+  (async () => {
+    const spec = { type: 'array', nMin: 5, nMax: 5, vMin: 1, vMax: 100, seed: 42 };
+    const a = await generateInput(spec, mulberry32(42));
+    const b = await generateInput(spec, mulberry32(42));
+    assert(a === b, '同种子输出一致', `${a} vs ${b}`);
+    const lines = a.trim().split('\n');
+    assert(lines[0] === '5', '首行为 n', lines[0]);
+    assert(lines[1].split(' ').length === 5, '次行为 5 个数');
+    const perm = await generateInput({ type: 'permutation', nMin: 6, nMax: 6, seed: 7 }, mulberry32(7));
+    const nums = perm.trim().split('\n')[1].split(' ').map(Number);
+    assert(new Set(nums).size === 6, '排列无重复');
+  })().catch((e) => { assert(false, '造数据', e.message); });
+}
+
+console.log('== 6. 知识图谱结构 ==');
+{
+  const { KNOWLEDGE_CATEGORIES } = require(out('features/manual/knowledgeMap.js'));
+  assert(Array.isArray(KNOWLEDGE_CATEGORIES) && KNOWLEDGE_CATEGORIES.length >= 6, `一级分类 ${KNOWLEDGE_CATEGORIES.length} 个`);
+  const all = KNOWLEDGE_CATEGORIES.flatMap((c) => c.subs || []).flatMap((s) => s.algorithms || []);
+  assert(all.length >= 25, `算法节点 ${all.length} 个`);
+  const bad = all.filter((a) => !a.name || !a.cpp || !a.complexity);
+  assert(bad.length === 0, '每个算法含 name/cpp/complexity', bad.map((b) => b.name).join(','));
+}
+
+console.log('== 7. 扩展激活链路（模拟 VS Code） ==');
+(async () => {
+  const vscodeMock = require('./mock-vscode');
+  const { activate, deactivate } = require(out('extension.js'));
+  const context = {
+    extensionUri: { toString: () => 'mock://ext' },
+    subscriptions: [],
+    globalState: { get: () => undefined, update: async () => {} },
+    secrets: { get: async () => undefined, store: async () => {}, delete: async () => {} }
+  };
+  try {
+    activate(context);
+    const cmds = vscodeMock.__registeredCommands.map((c) => c.command);
+    for (const expect of ['acmWorkflow.open', 'acmWorkflow.pickProblem', 'acmWorkflow.refreshTests',
+      'acmWorkflow.backfillAllTests', 'acmWorkflow.diagnose', 'acmWorkflow.beautify', 'acmWorkflow.beautifyRestore']) {
+      assert(cmds.includes(expect), `命令已注册 ${expect}`);
+    }
+    assert(vscodeMock.__registeredViews.length === 1 && vscodeMock.__registeredViews[0].viewType === 'acmWorkflow.workbench',
+      '侧边栏 WebviewView 已注册');
+    // 等 400ms 让 companion 服务绑定端口（activate 内异步无 await，端口在 close 前绑定）
+    await new Promise((r) => setTimeout(r, 400));
+    context.subscriptions.forEach((d) => { try { d.dispose && d.dispose(); } catch { /* ignore */ } });
+    deactivate();
+    console.log('  扩展激活与释放完成');
+  } catch (e) {
+    assert(false, '扩展激活', e.message);
+  }
+})();
+
+setTimeout(() => {
+  console.log(`\n结果：${passed} 通过，${failed} 失败`);
+  process.exit(failed > 0 ? 1 : 0);
+}, 500);

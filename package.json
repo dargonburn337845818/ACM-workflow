@@ -1,0 +1,182 @@
+{
+  "name": "acm-workflow",
+  "displayName": "ACM Workflow",
+  "description": "VSCode 中强大的 Codeforces 刷题助手：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录，全部在编辑器内完成",
+  "version": "0.18.0",
+  "publisher": "deepseekharness",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "codeforces",
+    "acm",
+    "competitive-programming",
+    "vscode-extension",
+    "algorithm",
+    "刷题",
+    "cp"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dargonburn337845818/ACM-workflow.git"
+  },
+  "author": "deepseekharness",
+  "contributors": [
+    {
+      "name": "deepseekharness"
+    }
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "acmWorkflow",
+          "title": "ACM Workflow",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "acmWorkflow": [
+        {
+          "id": "acmWorkflow.workbench",
+          "name": "ACM Workflow",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "acmWorkflow.open", "title": "ACM Workflow: 打开工作台", "category": "ACM Workflow" },
+      { "command": "acmWorkflow.pickProblem", "title": "ACM Workflow: 随机选题", "category": "ACM Workflow" },
+      { "command": "acmWorkflow.refreshTests", "title": "ACM Workflow: 重新获取测试数据", "category": "ACM Workflow" },
+      { "command": "acmWorkflow.backfillAllTests", "title": "ACM Workflow: 批量补充测试数据", "category": "ACM Workflow" },
+      { "command": "acmWorkflow.diagnose", "title": "ACM Workflow: 环境诊断", "category": "ACM Workflow" },
+      { "command": "acmWorkflow.beautify", "title": "ACM Workflow: 应用硬边墨色美化", "category": "ACM Workflow" },
+      { "command": "acmWorkflow.beautifyRestore", "title": "ACM Workflow: 还原美化", "category": "ACM Workflow" }
+    ],
+    "keybindings": [
+      {
+        "command": "acmWorkflow.open",
+        "key": "ctrl+alt+a",
+        "mac": "cmd+alt+a"
+      }
+    ],
+    "configuration": {
+      "title": "ACM Workflow",
+      "properties": {
+        "acmWorkflow.baseDir": {
+          "type": "string",
+          "default": "",
+          "description": "扩展数据根目录：题目代码生成到 {baseDir}\\code\\{平台}\\{题号}\\，记录数据库默认也放这里。留空则使用 ~/.acm-workflow（跨平台默认）。"
+        },
+        "acmWorkflow.templatePath": {
+          "type": "string",
+          "default": "",
+          "description": "生成题目的 cpp 模板文件路径（留空则使用内置默认模板）。"
+        },
+        "acmWorkflow.dbPath": {
+          "type": "string",
+          "default": "",
+          "description": "刷题记录 SQLite 文件路径（留空则使用 {baseDir}\\records.db）。"
+        },
+        "acmWorkflow.testTimeoutMs": {
+          "type": "number",
+          "default": 5000,
+          "description": "单用例运行超时（毫秒）。"
+        },
+        "acmWorkflow.companionPort": {
+          "type": "number",
+          "default": 27121,
+          "description": "接收 competitive-companion 浏览器插件推送的本地端口（与 cph 默认一致）。浏览器插件端口需设为相同值。"
+        },
+        "acmWorkflow.cfHandle": {
+          "type": "string",
+          "default": "",
+          "description": "Codeforces 账号 handle（用于看板统计、历史导入与爬取已写代码）。"
+        },
+        "acmWorkflow.translateProvider": {
+          "type": "string",
+          "enum": ["auto", "libre", "deepseek"],
+          "default": "auto",
+          "description": "题面翻译后端：auto（MyMemory + Google 兜底，无需配置）/ libre（LibreTranslate，端点见 libreEndpoint）/ deepseek（DeepSeek API，密钥存系统密钥链 acmWorkflow.deepseekKey）。"
+        },
+        "acmWorkflow.libreEndpoint": {
+          "type": "string",
+          "default": "https://libretranslate.com/translate",
+          "description": "LibreTranslate 翻译端点（自建实例可填 http://localhost:5000/translate）。"
+        },
+        "acmWorkflow.followHandles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "比赛面板「我的关注」榜单的额外关注 Handle（自己的 cfHandle 自动包含）。"
+        },
+        "acmWorkflow.proxy": {
+          "type": "string",
+          "default": "",
+          "description": "CF 网络代理地址（如 http://127.0.0.1:7890）。VS Code 扩展的请求不跟随系统代理，需要代理访问 CF 时在此填写；留空则尝试环境变量 HTTPS_PROXY/HTTP_PROXY。"
+        }
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "acmWorkflow.getStarted",
+        "title": "ACM Workflow 快速上手",
+        "description": "三步开始刷题：配置 CF Handle → 拉取或导入题目 → 测试、对拍与提交",
+        "steps": [
+          {
+            "id": "acmWorkflow.stepHandle",
+            "title": "① 配置 Codeforces Handle",
+            "description": "在设置中填写 acmWorkflow.cfHandle（或在工作台「记录」页点击「绑定 / 更换」）。用于拉取 AC 历史、生成薄弱点推荐与比赛关注榜单。",
+            "media": "media/walkthrough/step1.md"
+          },
+          {
+            "id": "acmWorkflow.stepPick",
+            "title": "② 选题 / 导入题目",
+            "description": "打开工作台（Ctrl+Alt+A）→ 选题页随机推荐或粘贴题目 URL 导入；比赛页可一键创建整场 Round。",
+            "media": "media/walkthrough/step2.md"
+          },
+          {
+            "id": "acmWorkflow.stepTest",
+            "title": "③ 测试、对拍与提交",
+            "description": "生成题目后样例自动写入测试面板：一键运行、单用例运行、造数据与对拍器，全部通过后可直接提交到 Codeforces。",
+            "media": "media/walkthrough/step3.md"
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src",
+    "package": "node -e \"require('fs').mkdirSync('dist',{recursive:true})\" && vsce package --out dist",
+    "test": "npm run compile && node tests/smoke.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "puppeteer-core": "^25.7.0",
+    "sql.js": "^1.14.1",
+    "undici": "^7.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.67.0"
+  }
+}
