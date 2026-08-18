@@ -2,7 +2,7 @@
   "name": "acm-workflow",
   "displayName": "ACM Workflow",
   "description": "VSCode 中强大的 Codeforces 刷题助手：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录，全部在编辑器内完成",
-  "version": "0.18.1",
+  "version": "0.18.2",
   "publisher": "deepseekharness",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -57,13 +57,41 @@
       ]
     },
     "commands": [
-      { "command": "acmWorkflow.open", "title": "ACM Workflow: 打开工作台", "category": "ACM Workflow" },
-      { "command": "acmWorkflow.pickProblem", "title": "ACM Workflow: 随机选题", "category": "ACM Workflow" },
-      { "command": "acmWorkflow.refreshTests", "title": "ACM Workflow: 重新获取测试数据", "category": "ACM Workflow" },
-      { "command": "acmWorkflow.backfillAllTests", "title": "ACM Workflow: 批量补充测试数据", "category": "ACM Workflow" },
-      { "command": "acmWorkflow.diagnose", "title": "ACM Workflow: 环境诊断", "category": "ACM Workflow" },
-      { "command": "acmWorkflow.beautify", "title": "ACM Workflow: 应用硬边墨色美化", "category": "ACM Workflow" },
-      { "command": "acmWorkflow.beautifyRestore", "title": "ACM Workflow: 还原美化", "category": "ACM Workflow" }
+      {
+        "command": "acmWorkflow.open",
+        "title": "ACM Workflow: 打开工作台",
+        "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.pickProblem",
+        "title": "ACM Workflow: 随机选题",
+        "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.refreshTests",
+        "title": "ACM Workflow: 重新获取测试数据",
+        "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.backfillAllTests",
+        "title": "ACM Workflow: 批量补充测试数据",
+        "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.diagnose",
+        "title": "ACM Workflow: 环境诊断",
+        "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.beautify",
+        "title": "ACM Workflow: 应用硬边墨色美化",
+        "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.beautifyRestore",
+        "title": "ACM Workflow: 还原美化",
+        "category": "ACM Workflow"
+      }
     ],
     "keybindings": [
       {
@@ -107,7 +135,12 @@
         },
         "acmWorkflow.translateProvider": {
           "type": "string",
-          "enum": ["auto", "libre", "deepseek", "local"],
+          "enum": [
+            "auto",
+            "libre",
+            "deepseek",
+            "local"
+          ],
           "default": "auto",
           "description": "题面翻译后端：auto（MyMemory + Google 兜底，无需配置）/ libre（LibreTranslate，端点见 libreEndpoint）/ deepseek（DeepSeek API，密钥存系统密钥链 acmWorkflow.deepseekKey）/ local（本地离线 Argos，端点见 localEndpoint）。"
         },
@@ -133,7 +166,9 @@
         },
         "acmWorkflow.followHandles": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "比赛面板「我的关注」榜单的额外关注 Handle（自己的 cfHandle 自动包含）。"
         },

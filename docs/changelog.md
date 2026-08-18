@@ -2,7 +2,7 @@
 
 版本号遵循语义化版本。本文件记录全部迭代历史（含内部开发记录提炼）。
 
-## 0.18.1 — WSL 适配（2026-08-18）
+## 0.18.2 — WSL 适配与题面公式修复（2026-08-18）
 
 - 新增 `tools/setup_wsl.sh`：一键安装 g++ / curl / python3 / Chromium，可选本地离线翻译
 - `src/utils/paths.ts` 新增 `normalizePath`：WSL 下自动把 `C:\...` / `D:\...` 转成 `/mnt/c/...` / `/mnt/d/...`，`baseDir` / `templatePath` / `dbPath` / `browserPath` 全部生效
