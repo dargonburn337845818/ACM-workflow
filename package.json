@@ -2,7 +2,7 @@
   "name": "acm-workflow",
   "displayName": "ACM Workflow",
   "description": "VSCode 中强大的 Codeforces 刷题助手：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录，全部在编辑器内完成",
-  "version": "0.18.2",
+  "version": "0.19.6",
   "publisher": "deepseekharness",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -90,6 +90,11 @@
       {
         "command": "acmWorkflow.beautifyRestore",
         "title": "ACM Workflow: 还原美化",
+        "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.setupGuide",
+        "title": "ACM Workflow: 环境配置引导",
         "category": "ACM Workflow"
       }
     ],
@@ -208,7 +213,7 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "tsc -p ./",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src",

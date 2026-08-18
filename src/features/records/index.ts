@@ -24,14 +24,9 @@ async function handleRecordAction(host: WorkbenchHost, payload: any) {
   if (!id || !action) return;
   try {
     if (action === 'delete') {
-      // V0.10：仅「未开始」题目可删除（已 AC 的题目不能删除）
-      const records = await listRecords();
-      const rec = records.find((r) => r.id === id);
-      if (rec && rec.status === 'untouched') {
-        await removeRecord(id);
-        await host.pushRecords();
-        await host.pushHistoryData();
-      }
+      await removeRecord(id);
+      await host.pushRecords();
+      await host.pushHistoryData();
       return;
     }
     if (action !== 'open') return; // V0.10：记录仅保留「打开题目」+ 未开始的「删除」

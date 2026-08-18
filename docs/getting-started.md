@@ -8,7 +8,7 @@
 |---|---|---|
 | VS Code | ≥ 1.85 | 任意平台（Windows / macOS / Linux / WSL） |
 | C++ 编译器 | g++（可选但强烈建议） | Windows: MinGW-w64 / MSYS2；macOS: `xcode-select --install`；Linux/WSL: `sudo apt install g++` 或 `bash tools/setup_wsl.sh`。扩展会自动探测 PATH 与常见安装位置 |
-| 浏览器（可选） | Chrome / Edge / Chromium | 用于 CF 登录、提交和洛谷浏览器兜底；WSL 可装 Chromium 或配置 `acmWorkflow.browserPath` 指向 Windows 浏览器 |
+| 浏览器（可选） | Chrome / Edge / Chromium | 用于 CF 登录、提交；WSL 可装 Chromium 或配置 `acmWorkflow.browserPath` 指向 Windows 浏览器 |
 | 网络 | 可访问 codeforces.com | 国内网络一般直连可用；慢的话见 troubleshooting 的代理方案 |
 
 > 没有 g++ 也可以先体验：选题、题面、翻译、记录都能用，只是「运行测试」需要编译器。

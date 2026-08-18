@@ -8,6 +8,7 @@ import { writeStatementFiles } from '../../services/statementFiles';
 import { findProbFile, saveProblemTests } from '../../services/template';
 import { countTranslatableParagraphs, translateStatementHtml } from '../../services/translate';
 import { problemFromProb, type WorkbenchHost } from '../../core/workbench';
+import { trace } from '../../services/diagnostics';
 
 
 export function installTest(host: WorkbenchHost): void {
@@ -155,10 +156,11 @@ async function handleTranslateStatement(host: WorkbenchHost, ) {
     host.view?.webview.postMessage({ type: 'statementTranslated', payload: { id: null, zh: null, reason: 'noStatement' } });
     return;
   }
+  trace('service', 'translateStatement', `start ${st.id}`);
   console.log(`[ACM-Workflow][翻译] 手动翻译请求：${st.id}（HTML ${st.html.length} 字符）`);
   let zh: (string | null)[] | null = host.translateCache.get(st.id) ?? null;
   if (!zh) {
-    zh = await translateStatementHtml(st.html).catch(() => null);
+    zh = await translateStatementHtml(st.html, { context: host.context }).catch(() => null);
     if (zh) host.translateCache.set(st.id, zh);
   }
   // V0.20：译文落盘到题目文件夹（题面.zh.json v2，与 HTML 段落对齐）
@@ -169,5 +171,7 @@ async function handleTranslateStatement(host: WorkbenchHost, ) {
   const translatable = countTranslatableParagraphs(st.html);
   const reason = zh && zh.some(Boolean) ? undefined : translatable > 0 ? 'unavailable' : 'none';
   host.view?.webview.postMessage({ type: 'statementTranslated', payload: { id: st.id, zh, reason } });
-  console.log(`[ACM-Workflow][翻译] 手动翻译结果：${zh ? zh.filter(Boolean).length + ' 段' : '失败（' + (translatable > 0 ? '翻译暂不可用' : '无可翻译段落') + '）'}`);
+  const okCount = zh ? zh.filter(Boolean).length : 0;
+  trace('service', 'translateStatement', okCount > 0 ? `ok ${st.id} ${okCount}段` : `fail ${st.id} ${translatable > 0 ? 'unavailable' : 'none'}`);
+  console.log(`[ACM-Workflow][翻译] 手动翻译结果：${okCount > 0 ? okCount + ' 段' : '失败（' + (translatable > 0 ? '翻译暂不可用' : '无可翻译段落') + '）'}`);
 }

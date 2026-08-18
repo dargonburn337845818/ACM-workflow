@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CfContest, ContestDetail } from '../../services/cfContest';
-import { fetchContestParticipants, getContestDetail, listCfContests } from '../../services/cfContest';
+import { getContestDetail, listCfContests } from '../../services/cfContest';
 import { getStoredSession } from '../../services/cfSession';
 import { getCodeforcesProblemDetail } from '../../services/fetchers/codeforces';
 import { fetchStatement } from '../../services/fetchers/statement';
@@ -27,8 +27,7 @@ export function installContest(host: WorkbenchHost): void {
 async function getContestDetailCached(host: WorkbenchHost, contestId: number): Promise<ContestDetail> {
   const hit = host.contestDetailCache.get(contestId);
   if (hit && Date.now() - hit.at < 120000) return hit.detail;
-  const handles = await contestFollowHandles(host);
-  const detail = await getContestDetail(host.context, contestId, { handles });
+  const detail = await getContestDetail(host.context, contestId);
   host.contestDetailCache.set(contestId, { at: Date.now(), detail });
   return detail;
 }
@@ -71,22 +70,7 @@ async function pushContestList(host: WorkbenchHost, ) {
   try {
     host.contestDetailCache.clear(); // 刷新列表时详情缓存一并失效（赛时榜单/题目会变）
     const contests = await listCfContests(host.context);
-    const out: CfContest[] = contests.map((c) => ({ ...c }));
-    let cursor = 0;
-    const workers = Array.from({ length: 2 }, async () => {
-      while (cursor < out.length) {
-        const i = cursor++;
-        if (out[i].phase === 'CODING') {
-          try {
-            out[i].participants = await fetchContestParticipants(host.context, out[i].id);
-          } catch {
-            /* 人数获取失败不影响列表 */
-          }
-        }
-      }
-    });
-    await Promise.all(workers);
-    host.view?.webview.postMessage({ type: 'contestList', contests: out });
+    host.view?.webview.postMessage({ type: 'contestList', contests: contests.map((c) => ({ ...c })) });
   } catch (e: any) {
     host.view?.webview.postMessage({ type: 'contestList', error: e?.message || '比赛列表获取失败' });
   }

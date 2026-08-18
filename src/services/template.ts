@@ -15,8 +15,7 @@ function templatePath(): string {
 }
 
 const PLATFORM_DIRS: Record<string, string> = {
-  codeforces: 'Codeforces',
-  luogu: 'Luogu'
+  codeforces: 'Codeforces'
 };
 
 function sanitizeFileName(name: string): string {
@@ -101,7 +100,7 @@ export function createProblemFile(problem: Problem, tests: { input: string; outp
   for (const cphSrcPath of srcPathVariants) {
     const prob = {
       name: `${problem.id}. ${problem.title}`,
-      group: problem.platform === 'luogu' ? 'Luogu' : 'Codeforces',
+      group: 'Codeforces',
       url: problem.url,
       interactive: false,
       memoryLimit: 256,
@@ -162,8 +161,7 @@ export function saveProblemTests(filePath: string, tests: { id: number; input: s
 }
 
 /**
- * 列出全部已生成的题目 cpp 绝对路径（Codeforces + 洛谷），用于批量补样例。
- * 注：洛谷风控严格，批量抓取容易挂起，脚本层面仍建议优先 CF。
+ * 列出全部已生成的题目 cpp 绝对路径（Codeforces），用于批量补样例。
  */
 export function listProblemCpps(): string[] {
   const codeDir = path.join(baseDir(), 'code');

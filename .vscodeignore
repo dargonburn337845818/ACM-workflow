@@ -15,3 +15,6 @@ src/**
 !README.md
 !LICENSE
 !CHANGELOG.md
+
+docs/changelog.md
+.bin-shim/

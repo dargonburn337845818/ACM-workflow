@@ -52,7 +52,7 @@ https://codeforces.com/gym/104053/problem/A         # gym
 
 **入口**：「测试」视图顶部（跟随当前打开的题目文件联动）
 
-- 题号解析：`.prob` 配置 → 文件名（`979E.cpp`）→ **父目录名**（`Codeforces/154A/Hometask.cpp`）→ USACO 洛谷关键字搜索
+- 题号解析：`.prob` 配置 → 文件名（`979E.cpp`）→ **父目录名**（`Codeforces/154A/Hometask.cpp`）
 - 排版：抓取页面 → cheerio 提取 标题/限制/描述/输入输出格式/样例/提示 → 结构化 HTML
   （公式保留、图片提示、时间/内存限制栏展示）
 - 翻译（先排版后翻译）：按段落切分 → 公式掩码（不翻译）→ 多后端翻译 →
@@ -162,7 +162,7 @@ https://codeforces.com/gym/104053/problem/A         # gym
 ## 12. 🖥️ 浏览器推送（companion）
 
 安装 [Competitive Companion](https://github.com/jmerle/competitive-companion) 浏览器插件 →
-插件端口设为 `27121` → 打开题目页点插件 → 扩展自动创建 cpp + .prob（洛谷反爬兜底方案）。
+插件端口设为 `27121` → 打开 Codeforces 题目页点插件 → 扩展自动创建 cpp + .prob。
 
 **实现**：`src/services/companionServer.ts`
 

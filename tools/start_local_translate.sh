@@ -12,8 +12,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ -x "$HOME/LibreTranslate/venv/bin/python" ]; then
   PY="$HOME/LibreTranslate/venv/bin/python"
+elif [ -x "$HOME/LibreTranslate/venv/Scripts/python.exe" ]; then
+  PY="$HOME/LibreTranslate/venv/Scripts/python.exe"
 elif [ -x "$HOME/.local/share/acm-workflow-translate/venv/bin/python" ]; then
   PY="$HOME/.local/share/acm-workflow-translate/venv/bin/python"
+elif [ -x "$HOME/.local/share/acm-workflow-translate/venv/Scripts/python.exe" ]; then
+  PY="$HOME/.local/share/acm-workflow-translate/venv/Scripts/python.exe"
 else
   echo "错误：未找到可用的 Python 虚拟环境。" >&2
   echo "请先运行: bash tools/setup_local_translate.sh" >&2

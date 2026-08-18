@@ -17,7 +17,7 @@ export type RecordStatus = 'untouched' | 'trying' | 'ac' | 'abandoned';
 
 export interface ProblemRecord {
   id: string;
-  platform: 'codeforces' | 'luogu';
+  platform: 'codeforces';
   title: string;
   difficulty?: number;
   url: string;
@@ -129,7 +129,8 @@ function rowsToRecords(rows: any[][]): ProblemRecord[] {
 export async function listRecords(): Promise<ProblemRecord[]> {
   const d = await getDb();
   const res = d.exec(
-    'SELECT id, platform, title, difficulty, url, status, attempts, updated_at FROM records ORDER BY updated_at DESC'
+    'SELECT id, platform, title, difficulty, url, status, attempts, updated_at FROM records WHERE platform = ? ORDER BY updated_at DESC',
+    ['codeforces']
   );
   if (res.length === 0) return [];
   return rowsToRecords(res[0].values);
@@ -200,7 +201,7 @@ export async function getStats(): Promise<{ total: number; ac: number; trying: n
  *  V0.8：可传入每题的原始 AC 时间 updatedAt（毫秒），否则用当前时间。
  *  修复：历史导入不再统一写"现在"，避免历史 AC 混入今日统计。 */
 export async function bulkImport(
-  items: { id: string; platform: 'codeforces' | 'luogu'; title: string; difficulty?: number; url: string; status: RecordStatus; attempts?: number; updatedAt?: number }[]
+  items: { id: string; platform: 'codeforces'; title: string; difficulty?: number; url: string; status: RecordStatus; attempts?: number; updatedAt?: number }[]
 ): Promise<number> {
   if (items.length === 0) return 0;
   const d = await getDb();

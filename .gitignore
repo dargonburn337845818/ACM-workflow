@@ -28,3 +28,6 @@ tools/shots/
 # 系统与编辑器
 .DS_Store
 *.suo
+
+# 临时会话文件
+*.ses

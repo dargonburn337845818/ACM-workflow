@@ -1,4 +1,4 @@
-export type Platform = 'codeforces' | 'luogu';
+export type Platform = 'codeforces';
 
 export interface Problem {
   id: string;

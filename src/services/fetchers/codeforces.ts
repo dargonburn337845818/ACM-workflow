@@ -311,32 +311,53 @@ export async function getCodeforcesProblems(): Promise<Problem[]> {
     return disk;
   }
 
-  const res = await fetch('https://codeforces.com/api/problemset.problems', {
-    headers: { 'User-Agent': CF_UA, 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(30000)
-  });
-  if (!res.ok) {
-    throw new Error(`Codeforces API 请求失败: ${res.status}`);
+  let lastError: Error | null = null;
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (attempt > 1) {
+      await sleep(attempt * 800);
+      console.warn(`[ACM-Workflow][CF API] problemset.problems 第 ${attempt - 1} 次尝试失败，重试`);
+    }
+    try {
+      const res = await fetch('https://codeforces.com/api/problemset.problems', {
+        headers: { 'User-Agent': CF_UA, 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(30000)
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        const snippet = body.trim().slice(0, 200);
+        const err = new Error(`Codeforces API 请求失败: ${res.status}${snippet ? '：' + snippet : ''}`);
+        if (res.status < 500) throw err;
+        lastError = err;
+        continue;
+      }
+
+      const data = JSON.parse(await res.text()) as CFResponse;
+      if (data.status !== 'OK') {
+        throw new Error(`Codeforces API 返回异常：${(data as any).comment || 'unknown'}`);
+      }
+
+      cache = data.result.problems
+        .filter(p => p.type === 'PROGRAMMING')
+        .map(p => ({
+          id: `${p.contestId}${p.index}`,
+          platform: 'codeforces' as const,
+          title: p.name,
+          difficulty: p.rating,
+          tags: p.tags || [],
+          url: `https://codeforces.com/problemset/problem/${p.contestId}/${p.index}`
+        }));
+
+      writeCfProblemsDiskCache(cache);
+      return cache;
+    } catch (e: any) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      // 4xx 或 CF 返回业务错误时重试无意义；5xx/网络异常/非 JSON 继续重试
+      if (/Codeforces API 请求失败: 4\d\d/.test(err.message) || /Codeforces API 返回异常/.test(err.message)) throw err;
+      lastError = err;
+    }
   }
-
-  const data = (await res.json()) as CFResponse;
-  if (data.status !== 'OK') {
-    throw new Error('Codeforces API 返回异常');
-  }
-
-  cache = data.result.problems
-    .filter(p => p.type === 'PROGRAMMING')
-    .map(p => ({
-      id: `${p.contestId}${p.index}`,
-      platform: 'codeforces' as const,
-      title: p.name,
-      difficulty: p.rating,
-      tags: p.tags || [],
-      url: `https://codeforces.com/problemset/problem/${p.contestId}/${p.index}`
-    }));
-
-  writeCfProblemsDiskCache(cache);
-  return cache;
+  throw lastError || new Error(`Codeforces API 请求失败（已重试 ${maxAttempts} 次）`);
 }
 
 export async function pickCodeforcesProblem(options: {

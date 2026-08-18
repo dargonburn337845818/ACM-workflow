@@ -57,7 +57,6 @@
 │   │   ├── 154A/            #   单题：目录名 = 题号
 │   │   │   └── Hometask.cpp
 │   │   └── Contest_2257/    #   比赛：contest_{id}_{index}.cpp + .prob
-│   └── Luogu/
 ├── records.db               # 刷题记录（SQLite，sql.js WASM）
 └── cache/                   # 磁盘缓存（可再生，可安全删除）
     ├── cf-problems.json     #   CF 题集（TTL 12h）

@@ -234,6 +234,13 @@ async function probeLocalServer(probeUrl: string): Promise<boolean> {
   }
 }
 
+/** Windows 路径转 WSL 挂载路径（如 C:\a\b -> /mnt/c/a/b）；非 Windows 路径返回 null */
+function toWslPath(p: string): string | null {
+  const m = /^([A-Za-z]):\\(.*)$/.exec(p);
+  if (!m) return null;
+  return '/mnt/' + m[1].toLowerCase() + '/' + m[2].replace(/\\/g, '/');
+}
+
 async function ensureLocalServer(endpoint: string): Promise<boolean> {
   const probeUrl = getLocalProbeUrl(endpoint);
   if (await probeLocalServer(probeUrl)) return true;
@@ -248,25 +255,42 @@ async function ensureLocalServer(endpoint: string): Promise<boolean> {
   localServerStarting = (async () => {
     const script = getLocalServerScript();
     const port = getLocalPort(endpoint);
-    console.log(`[ACM-Workflow][翻译] 本地翻译服务未启动，尝试自动拉起: ${script} --port ${port}`);
-    let spawnFailed = false;
-    const child = spawn('bash', [script, '--port', String(port)], {
-      cwd: path.resolve(__dirname, '..', '..'),
-      stdio: 'ignore',
-      detached: false,
-    });
-    child.on('error', (err) => {
-      spawnFailed = true;
-      console.warn(`[ACM-Workflow][翻译] 自动启动本地翻译服务失败：`, err);
-    });
-    for (let i = 0; i < 16; i++) {
-      if (spawnFailed) return false;
-      await new Promise((r) => setTimeout(r, 500));
+    const root = path.resolve(__dirname, '..', '..');
+    const attempts: { cmd: string; args: string[] }[] = [];
+    if (process.platform === 'win32') {
+      attempts.push({ cmd: 'bash.exe', args: [script, '--port', String(port)] });
+      const wslScript = toWslPath(script);
+      if (wslScript) {
+        attempts.push({ cmd: 'wsl.exe', args: ['bash', '-lc', `"${wslScript}" --port ${port}`] });
+      }
+    } else {
+      attempts.push({ cmd: 'bash', args: [script, '--port', String(port)] });
+    }
+
+    for (const attempt of attempts) {
+      console.log(`[ACM-Workflow][翻译] 本地翻译服务未启动，尝试自动拉起: ${attempt.cmd} ${attempt.args.join(' ')}`);
+      let spawnFailed = false;
+      const child = spawn(attempt.cmd, attempt.args, {
+        cwd: root,
+        stdio: 'ignore',
+        detached: false,
+      });
+      child.on('error', (err) => {
+        spawnFailed = true;
+        console.warn(`[ACM-Workflow][翻译] 自动启动本地翻译服务失败（${attempt.cmd}）：`, err);
+      });
+      for (let i = 0; i < 16; i++) {
+        if (spawnFailed) break;
+        await new Promise((r) => setTimeout(r, 500));
+        if (await probeLocalServer(probeUrl)) return true;
+      }
       if (await probeLocalServer(probeUrl)) return true;
     }
+
     console.warn('[ACM-Workflow][翻译] 本地翻译服务自动启动超时，请手动运行 tools/start_local_translate.sh');
     return false;
   })();
+  localServerStarting.finally(() => { localServerStarting = null; }).catch(() => {});
   return localServerStarting;
 }
 
@@ -283,7 +307,11 @@ async function localTranslate(text: string): Promise<string | null> {
       body: JSON.stringify({ q: text, source: 'en', target: 'zh', format: 'text' }),
       signal: AbortSignal.timeout(15000)
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.warn(`[ACM-Workflow][翻译] 本地翻译请求失败 HTTP ${res.status}: ${body.slice(0, 200)}`);
+      return null;
+    }
     const data: any = await res.json();
     const t = String(data?.translatedText || '').trim();
     return t && t !== text ? t : null;
@@ -324,6 +352,15 @@ async function deepseekTranslate(text: string, apiKey: string): Promise<string |
   }
 }
 
+/** 本地翻译服务是否可用：探测并尝试自动启动；不可用返回 false，避免逐段重试长时间卡顿。 */
+async function isLocalServerReady(): Promise<boolean> {
+  let endpoint = DEFAULT_LOCAL;
+  try {
+    endpoint = vscode.workspace.getConfiguration('acmWorkflow').get<string>('localEndpoint', DEFAULT_LOCAL) || DEFAULT_LOCAL;
+  } catch { /* 单测环境用默认 */ }
+  return ensureLocalServer(endpoint);
+}
+
 /** 并发受限的 map */
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
@@ -348,6 +385,13 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 export async function translateStatementHtml(html: string, opts?: { context?: import('vscode').ExtensionContext }): Promise<(string | null)[]> {
   const { provider, apiKey } = await resolveProvider(opts?.context);
   const $ = loadHtml(html);
+  if (provider === 'local') {
+    const ready = await isLocalServerReady();
+    if (!ready) {
+      console.warn('[ACM-Workflow][翻译] 本地翻译服务不可用，跳过翻译（题面仍正常显示）');
+      return new Array($('.st-block.st-p').length).fill(null);
+    }
+  }
   const blocks = $('.st-block.st-p').toArray();
   const out: (string | null)[] = new Array(blocks.length).fill(null);
   if (blocks.length === 0) {
@@ -364,7 +408,7 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
       const $m = $(node);
       const src = $m.text();
       const block = $m.hasClass('acm-math-block');
-      $m.replaceWith(`\u0000☃${math.length}☃\u0000`);
+      $m.replaceWith(`MATH${math.length}`);
       math.push({ src, block });
     });
     const text = $el.find('.st-en').first().text().replace(/\s+/g, ' ').trim();
@@ -387,15 +431,21 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
     if (!results[k]) { out[j.index] = null; return; }
     let zh = results[k];
     const used = new Set<number>();
-    // V0.21：宽容匹配占位符——翻译 API 常剥掉 \u0000 控制符（甚至插入空格）；
-    // V0.24：改用 ☃ 符号占位符，避免 Argos 等本地翻译把 "MATH" 音译成 "马特" 导致泄漏
-    zh = zh.replace(/\u0000?☃\s*(\d+)\s*☃\u0000?/g, (_m, n) => {
+    // V0.26：用 MATH{n} 占位符（Argos 实测可原样保留）；同时兼容旧 ☃、{n}}、XQn☃ 等被本地模型改写的形式
+    const restoreMath = (_m: string, n: string) => {
       const mi = Number(n);
       used.add(mi);
       const math = j.math[mi];
       if (!math) return _m;
       return (math.block ? '$$' : '$') + math.src + (math.block ? '$$' : '$');
-    });
+    };
+    zh = zh
+      .replace(/\bMATH\s*(\d+)\b/g, restoreMath)
+      .replace(/\u0000?☃\s*(\d+)\s*☃\u0000?/g, restoreMath)
+      .replace(/\{(\d+)\}\}/g, restoreMath)
+      .replace(/\{(\d+)\}/g, restoreMath)
+      .replace(/(?:XQ|QQ|☃)?\s*(\d+)\s*☃/g, restoreMath)
+      .replace(/(?:XQ|QQ)\s*(\d+)\b/g, restoreMath);
     // 翻译服务丢弃的公式占位符补回段尾（公式不应被翻译/丢失）
     for (let mi = 0; mi < j.math.length; mi++) {
       if (!used.has(mi)) {

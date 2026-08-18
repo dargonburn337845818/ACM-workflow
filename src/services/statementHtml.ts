@@ -4,7 +4,7 @@ import { fetchBinary } from './fetchers/codeforces';
 
 /**
  * 题面 HTML 排版（V0.20 重构）：
- * 用 cheerio 解析 CF / 洛谷题目页，从 div.problem-statement / article 中提取
+ * 用 cheerio 解析 Codeforces 题目页，从 div.problem-statement 中提取
  * 标题、时间/内存限制、题目描述、输入输出格式、样例、提示等区块。
  *
  * 排版规则：
@@ -458,52 +458,4 @@ export async function parseCfStatementHtml(html: string, download?: StatementIma
     timeLimitMs: timeLabel ? timeToMs(timeLabel) : undefined,
     memoryLimitMb: memoryLabel ? parseFloat(memoryLabel) : undefined
   };
-}
-
-/* ---------------- 洛谷解析 ---------------- */
-
-export async function parseLuoguStatementHtml(html: string, download?: StatementImageDownloader): Promise<StatementParseResult> {
-  const $ = cheerio.load(html);
-  const $art = $('article').first();
-  if (!$art.length) throw new Error('未找到题面区块');
-
-  const title = collapseText($art.find('h1').first().text());
-  const ctx: BuildCtx = { images: [] };
-  let body = '';
-  let pending: InlineChunk[] = [];
-  const flush = () => {
-    if (!pending.length) return;
-    const joined = joinInlineChunks(pending);
-    pending = [];
-    if (joined.html) body += wrapPara(joined.html.replace(/^\s+/, '').replace(/\s+$/, ''));
-  };
-
-  $art.children().each((_i, node) => {
-    const anyNode = node as any;
-    if (anyNode.type === 'text') {
-      const c = renderInlineNode($, node, ctx);
-      if (c.html) pending.push(c);
-      return;
-    }
-    if (anyNode.type !== 'tag') return;
-    if (node.name === 'h1') return; // 标题已在顶部
-    if (node.name === 'h2') {
-      flush();
-      body += `<h2 class="st-h">${escapeHtml(collapseText($(node).text()))}</h2>`;
-      return;
-    }
-    if (INLINE_TAGS.has(node.name)) {
-      const c = renderInlineNode($, node, ctx);
-      if (c.html) pending.push(c);
-      return;
-    }
-    flush();
-    body += renderBlockNode($, node, ctx);
-  });
-  flush();
-
-  const raw = `<h1 class="st-title">${escapeHtml(title)}</h1>${body}`;
-  const htmlOut = await finishHtml(raw, ctx, download);
-  console.log(`[ACM-Workflow][题面] parseLuoguStatementHtml 完成：标题=${title}，图片 ${ctx.images.length} 张，HTML ${htmlOut.length} 字符`);
-  return { html: htmlOut, title };
 }

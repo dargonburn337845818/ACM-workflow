@@ -117,15 +117,14 @@ WSL 下如果不想在 Linux 里装浏览器，可以直接复用 Windows 的 Ed
 
 其余功能在工作台内点击即可；命令面板输入 `ACM Workflow` 可查看全部命令：
 
-`打开工作台` · `随机选题` · `重新获取测试数据` · `批量补充测试数据` · `环境诊断` · `应用硬边墨色美化` · `还原美化`
+`打开工作台` · `随机选题` · `重新获取测试数据` · `批量补充测试数据` · `工作流诊断` · `应用硬边墨色美化` · `还原美化`
 
 ## ❓ 常见问题（FAQ）
 
-- **题面空白 / 抓取失败？** 运行命令 `ACM Workflow: 环境诊断` 查看网络与工具链状态；题面有 30 天磁盘缓存，断网也可读缓存。
+- **题面空白 / 抓取失败？** 运行命令 `ACM Workflow: 工作流诊断` 查看网络、工具链、操作轨迹与发现的问题；题面有 30 天磁盘缓存，断网也可读缓存。
 - **编译失败？** 需要 g++。Windows 装 [MinGW-w64](https://www.mingw-w64.org/) 或 MSYS2，Linux/macOS 装 gcc；WSL 可运行 `bash tools/setup_wsl.sh`；扩展自动探测 PATH 与常见安装位置。
 - **WSL 里打不开浏览器？** 先运行 `bash tools/setup_wsl.sh` 安装 Chromium，或在设置里把 `acmWorkflow.browserPath` 指向 Windows 侧 Edge/Chrome（`/mnt/c/...`）。
 - **CF 访问慢？** 扩展请求不跟随系统代理：有代理请配置 `acmWorkflow.proxy`；无代理时扩展已强制 IPv4 直连（规避 IPv6 半通问题）。
-- **洛谷题目？** 支持洛谷题面/样例抓取与历史记录（浏览器直连 + 缓存兜底）；选题专注 Codeforces。
 - **隐私？** 账号密码/Cookie/DeepSeek Key 全部存系统密钥链（`vscode.SecretStorage`），不写入任何配置文件与代码仓库。
 
 更多见 [docs/troubleshooting.md](docs/troubleshooting.md)
@@ -149,8 +148,9 @@ src/
 │   ├── records/              #   刷题记录 + 历史导入
 │   └── manual/               #   知识导论（算法手册）
 ├── services/                 # 通用服务
-│   ├── fetchers/             #   codeforces / luogu / statement / userStats
-│   ├── runner.ts             #   编译（缓存）/ 运行 / 比对 / 环境诊断
+│   ├── fetchers/             #   codeforces / statement / userStats
+│   ├── runner.ts             #   编译（缓存）/ 运行 / 比对 / 环境探测
+│   ├── diagnostics.ts        #   工作流诊断：轨迹 / 网络 / 异常分析 / 报告
 │   ├── template.ts           #   生成 cpp + .prob（CPH 兼容双盘符）
 │   ├── cfSession.ts          #   CF 会话（SecretStorage）
 │   ├── cfContest.ts          #   比赛 API + 榜单提取
