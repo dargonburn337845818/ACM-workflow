@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import puppeteer from 'puppeteer-core';
-import { getBrowserPath } from './fetchers/luogu';
+import { getBrowserPath } from './browser';
 import { writeSessionCookiesToJar, getFetchDispatcher } from './fetchers/codeforces';
 
 /**
@@ -129,13 +129,16 @@ export async function clearSession(context: vscode.ExtensionContext): Promise<vo
 async function launchVisibleBrowser() {
   const exe = getBrowserPath();
   if (!exe) {
-    throw new CfSessionError('未找到 Edge/Chrome 浏览器，无法打开 Codeforces 登录页', 'login-failed');
+    throw new CfSessionError(
+      '未找到 Edge/Chrome/Chromium 浏览器，无法打开 Codeforces 登录页。WSL 可运行 bash tools/setup_wsl.sh 或配置 acmWorkflow.browserPath',
+      'login-failed'
+    );
   }
   return puppeteer.launch({
     executablePath: exe,
     headless: false, // 有头：用户需要手动输入账号密码
     args: [
-      '--disable-gpu', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
       '--lang=en',
       '--window-size=1100,850',
@@ -295,38 +298,63 @@ export async function cfApiGet<T>(
   }
 
   const timeoutMs = options.timeoutMs ?? 20000;
-  let res: Response;
-  try {
-    const dispatcher = getFetchDispatcher();
-    res = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(timeoutMs),
-      ...(dispatcher ? { dispatcher } : {})
-    } as any);
-  } catch (e: any) {
-    throw new CfSessionError(`CF API 网络请求失败：${e?.message || e}`, 'network');
-  }
+  const maxAttempts = 3;
+  let lastError: CfSessionError | null = null;
 
-  // 403 = 会话失效（CF 对无效会话的典型响应），清除并提示重新登录
-  if (res.status === 403) {
-    if (options.needSession) {
-      await clearSession(context);
-      throw new CfSessionError('Codeforces 会话已失效（被服务端拒绝），请重新登录', 'expired');
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (attempt > 1) {
+      const delayMs = attempt * 800;
+      console.warn(`[ACM-Workflow][CF API] 第 ${attempt - 1} 次尝试失败，${delayMs}ms 后重试（${apiPath}）`);
+      await new Promise((r) => setTimeout(r, delayMs));
     }
-    throw new CfSessionError(`CF API 拒绝访问（HTTP 403），可能被限流，请稍后重试`, 'network');
-  }
-  if (!res.ok) {
-    throw new CfSessionError(`CF API 请求失败（HTTP ${res.status}）`, 'network');
+
+    let res: Response;
+    try {
+      const dispatcher = getFetchDispatcher();
+      res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(timeoutMs),
+        ...(dispatcher ? { dispatcher } : {})
+      } as any);
+    } catch (e: any) {
+      lastError = new CfSessionError(`CF API 网络请求失败：${e?.message || e}`, 'network');
+      continue;
+    }
+
+    // 403 = 会话失效（CF 对无效会话的典型响应），清除并提示重新登录
+    if (res.status === 403) {
+      if (options.needSession) {
+        await clearSession(context);
+        throw new CfSessionError('Codeforces 会话已失效（被服务端拒绝），请重新登录', 'expired');
+      }
+      throw new CfSessionError(`CF API 拒绝访问（HTTP 403），可能被限流，请稍后重试`, 'network');
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      const snippet = body.trim().slice(0, 200);
+      const detail = snippet ? `，响应：${snippet}` : '';
+      lastError = new CfSessionError(`CF API 请求失败（HTTP ${res.status}）${detail}`, 'network');
+      // 4xx 重试无意义；5xx 可能是 CF 网关临时故障，继续重试
+      if (res.status < 500) throw lastError;
+      continue;
+    }
+
+    let data: any;
+    try {
+      data = await res.json();
+    } catch {
+      const body = await res.text().catch(() => '');
+      const snippet = body.trim().slice(0, 200);
+      lastError = new CfSessionError(`CF API 返回非 JSON 数据${snippet ? '：' + snippet : ''}`, 'network');
+      continue;
+    }
+
+    if (data?.status !== 'OK') {
+      throw new CfSessionError(`CF API 返回错误：${data?.comment || 'unknown'}`, 'network');
+    }
+    return data.result as T;
   }
 
-  let data: any;
-  try {
-    data = await res.json();
-  } catch {
-    throw new CfSessionError('CF API 返回非 JSON 数据', 'network');
-  }
-  if (data?.status !== 'OK') {
-    throw new CfSessionError(`CF API 返回错误：${data?.comment || 'unknown'}`, 'network');
-  }
-  return data.result as T;
+  throw lastError || new CfSessionError(`CF API 请求失败（已重试 ${maxAttempts} 次）`, 'network');
 }

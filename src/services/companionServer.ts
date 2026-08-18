@@ -7,7 +7,7 @@ import { createProblemFile } from './template';
 /**
  * Competitive Companion 兼容接收服务。
  *
- * 洛谷/Codeforces 有反爬（洛谷为 JS 挑战 WAF），扩展自身抓取不稳定。
+ * Codeforces 有反爬，扩展自身抓取不稳定。
  * 借鉴 cph 的成熟方案：用户在浏览器安装 competitive-companion 插件，
  * 打开题目页点插件图标，插件在真实浏览器环境里提取题目与样例，
  * POST 到本服务（默认端口 27121，与 cph 一致），我们收到后自动创建
@@ -22,13 +22,9 @@ function problemFromCompanion(raw: any): { problem: Problem; tests: { input: str
     output: String(t?.output ?? '')
   }));
 
-  let platform: 'codeforces' | 'luogu' = 'codeforces';
+  const platform: 'codeforces' = 'codeforces';
   let id = '';
-  if (url.includes('luogu.com.cn')) {
-    platform = 'luogu';
-    const m = /\/problem\/([A-Za-z0-9]+)/.exec(url);
-    id = m ? m[1] : '';
-  } else if (url.includes('codeforces.com')) {
+  if (url.includes('codeforces.com')) {
     const m = /problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/.exec(url)
       || /contest\/(\d+)\/problem\/([A-Za-z0-9]+)/.exec(url);
     id = m ? m[1] + m[2] : '';

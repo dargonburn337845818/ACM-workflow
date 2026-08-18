@@ -4,7 +4,7 @@ import { fetchBinary } from './fetchers/codeforces';
 
 /**
  * 题面 HTML 排版（V0.20 重构）：
- * 用 cheerio 解析 CF / 洛谷题目页，从 div.problem-statement / article 中提取
+ * 用 cheerio 解析 Codeforces 题目页，从 div.problem-statement 中提取
  * 标题、时间/内存限制、题目描述、输入输出格式、样例、提示等区块。
  *
  * 排版规则：
@@ -47,8 +47,26 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** 文本中的 LaTeX 边界：$$..$$ | \[..\] | \(..\) | $..$（按此顺序匹配，互不拆分） */
-const MATH_TEXT_RE = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]+\$/g;
+/** 去掉 LaTeX 定界符（$$$..$$$ / $$..$$ / \[..\] / \(..\) / $..$），供 KaTeX 直接渲染 */
+function stripMathDelimiters(src: string): string {
+  const s = src.trim();
+  const pairs: [string, string][] = [
+    ['$$$', '$$$'],
+    ['$$', '$$'],
+    ['\\[', '\\]'],
+    ['\\(', '\\)'],
+    ['$', '$']
+  ];
+  for (const [left, right] of pairs) {
+    if (s.startsWith(left) && s.endsWith(right) && s.length >= left.length + right.length) {
+      return s.slice(left.length, s.length - right.length).trim();
+    }
+  }
+  return s;
+}
+
+/** 文本中的 LaTeX 边界：$$$..$$$ | $$..$$ | \[..\] | \(..\) | $..$（按此顺序匹配，互不拆分） */
+const MATH_TEXT_RE = /\$\$\$[\s\S]*?\$\$\$|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]+\$/g;
 
 /**
  * 把纯文本中的公式片段替换为 acm-math 标签（其余部分做 HTML 转义）。
@@ -62,10 +80,12 @@ function protectMathText(text: string): string {
   while ((m = re.exec(text))) {
     parts.push(escapeHtml(text.slice(last, m.index)));
     const raw = m[0];
-    const block = raw.startsWith('$$') || raw.startsWith('\\[');
-    // 定界符长度：$$..$$ / \[..\] / \(..\) 都是 2 字符；$..$ 是 1 字符
+    // CF 题面用 $$$..$$$ 表示行内公式，必须先于 $$..$$ 识别，且按行内处理
+    const triple = raw.startsWith('$$$');
+    const block = !triple && (raw.startsWith('$$') || raw.startsWith('\\['));
+    // 定界符长度：$$$..$$$ 是 3 字符；$$..$$ / \[..\] / \(..\) 都是 2 字符；$..$ 是 1 字符
     const dbl = block || raw.startsWith('\\(');
-    const inner = raw.slice(dbl ? 2 : 1, raw.length - (dbl ? 2 : 1)).trim();
+    const inner = raw.slice(triple ? 3 : (dbl ? 2 : 1), raw.length - (triple ? 3 : (dbl ? 2 : 1))).trim();
     parts.push(block
       ? `<div class="acm-math acm-math-block">${escapeHtml(inner)}</div>`
       : `<span class="acm-math">${escapeHtml(inner)}</span>`);
@@ -148,8 +168,8 @@ function renderInlineNode($: cheerio.CheerioAPI, node: AnyNode, ctx: BuildCtx): 
   if (name === 'span') {
     const cls = String($el.attr('class') || '');
     if (cls.includes('tex-span')) {
-      // CF 行内公式：取 span 内文本作为 LaTeX 源码（不拆分、不折叠内部）
-      const src = $el.text().replace(THIN_SPACES, ' ').replace(/\s+/g, ' ').trim();
+      // CF 行内公式：取 span 内文本作为 LaTeX 源码（不拆分、不折叠内部），去掉外层定界符
+      const src = stripMathDelimiters($el.text().replace(THIN_SPACES, ' ').replace(/\s+/g, ' ').trim());
       if (!src) return { html: '', text: '' };
       return { html: `<span class="acm-math">${escapeHtml(src)}</span>`, text: src };
     }
@@ -438,52 +458,4 @@ export async function parseCfStatementHtml(html: string, download?: StatementIma
     timeLimitMs: timeLabel ? timeToMs(timeLabel) : undefined,
     memoryLimitMb: memoryLabel ? parseFloat(memoryLabel) : undefined
   };
-}
-
-/* ---------------- 洛谷解析 ---------------- */
-
-export async function parseLuoguStatementHtml(html: string, download?: StatementImageDownloader): Promise<StatementParseResult> {
-  const $ = cheerio.load(html);
-  const $art = $('article').first();
-  if (!$art.length) throw new Error('未找到题面区块');
-
-  const title = collapseText($art.find('h1').first().text());
-  const ctx: BuildCtx = { images: [] };
-  let body = '';
-  let pending: InlineChunk[] = [];
-  const flush = () => {
-    if (!pending.length) return;
-    const joined = joinInlineChunks(pending);
-    pending = [];
-    if (joined.html) body += wrapPara(joined.html.replace(/^\s+/, '').replace(/\s+$/, ''));
-  };
-
-  $art.children().each((_i, node) => {
-    const anyNode = node as any;
-    if (anyNode.type === 'text') {
-      const c = renderInlineNode($, node, ctx);
-      if (c.html) pending.push(c);
-      return;
-    }
-    if (anyNode.type !== 'tag') return;
-    if (node.name === 'h1') return; // 标题已在顶部
-    if (node.name === 'h2') {
-      flush();
-      body += `<h2 class="st-h">${escapeHtml(collapseText($(node).text()))}</h2>`;
-      return;
-    }
-    if (INLINE_TAGS.has(node.name)) {
-      const c = renderInlineNode($, node, ctx);
-      if (c.html) pending.push(c);
-      return;
-    }
-    flush();
-    body += renderBlockNode($, node, ctx);
-  });
-  flush();
-
-  const raw = `<h1 class="st-title">${escapeHtml(title)}</h1>${body}`;
-  const htmlOut = await finishHtml(raw, ctx, download);
-  console.log(`[ACM-Workflow][题面] parseLuoguStatementHtml 完成：标题=${title}，图片 ${ctx.images.length} 张，HTML ${htmlOut.length} 字符`);
-  return { html: htmlOut, title };
 }

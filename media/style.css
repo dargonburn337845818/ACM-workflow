@@ -258,6 +258,7 @@ input:focus, select:focus, textarea:focus {
 .st-section .st-body { max-height: none; }
 .st-empty { font-size: 11.5px; padding: 20px 0; text-align: center; line-height: 1.8; }
 .st-error { color: var(--err); font-size: 11px; margin-top: 6px; }
+.st-info { color: var(--gold); font-size: 11px; margin-top: 6px; }
 .st-error .btn { margin-left: 6px; font-size: 11px; padding: 2px 8px; }
 .st-limits {
   font-size: 11px;
@@ -328,7 +329,13 @@ input:focus, select:focus, textarea:focus {
 .st-en table { border-collapse: collapse; margin: 8px 0; font-size: 12px; width: 100%; }
 .st-en th, .st-en td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
 .st-en th { background: var(--panel); color: var(--gold); font-weight: 600; }
-.st-en img { max-width: 100%; border: 1px solid var(--border); }
+.st-en img, .contest-st-body img {
+  max-width: 100%;
+  border: 1px solid var(--border);
+  /* 深色主题下，CF 部分“文字型小图”是透明底黑字，加白底保证可读 */
+  background: #fff;
+  padding: 2px;
+}
 .st-en a { color: var(--gold); }
 .st-en blockquote { border-left: 2px solid var(--gold); padding-left: 10px; color: var(--muted); margin: 6px 0; }
 #view-test.mode-en .st-zh { display: none; }

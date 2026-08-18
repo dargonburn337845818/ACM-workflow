@@ -5,7 +5,7 @@ cache/
 code/
 records.db
 dist/
-tools/
+tools/shots/
 tests/
 .git/
 .gitignore
@@ -15,3 +15,6 @@ src/**
 !README.md
 !LICENSE
 !CHANGELOG.md
+
+docs/changelog.md
+.bin-shim/

@@ -3,7 +3,6 @@
  */
 import * as vscode from 'vscode';
 import { getCodeforcesProblemDetail, getCodeforcesProblems, pickCodeforcesProblem } from '../../services/fetchers/codeforces';
-import { getLuoguProblemDetail } from '../../services/fetchers/luogu';
 import { ensureRecord, listRecords } from '../../services/records';
 import { createProblemFile, updateProblemTests } from '../../services/template';
 import type { WorkbenchHost, PickState } from '../../core/workbench';
@@ -26,7 +25,6 @@ async function handleFetchProblem(host: WorkbenchHost, payload: any) {
     const exclude: Set<string> | undefined = Array.isArray(payload?.exclude)
       ? new Set(payload.exclude.map((x: any) => String(x)))
       : undefined;
-    // V0.12：洛谷选题已移除，专心 CF
     const problem = await pickCodeforcesProblem({ minRating, maxRating, tags: [], exclude });
     if (problem.difficulty) host.difficultyById.set(problem.id, problem.difficulty); // Bug6：记录难度
 
@@ -55,9 +53,7 @@ async function handleCreateFile(host: WorkbenchHost, payload: any) {
     let tests: { input: string; output: string }[] = [];
     let detailWarning: string | undefined;
     try {
-      const detail = problem.platform === 'luogu'
-        ? await getLuoguProblemDetail(problem)
-        : await getCodeforcesProblemDetail(problem);
+      const detail = await getCodeforcesProblemDetail(problem);
       tests = detail.tests;
       if (tests.length === 0) {
         detailWarning = '未能从题目页面解析出测试数据（可能被反爬拦截）';
@@ -97,9 +93,7 @@ async function retryBackfill(host: WorkbenchHost, problem: Problem, filePath: st
   for (let attempt = 1; attempt <= 3; attempt++) {
     await new Promise(r => setTimeout(r, 2500 * attempt));
     try {
-      const detail = problem.platform === 'luogu'
-        ? await getLuoguProblemDetail(problem)
-        : await getCodeforcesProblemDetail(problem);
+      const detail = await getCodeforcesProblemDetail(problem);
       if (detail.tests.length > 0) {
         const updated = updateProblemTests(filePath, detail.tests);
         host.view?.webview.postMessage({

@@ -2,11 +2,12 @@
   const vscode = acquireVsCodeApi();
   let currentProblem = null;
   let lastPickPayload = null; // 记住上次选题条件，供"换一题/下一题"复用
+  let contestLoaded = false; // 比赛列表是否已请求过（避免进入比赛页只显示“加载中”但不加载）
 
   // ===== 题面与翻译（V0.8）：marked + KaTeX CDN 多源回退 =====
   const stBody = document.getElementById('st-body');
   const stModeBtn = document.getElementById('st-mode-btn');
-  const stTranslateBtn = document.getElementById('st-translate-btn');
+  const stRefetchBtn = document.getElementById('st-refetch-btn');
   const curFileEl = document.getElementById('cur-file');   // Bug6：共用「当前题目」指示器
   const stLimitsEl = document.getElementById('st-limits'); // Bug4：时间/内存限制栏
   const stImgHint = document.getElementById('st-img-hint'); // Bug3：带图题提示
@@ -247,13 +248,14 @@
       applyStMode();
     });
   }
-  if (stTranslateBtn) {
-    stTranslateBtn.addEventListener('click', () => {
-      if (!stData) return;
+  if (stRefetchBtn) {
+    stRefetchBtn.addEventListener('click', () => {
+      if (!stData || refetchInFlight) return;
       const se = document.getElementById('st-error');
       if (se) se.textContent = '';
-      stTranslateBtn.textContent = '翻译中…';
-      vscode.postMessage({ type: 'translateStatement' });
+      beginRefetchRequest();
+      stRefetchBtn.textContent = '重新获取中…';
+      vscode.postMessage({ type: 'refreshStatement' });
     });
   }
 
@@ -535,18 +537,6 @@
         vscode.postMessage({ type: 'testCancel' });
       });
     }
-    const testSubmitBtn = document.getElementById('test-submit-btn');
-    if (testSubmitBtn) {
-      testSubmitBtn.addEventListener('click', () => {
-        if (!testFilePath) {
-          setTestStatus('请先打开一个题目 cpp 文件', 'error');
-          return;
-        }
-        testSubmitBtn.disabled = true;
-        testSubmitBtn.textContent = '提交中…';
-        vscode.postMessage({ type: 'submitCurrent' });
-      });
-    }
   }
 
   // ===== 主导航 =====
@@ -560,6 +550,11 @@
       views.forEach((v) => v.classList.toggle('active', v.id === 'view-' + view));
       if (view === 'history') vscode.postMessage({ type: 'recordsReady' });
       if (view === 'test') vscode.postMessage({ type: 'statementReady' }); // V0.10：题面并入测试面板
+      if (view === 'contest' && !contestLoaded) {
+        const cl = document.getElementById('contest-list');
+        if (cl) cl.innerHTML = '<div class="muted chart-empty">加载中…</div>';
+        vscode.postMessage({ type: 'contestListReady' });
+      }
     });
   });
 
@@ -833,7 +828,8 @@
     const rePickBtn = document.getElementById('re-pick-btn');
     if (rePickBtn) {
       rePickBtn.addEventListener('click', () => {
-        if (!lastPickPayload) return;
+        if (!lastPickPayload || pickRequestInFlight) return;
+        beginPickRequest();
         rePickBtn.disabled = true;
         if (pickBtn) pickBtn.disabled = true;
         setStatus('正在换一道 Codeforces 题...');
@@ -866,7 +862,7 @@
 
   function applyState(state) {
     if (!state) return;
-    // V0.12：洛谷选题已移除，仅恢复 CF 难度与结果
+    // 恢复 CF 难度与结果
     if (minRange && state.minRating !== undefined) minRange.value = String(state.minRating);
     if (maxRange && state.maxRating !== undefined) maxRange.value = String(state.maxRating);
     updateSliderUI();
@@ -876,7 +872,35 @@
 
   // Bug2：筛选条件下已尝试过的题目 ID（最多 20），避免重复推荐/空条件死循环
   let pickedIds = [];
+  let pickRequestInFlight = false;
+  let pickRequestTimer = null;
+  let refetchInFlight = false;
+  let refetchTimer = null;
+  let translationStatusTimer = null;
+  let translationStatusStart = 0;
+  const stTranslationStatusEl = document.getElementById('st-translation-status');
   const NO_PROBLEM_MSG = '当前筛选条件下无可用题目，请调整筛选条件';
+
+  function updateTranslationStatus() {
+    if (!stTranslationStatusEl) return;
+    const sec = Math.max(1, Math.round((Date.now() - translationStatusStart) / 1000));
+    stTranslationStatusEl.textContent = '正在翻译中…（已 ' + sec + 's）';
+  }
+
+  function beginTranslationStatus() {
+    translationStatusStart = Date.now();
+    if (translationStatusTimer) clearInterval(translationStatusTimer);
+    translationStatusTimer = setInterval(updateTranslationStatus, 500);
+    updateTranslationStatus();
+  }
+
+  function endTranslationStatus() {
+    if (translationStatusTimer) {
+      clearInterval(translationStatusTimer);
+      translationStatusTimer = null;
+    }
+    if (stTranslationStatusEl) stTranslationStatusEl.textContent = '';
+  }
 
   function setPickButtonsDisabled(disabled) {
     const reBtn = document.getElementById('re-pick-btn');
@@ -888,6 +912,67 @@
   function resetPicked() {
     pickedIds = [];
     setPickButtonsDisabled(false);
+  }
+
+  function beginPickRequest() {
+    if (pickRequestTimer) clearTimeout(pickRequestTimer);
+    pickRequestInFlight = true;
+    pickRequestTimer = setTimeout(() => {
+      pickRequestInFlight = false;
+      pickRequestTimer = null;
+      setPickButtonsDisabled(false);
+    }, 20000);
+  }
+
+  function endPickRequest() {
+    pickRequestInFlight = false;
+    if (pickRequestTimer) {
+      clearTimeout(pickRequestTimer);
+      pickRequestTimer = null;
+    }
+  }
+
+  function beginRefetchRequest() {
+    if (refetchTimer) clearTimeout(refetchTimer);
+    refetchInFlight = true;
+    if (stRefetchBtn) stRefetchBtn.disabled = true;
+    refetchTimer = setTimeout(() => {
+      refetchInFlight = false;
+      refetchTimer = null;
+      if (stRefetchBtn) {
+        stRefetchBtn.disabled = false;
+        stRefetchBtn.textContent = '重新获取';
+      }
+    }, 60000);
+  }
+
+  function endRefetchRequest() {
+    refetchInFlight = false;
+    if (refetchTimer) {
+      clearTimeout(refetchTimer);
+      refetchTimer = null;
+    }
+    if (stRefetchBtn) {
+      stRefetchBtn.disabled = false;
+      stRefetchBtn.textContent = '重新获取';
+    }
+  }
+
+  let opTimer = null;
+  let opTimerStart = 0;
+  function beginOpTimer(update) {
+    opTimerStart = Date.now();
+    if (opTimer) clearInterval(opTimer);
+    opTimer = setInterval(() => {
+      const sec = Math.max(1, Math.round((Date.now() - opTimerStart) / 1000));
+      update(sec);
+    }, 1000);
+  }
+  function endOpTimer() {
+    if (opTimer) {
+      clearInterval(opTimer);
+      opTimer = null;
+    }
   }
 
   function rememberPicked(id) {
@@ -913,6 +998,8 @@
         setStatus('难度区间有误：最小值不能大于最大值', true);
         return;
       }
+      if (pickRequestInFlight) return;
+      beginPickRequest();
       pickBtn.disabled = true;
       const reBtn = document.getElementById('re-pick-btn');
       if (reBtn) reBtn.disabled = true;
@@ -1034,24 +1121,23 @@
       '<div class="rec-item">' +
       '<div class="rec-item-head">' +
       '<span class="rec-id">' + escapeHtml(r.id) + '</span>' +
-      '<span class="rec-platform">' + (r.platform === 'luogu' ? '洛谷' : 'CF') + '</span>' +
+      '<span class="rec-platform">CF</span>' +
       (r.difficulty !== undefined && r.difficulty !== null
         ? '<span class="rec-diff">' + escapeHtml(r.difficulty) + '</span>' : '') +
       '<span class="rec-date">' + fmtDate(r.updatedAt) + '</span>' +
       '</div>' +
       '<div class="rec-title">' + escapeHtml(r.title) + '</div>' +
       '<div class="rec-actions">' +
-      '<button class="rec-action" data-id="' + escapeHtml(r.id) + '" data-action="open" title="在工作台加载题面并打开/创建代码文件">打开题目</button>' +
-      (r.status === 'untouched'
-        ? '<button class="rec-action danger" data-id="' + escapeHtml(r.id) + '" data-action="delete" title="从列表中移除（未开始）">删除</button>'
-        : '') +
+      '<button class="rec-action" data-url="' + escapeHtml(r.url || ('https://codeforces.com/problemset/problem/' + r.id)) + '" title="在浏览器打开 CF 题目页">打开题目</button>' +
+      '<button class="rec-action danger" data-id="' + escapeHtml(r.id) + '" data-action="delete" title="从列表中删除该记录">删除</button>' +
       '</div>' +
       '</div>'
     ).join('');
 
     recListEl.querySelectorAll('.rec-action').forEach((btn) => {
       btn.addEventListener('click', () => {
-        vscode.postMessage({ type: 'recordAction', payload: { id: btn.dataset.id, action: btn.dataset.action } });
+        const action = btn.dataset.action;
+        if (action) vscode.postMessage({ type: 'recordAction', payload: { id: btn.dataset.id, action } });
       });
     });
   }
@@ -1071,17 +1157,18 @@
     if (streakEl) streakEl.textContent = ts && ts.streak != null ? ts.streak : '–';
   }
 
-  // ===== CF 账号绑定 / 专题饼图（纯 SVG 环形图，零依赖；标签中文，V0.8） =====
+  // ===== CF 账号（登录态）/ 专题饼图（纯 SVG 环形图，零依赖；标签中文，V0.8） =====
   const cfHandleEl = document.getElementById('cf-handle');
-  const cfBindBtn = document.getElementById('cf-bind-btn');
   const cfImportBtn = document.getElementById('cf-import-btn');
   const pieChartEl = document.getElementById('pie-chart');
 
-  if (cfBindBtn) {
-    cfBindBtn.addEventListener('click', () => vscode.postMessage({ type: 'bindCfHandle' }));
-  }
   if (cfImportBtn) {
-    cfImportBtn.addEventListener('click', () => vscode.postMessage({ type: 'importCfHistory' }));
+    cfImportBtn.addEventListener('click', () => {
+      cfImportBtn.disabled = true;
+      cfImportBtn.textContent = '导入中…';
+      beginOpTimer((sec) => setStatus('正在导入 AC 历史…（已 ' + sec + 's）'));
+      vscode.postMessage({ type: 'importCfHistory' });
+    });
   }
 
   /** CF 标签 → 中文（V0.8：饼图/推荐全部中文展示） */
@@ -1172,7 +1259,7 @@
 
   function renderCfHandle(handle) {
     if (cfHandleEl) {
-      cfHandleEl.textContent = handle || '未绑定';
+      cfHandleEl.textContent = handle || '未登录';
       cfHandleEl.classList.toggle('bound', !!handle);
     }
   }
@@ -1244,6 +1331,12 @@
       askConfirm('确定退出 Codeforces 登录态？将清除本地加密保存的会话。', '退出', () => {
         vscode.postMessage({ type: 'cfLogout' });
       });
+    });
+  }
+  const diagBtn = document.getElementById('diag-btn');
+  if (diagBtn) {
+    diagBtn.addEventListener('click', () => {
+      vscode.postMessage({ type: 'diagnose' });
     });
   }
 
@@ -1319,7 +1412,7 @@
         '<span class="mono prob-index">' + escapeHtml(p.index) + '</span>' +
         '<span class="prob-name" title="' + escapeHtml(p.name) + '">' + escapeHtml(p.name) + '</span>' +
         '<span class="mono prob-rating">' + (p.rating || '—') + '</span>' +
-        '<button class="btn sm prob-translate-btn" data-url="https://codeforces.com/contest/' + contestId + '/problem/' + escapeHtml(p.index) + '" data-label="' + escapeHtml(p.index) + '">翻译</button>' +
+        '<button class="btn sm prob-open-btn" data-url="https://codeforces.com/contest/' + contestId + '/problem/' + escapeHtml(p.index) + '" title="在浏览器打开该题">打开题目</button>' +
       '</div>'
     ).join('');
   }
@@ -1331,6 +1424,18 @@
     if (!box || !detail) return;
     const top = detail.top || [];
     const mine = detail.mine || [];
+    const phase = detail.contest && detail.contest.phase;
+    if (phase && phase !== 'CODING') {
+      const preHtml = '<div class="st-sec-head"><span>比赛尚未开始</span><span class="spacer"></span>' +
+        '<button class="btn sm follow-btn" title="设置关注的 Handle（自己会自动加入）">关注…</button></div>' +
+        '<div class="muted chart-empty">榜单与关注数据将在比赛开始后公布</div>';
+      box.insertAdjacentHTML('beforeend', preHtml);
+      const followBtn = box.querySelector('.follow-btn');
+      if (followBtn) {
+        followBtn.addEventListener('click', () => vscode.postMessage({ type: 'followHandlesAsk' }));
+      }
+      return;
+    }
     let html = '<div class="st-sec-head"><span>大致榜单 · 前 ' + top.length + ' 名</span><span class="spacer"></span>' +
       '<button class="btn sm follow-btn" title="设置关注的 Handle（自己会自动加入）">关注…</button></div>';
     if (top.length === 0) {
@@ -1417,10 +1522,14 @@
         vscode.postMessage({ type: 'contestListReady' });
       });
     }
+    if (!contestLoaded) {
+      contestListEl.innerHTML = '<div class="muted chart-empty">加载中…</div>';
+      vscode.postMessage({ type: 'contestListReady' });
+    }
     contestListEl.addEventListener('click', (e) => {
       const expandBtn = e.target.closest('.contest-expand-btn');
       const createBtn = e.target.closest('.contest-create-btn');
-      const translateBtn = e.target.closest('.prob-translate-btn');
+      const openBtn = e.target.closest('.prob-open-btn');
       const card = e.target.closest('.contest-card');
       if (!card) return;
       const contestId = Number(card.dataset.contestId);
@@ -1447,12 +1556,9 @@
         });
         return;
       }
-      if (translateBtn) {
-        const url = translateBtn.dataset.url;
-        const label = translateBtn.dataset.label || '';
-        translateBtn.disabled = true;
-        translateBtn.textContent = '翻译中…';
-        vscode.postMessage({ type: 'problemTranslate', payload: { url, label } });
+      if (openBtn) {
+        const url = openBtn.dataset.url;
+        if (url) vscode.postMessage({ type: 'openExternal', url });
       }
     });
     const stClose = document.getElementById('contest-st-close');
@@ -1715,7 +1821,7 @@
           (data.cacheSource === 'fallback' ? '（来自全局缓存兜底）' : data.cacheSource === 'folder' ? '（来自题目文件夹缓存）' : ''));
         if (data.empty) {
           stData = null; stZh = null;
-          if (stTranslateBtn) stTranslateBtn.textContent = '翻译';
+          if (stRefetchBtn) stRefetchBtn.textContent = '重新获取';
           if (stBody) stBody.innerHTML = '<div class="muted st-empty">请在编辑器中打开一个题目文件（如 979E.cpp / P1001.cpp）</div>';
           renderCurFile(null);
           renderLimits();
@@ -1725,7 +1831,7 @@
         }
         stData = { id: data.id, title: data.title, url: data.url, html: data.html, difficulty: data.difficulty, limits: data.limits || {} };
         stZh = null;
-        if (stTranslateBtn) stTranslateBtn.textContent = '翻译';
+        endRefetchRequest();
         // V0.20：仅「抓取失败→全局缓存兜底」显示提示+刷新按钮；成功/文件夹缓存命中自动清除
         renderCacheNotice(data.cacheSource === 'fallback' ? 'fallback' : null);
         // Bug6/Bug4/Bug3：同步共用指示器、限制栏与图片提示
@@ -1737,36 +1843,45 @@
         loadStatementLibs(renderStatementBody);
         break;
       }
+      case 'translationStatus': {
+        const data = msg.payload || msg;
+        if (data.busy) beginTranslationStatus();
+        else endTranslationStatus();
+        break;
+      }
       case 'statementTranslated': {
         // V0.16：兼容 { type, payload } 信封与旧平铺格式
         const data = msg.payload || msg;
-        if (stTranslateBtn) stTranslateBtn.textContent = '翻译';
+        endRefetchRequest();
         if (data.id && data.zh) {
           stZh = data.zh;
           renderStatementBody();
         } else if (data.reason === 'unavailable') {
-          // Bug1：翻译重试后仍失败 → 友好降级提示 + 手动重试按钮
+          // Bug1：翻译重试后仍失败 → 友好降级提示 + 重新获取按钮
           const se = document.getElementById('st-error');
           if (se) {
-            se.innerHTML = '翻译暂不可用，请稍后重试 <button class="btn" id="st-retry-btn">手动重试</button>';
+            se.innerHTML = '翻译暂不可用，可重新获取题面更新缓存 <button class="btn" id="st-retry-btn">重新获取</button>';
             const rb = document.getElementById('st-retry-btn');
             if (rb) {
               rb.addEventListener('click', () => {
+                if (refetchInFlight) return;
                 se.textContent = '';
-                if (stTranslateBtn) stTranslateBtn.textContent = '翻译中…';
-                vscode.postMessage({ type: 'translateStatement' });
+                beginRefetchRequest();
+                if (stRefetchBtn) stRefetchBtn.textContent = '重新获取中…';
+                vscode.postMessage({ type: 'refreshStatement' });
               });
             }
           }
         } else {
           const se = document.getElementById('st-error');
-          if (se) se.textContent = '翻译失败或当前题面无英文段落（标题/代码块保留原文）';
+          if (se) se.textContent = '题面已获取，翻译暂不可用；可点击「重新获取」更新本地缓存';
         }
         break;
       }
       case 'statementError': {
         // V0.16：兼容 { type, payload } 信封与旧平铺格式
         const data = msg.payload || msg;
+        endRefetchRequest();
         console.warn('[ACM-Workflow][题面] webview 收到 statementError：', data.message);
         stData = null;
         renderCacheNotice(null);
@@ -1782,11 +1897,12 @@
         break;
       case 'problemResult':
         lastPickPayload = {
-          platform: msg.problem && msg.problem.platform === 'luogu' ? 'luogu' : 'codeforces',
+          platform: 'codeforces',
           minRating: Number(minRange ? minRange.value : 0),
           maxRating: Number(maxRange ? maxRange.value : 0)
         };
         rememberPicked(msg.problem && msg.problem.id); // Bug2：记录已尝试
+        endPickRequest();
         setPickButtonsDisabled(false);
         setStatus('');
         renderProblem(msg.problem);
@@ -1803,6 +1919,7 @@
           maxRating: Number(maxRange ? maxRange.value : 2400)
         };
         rememberPicked(msg.problem.id);
+        endPickRequest();
         setPickButtonsDisabled(false);
         setStatus('薄弱专题：' + (msg.tag || '未知') + '（基于本地 AC 记录通过率）');
         renderProblem(msg.problem);
@@ -1816,9 +1933,18 @@
         if (stNav) stNav.click();
         break;
       }
-      case 'status':
+      case 'status': {
         setStatus(msg.message || '');
+        const im = msg.message || '';
+        if (/已导入|拉取 AC 历史失败|请先登录/.test(im)) {
+          endOpTimer();
+          if (cfImportBtn) {
+            cfImportBtn.disabled = false;
+            cfImportBtn.textContent = '导入历史';
+          }
+        }
         break;
+      }
       case 'fileCreated':
         setStatus(msg.message || '已生成');
         const testNav = document.querySelector('.nav-item[data-view="test"]');
@@ -1832,7 +1958,13 @@
         break;
       case 'error': {
         const em = msg.message || '';
+        endOpTimer();
+        if (cfImportBtn) {
+          cfImportBtn.disabled = false;
+          cfImportBtn.textContent = '导入历史';
+        }
         // Bug2：筛选无结果 → 指定提示并禁用换一题/随机推荐，直到用户调整条件
+        endPickRequest();
         if (/无可用题目|没有找到|没有符合条件|无符合条件的题目/.test(em)) {
           setStatus(NO_PROBLEM_MSG, true);
           setPickButtonsDisabled(true);
@@ -1888,7 +2020,8 @@
           nextBtn.style.marginLeft = '8px';
           nextBtn.textContent = '下一题 ▸';
           nextBtn.addEventListener('click', () => {
-            if (lastPickPayload) {
+            if (lastPickPayload && !pickRequestInFlight) {
+              beginPickRequest();
               vscode.postMessage({ type: 'fetchProblem', payload: lastPickPayload });
               const pickNav = document.querySelector('.nav-item[data-view="pick"]');
               if (pickNav) pickNav.click();
@@ -1917,7 +2050,6 @@
         break;
       case 'cfBound':
         renderCfHandle(msg.handle);
-        setStatus('已绑定 ' + msg.handle + '，正在导入 AC 历史…');
         break;
       case 'historyData':
         renderPie(msg.tagStats);
@@ -1942,6 +2074,7 @@
       }
       // ===== 比赛模块（V0.22）=====
       case 'contestList': {
+        contestLoaded = true;
         if (msg.error) {
           if (contestListEl) contestListEl.innerHTML = '<div class="muted chart-empty">' + escapeHtml(msg.error) + '</div>';
           break;
@@ -1964,7 +2097,6 @@
       case 'contestDetail':
         contestDetailCache[msg.contestId] = msg.detail;
         renderContestProblems(msg.contestId, msg.detail);
-        renderStandings(msg.contestId, msg.detail);
         break;
       case 'contestDetailError': {
         const card = contestListEl && contestListEl.querySelector('.contest-card[data-contest-id="' + msg.contestId + '"]');
@@ -2065,24 +2197,6 @@
       case 'verifierBrutePicked':
         if (vpBrute) vpBrute.value = msg.path || '';
         break;
-      // ===== 提交 =====
-      case 'submitStatus': {
-        setTestStatus(msg.message || '', '');
-        break;
-      }
-      case 'submitResult': {
-        const btn = document.getElementById('test-submit-btn');
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = '提交';
-        }
-        if (msg.ok) {
-          setTestStatus(msg.message || '已提交', 'ok');
-        } else {
-          setTestStatus(msg.message || '提交失败', 'error');
-        }
-        break;
-      }
       // ===== 通过 URL 导入题目（V0.23）=====
       case 'urlImportStatus': {
         urlImporting = !!msg.busy;

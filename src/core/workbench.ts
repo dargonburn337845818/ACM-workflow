@@ -3,23 +3,24 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { KNOWLEDGE_CATEGORIES } from '../features/manual/knowledgeMap';
 import { getCodeforcesProblems, getCodeforcesProblemDetail } from '../services/fetchers/codeforces';
-import { getLuoguProblemDetail, searchLuoguByKeyword } from '../services/fetchers/luogu';
 import { fetchStatement, parseLimitsFromHtml } from '../services/fetchers/statement';
 import { translateStatementHtml, countTranslatableParagraphs } from '../services/translate';
 import { readStatementCache, writeStatementCache } from '../services/statementCache';
 import { readStatementFiles, writeStatementFiles } from '../services/statementFiles';
 import { findProbFile, updateProblemTests, listProblemCpps, saveProblemTests } from '../services/template';
 import { compileCpp } from '../services/runner';
-import { diagnoseEnv } from '../services/runner';
+import { trace, collectDiagnosticReport, writeDiagnosticFiles, DiagnosticRuntime } from '../services/diagnostics';
+import { runSetupGuide } from '../services/setupGuide';
 import { listRecords, ensureRecord, getStats, ProblemRecord } from '../services/records';
+import { getStoredSession } from '../services/cfSession';
 import { computeDifficultyBins } from '../services/statistics';
 import { ContestDetail } from '../services/cfContest';
+import { resolveBaseDir, resolveDbPath } from '../utils/paths';
 import { Problem } from '../types';
 import { installSession } from '../features/session';
 import { installContest } from '../features/contest';
 import { installDatagen } from '../features/datagen';
 import { installVerifier } from '../features/verifier';
-import { installSubmit } from '../features/submit';
 import { installUrlimport } from '../features/urlImport';
 import { installPick } from '../features/pick';
 import { installTest } from '../features/test';
@@ -43,7 +44,6 @@ export interface WorkbenchHost {
   translateCache: Map<string, (string | null)[]>;
   statementTasks: Map<string, Promise<void>>;
   difficultyById: Map<string, number>;
-  submitBusy: boolean;
   urlImportBusy: boolean;
   // 联动方法（保留在 workbench 类，features 跨模块调用）
   pushTestState(): Promise<void>;
@@ -64,7 +64,7 @@ export interface WorkbenchHost {
 
 /** 选题视图状态（globalState 持久化） */
 export interface PickState {
-  platform?: 'codeforces' | 'luogu';
+  platform?: 'codeforces';
   minRating?: number;
   maxRating?: number;
   problem?: Problem;
@@ -135,13 +135,9 @@ function renderPickView(): string {
 export function problemFromProb(prob: any): Problem | null {
   const url = String(prob?.url || '');
   if (!url) return null;
-  let platform: 'codeforces' | 'luogu' = 'codeforces';
+  const platform: 'codeforces' = 'codeforces';
   let id = '';
-  if (url.includes('luogu.com.cn')) {
-    platform = 'luogu';
-    const m = /\/problem\/([A-Za-z0-9]+)/.exec(url);
-    id = m ? m[1] : '';
-  } else if (url.includes('codeforces.com')) {
+  if (url.includes('codeforces.com')) {
     const m = /problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/.exec(url)
       || /contest\/(\d+)\/problem\/([A-Za-z0-9]+)/.exec(url);
     id = m ? m[1] + m[2] : '';
@@ -162,34 +158,22 @@ function cfProblem(contestId: string, index: string): Problem {
   };
 }
 
-function luoguProblem(id: string): Problem {
-  const pid = id.toUpperCase();
-  return { id: pid, platform: 'luogu', title: '', tags: [], url: `https://www.luogu.com.cn/problem/${pid}` };
-}
-
 /**
  * 从文件名 / 路径解析题目 ID（V0.13：修复「文件名是题目名、题号在目录名」的场景）。
  * 解析顺序：
- *  1. 文件名（basename）：`P1001.cpp` → 洛谷；`979E.cpp` → CF（contestId=979, index=E）
- *  2. 父目录名：`Codeforces/154A/Hometask.cpp` → CF 154A；`Luogu/P1660/x.cpp` → 洛谷 P1660
- *  3. USACO 文件名 → 返回 null（由 pushStatement 走洛谷关键字搜索）
+ *  1. 文件名（basename）：`979E.cpp` → CF（contestId=979, index=E）
+ *  2. 父目录名：`Codeforces/154A/Hometask.cpp` → CF 154A
  * 其余（main.cpp / A.cpp 等）→ 不是题目文件，返回 null
  */
 export function problemFromFileName(filePath: string): Problem | null {
   const base = path.basename(filePath).replace(/\.cpp$/i, '');
   const dir = path.basename(path.dirname(filePath));
   // 1) 文件名优先
-  if (/^p\d+$/i.test(base)) return luoguProblem(base);
   const m = /^(\d{3,6})([A-Za-z]\d*)$/.exec(base);
   if (m) return cfProblem(m[1], m[2]);
-  // 洛谷目录下的纯数字文件名
-  if (dir.toLowerCase() === 'luogu' && /^\d+$/.test(base)) return luoguProblem(base);
   // 2) V0.13：父目录名 = 题号（扩展生成的题目目录结构 code/{平台}/{题号}/题目名.cpp）
-  if (/^p\d+$/i.test(dir)) return luoguProblem(dir);
   const dm = /^(\d{3,6})([A-Za-z]\d*)$/.exec(dir);
   if (dm) return cfProblem(dm[1], dm[2]);
-  // 3) USACO 由 pushStatement 异步搜索
-  if (/^USACO/i.test(base)) return null;
   return null;
 }
 
@@ -247,8 +231,6 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
   public handlers: Record<string, Handler> = {};
   /** 题目难度缓存（题号 → CF rating，Bug6：共用「当前题目」指示器显示难度） */
   public difficultyById = new Map<string, number>();
-  /** 提交进行中（防重复点击） */
-  public submitBusy = false;
   /** URL 导入进行中（防重复点击） */
   public urlImportBusy = false;
 
@@ -260,6 +242,20 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
         if (r.difficulty) this.difficultyById.set(r.id, r.difficulty);
       }
     } catch { /* 记录不可用时难度显示 — */ }
+  }
+
+  /** 确保 CF 题目难度进入 difficultyById：URL 导入/本地打开没有 difficulty 时从题集补 */
+  private async ensureDifficulty(problem: Problem): Promise<void> {
+    if (problem.difficulty) {
+      this.difficultyById.set(problem.id, problem.difficulty);
+      return;
+    }
+    if (problem.platform !== 'codeforces') return;
+    try {
+      const all = await getCodeforcesProblems();
+      const p = all.find((x) => x.id === problem.id);
+      if (p && p.difficulty) this.difficultyById.set(problem.id, p.difficulty);
+    } catch { /* 题集不可用时保持未定 */ }
   }
 
   public resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -304,6 +300,7 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
   /** 编译当前文件（带缓存）；失败时向 webview 发送错误提示并返回 { ok: false } */
   public compileFor(filePath: string, _caseCount: number, _mode?: string): { ok: boolean; exePath?: string; message: string } {
     const res = compileCpp(filePath);
+    trace('service', 'compile', res.ok ? 'ok' : `fail: ${res.message}`);
     if (!res.ok) {
       this.view?.webview.postMessage({ type: 'testStatus', message: res.message, isError: true });
       this.view?.webview.postMessage({ type: 'testRunDone', passed: 0, total: 0, message: '编译失败', cancelled: false });
@@ -325,6 +322,13 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
   }
 
   private async handleMessage(msg: any) {
+    trace('webview', String(msg?.type || 'unknown'), 'received');
+
+    if (msg?.type === 'diagnose') {
+      await this.diagnose();
+      return;
+    }
+
     if (msg?.type === 'openExternal' && msg.url) {
       vscode.env.openExternal(vscode.Uri.parse(msg.url));
       return;
@@ -424,9 +428,7 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     }
     vscode.window.showInformationMessage('正在重新获取测试数据...');
     try {
-      const detail = url.includes('luogu.com.cn')
-        ? await getLuoguProblemDetail({ id: (url.split('/problem/')[1] || '').split('?')[0], platform: 'luogu', title: '', tags: [], url: '' } as Problem)
-        : await getCodeforcesProblemDetail({ url } as Problem);
+      const detail = await getCodeforcesProblemDetail({ url } as Problem);
       if (detail.tests.length === 0) {
         throw new Error('页面里没有解析出测试数据');
       }
@@ -437,7 +439,7 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
           : `抓到 ${detail.tests.length} 组测试数据，但没找到 .prob 写入位置。`
       );
     } catch (e: any) {
-      vscode.window.showErrorMessage(`获取测试数据失败：${e?.message || e}`);
+      WorkbenchSidebarProvider.offerDiagnose(`获取测试数据失败：${e?.message || e}`);
     }
   }
 
@@ -458,26 +460,13 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     if (!problem) {
       problem = problemFromFileName(filePath); // V0.9：文件名解析兜底
     }
-    // Bug3：USACO 等非标准命名（USACO10FEB_Chocolate_Buying_S.cpp）→ 洛谷关键字搜索
-    if (!problem && /^USACO/i.test(path.basename(filePath))) {
-      try {
-        const kw = path.basename(filePath).replace(/\.cpp$/i, '').replace(/_/g, ' ');
-        const hit = await searchLuoguByKeyword(kw);
-        if (hit) {
-          problem = {
-            id: hit.pid,
-            platform: 'luogu',
-            title: hit.name,
-            tags: [],
-            url: `https://www.luogu.com.cn/problem/${hit.pid}`
-          };
-        }
-      } catch {
-        problem = null; // 搜索失败按非题目文件处理
-      }
-    }
     if (!problem) { empty(); return; }
     console.log(`[ACM-Workflow][题面] 解析成功: ${problem.platform} ${problem.id}（${filePath}）`);
+    // 最多等 1.2s 补难度，避免 CF 题集未缓存且网络慢时阻塞题面显示
+    await Promise.race([
+      this.ensureDifficulty(problem),
+      new Promise((r) => setTimeout(r, 1200))
+    ]);
 
     // V0.20：题目文件夹落盘（排版 HTML）优先——切换界面直接读盘；手动刷新时跳过
     if (!force) {
@@ -531,6 +520,7 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
   }
 
   public async doFetchAndPushStatement(filePath: string, problem: Problem) {
+    trace('service', 'fetchStatement', `start ${problem.platform} ${problem.id}`);
     // V0.13：先显示加载态（题面抓取需数秒）——同时覆盖之前的缓存提示状态
     this.view?.webview.postMessage({ type: 'statementLoading', payload: {} });
     console.log('[ACM-Workflow][题面] 已发送 statementLoading → webview');
@@ -539,20 +529,8 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
       this.lastStatement = { id: problem.id, title: problem.title, url: problem.url, html: res.html, filePath };
       this.lastLimits = { timeLimitMs: res.timeLimitMs, memoryLimitMb: res.memoryLimitMb };
       writeStatementCache(problem.platform, problem.id, res.html); // 全局缓存（排版 HTML）
-      // V0.20：抓取即翻译（CF，基于排版 HTML 的清晰纯文本）并落盘，之后直接调用
-      let zh: (string | null)[] | null = null;
-      if (problem.platform === 'codeforces') {
-        console.log(`[ACM-Workflow][翻译] 自动翻译开始：${problem.id}`);
-        try {
-          zh = await translateStatementHtml(res.html);
-          if (zh) this.translateCache.set(problem.id, zh);
-        } catch {
-          zh = null;
-        }
-        console.log(`[ACM-Workflow][翻译] 自动翻译结束：${problem.id}（${zh ? zh.filter(Boolean).length : 0} 段）`);
-      }
-      writeStatementFiles(filePath, res.html, zh);
-      console.log(`[ACM-Workflow][题面] 已落盘：${filePath}（HTML ${res.html.length} 字符${zh ? '，译文 ' + zh.filter(Boolean).length + ' 段' : ''}）`);
+      // V0.25：先落盘 HTML/MD 并立即推送题面，翻译改为后台异步执行，避免本地翻译不可用时阻塞题面显示
+      writeStatementFiles(filePath, res.html, null);
       this.view?.webview.postMessage({
         type: 'statementData',
         payload: {
@@ -563,14 +541,40 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
         }
       });
       console.log(`[ACM-Workflow][题面] 已发送 statementData → webview（HTML ${res.html.length} 字符）`);
-      if (zh && zh.length > 0) {
-        this.view?.webview.postMessage({ type: 'statementTranslated', payload: { id: problem.id, zh } });
-        console.log(`[ACM-Workflow][题面] 已发送 statementTranslated → webview（${zh.filter(Boolean).length} 段译文）`);
-      } else if (problem.platform === 'codeforces' && countTranslatableParagraphs(res.html) > 0) {
-        this.view?.webview.postMessage({ type: 'statementTranslated', payload: { id: problem.id, zh: null, reason: 'unavailable' } });
-        console.log('[ACM-Workflow][题面] 已发送 statementTranslated（翻译暂不可用）→ webview');
+      trace('service', 'fetchStatement', 'ok');
+
+      if (problem.platform === 'codeforces') {
+        trace('service', 'translateStatement', `start ${problem.id}`);
+        console.log(`[ACM-Workflow][翻译] 自动翻译开始：${problem.id}`);
+        void (async () => {
+          this.view?.webview.postMessage({ type: 'translationStatus', payload: { busy: true, id: problem.id } });
+          try {
+            const zh = await translateStatementHtml(res.html, { context: this.context });
+            if (zh) this.translateCache.set(problem.id, zh);
+            const autoOk = zh ? zh.filter(Boolean).length : 0;
+            trace('service', 'translateStatement', autoOk > 0 ? `ok ${problem.id} ${autoOk}段` : `fail ${problem.id}`);
+            console.log(`[ACM-Workflow][翻译] 自动翻译结束：${problem.id}（${autoOk} 段）`);
+            if (zh && zh.length > 0) {
+              writeStatementFiles(filePath, res.html, zh);
+              this.view?.webview.postMessage({ type: 'statementTranslated', payload: { id: problem.id, zh } });
+              console.log(`[ACM-Workflow][题面] 已发送 statementTranslated → webview（${zh.filter(Boolean).length} 段译文）`);
+            } else if (countTranslatableParagraphs(res.html) > 0) {
+              this.view?.webview.postMessage({ type: 'statementTranslated', payload: { id: problem.id, zh: null, reason: 'unavailable' } });
+              console.log('[ACM-Workflow][题面] 已发送 statementTranslated（翻译暂不可用）→ webview');
+            }
+          } catch (e) {
+            trace('service', 'translateStatement', `fail ${problem.id}`);
+            console.warn(`[ACM-Workflow][翻译] 自动翻译异常：${problem.id}`, e);
+            if (countTranslatableParagraphs(res.html) > 0) {
+              this.view?.webview.postMessage({ type: 'statementTranslated', payload: { id: problem.id, zh: null, reason: 'unavailable' } });
+            }
+          } finally {
+            this.view?.webview.postMessage({ type: 'translationStatus', payload: { busy: false, id: problem.id } });
+          }
+        })();
       }
     } catch (e: any) {
+      trace('service', 'fetchStatement', `fail: ${e?.message || e}`);
       // V0.12：抓取失败 → 读全局缓存兜底，保证题面可见（附「刷新」按钮，网络恢复可重抓）
       console.warn('[ACM-Workflow][题面] 抓取异常：', e?.message || e);
       const cached = readStatementCache(problem.platform, problem.id);
@@ -655,9 +659,7 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
         continue;
       }
       try {
-        const detail = url.includes('luogu.com.cn')
-          ? await getLuoguProblemDetail({ id: (url.split('/problem/')[1] || '').split('?')[0], platform: 'luogu', title: '', tags: [], url: '' } as Problem)
-          : await getCodeforcesProblemDetail({ url } as Problem);
+        const detail = await getCodeforcesProblemDetail({ url } as Problem);
         if (detail.tests.length === 0) {
           out.appendLine(`[FAIL] ${base}  页面解析出 0 组测试`);
           fail++;
@@ -675,6 +677,9 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     out.appendLine(`== 完成：成功 ${ok}，失败 ${fail}，跳过 ${skip} ==`);
     out.show();
     vscode.window.showInformationMessage(`批量补样例完成：成功 ${ok}，失败 ${fail}，跳过 ${skip}`);
+    if (fail > 0) {
+      WorkbenchSidebarProvider.offerDiagnose(`批量补样例有 ${fail} 个失败，可运行工作流诊断查看原因。`);
+    }
   }
 
   private static getOutput(): vscode.OutputChannel {
@@ -684,17 +689,108 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     return WorkbenchSidebarProvider.output;
   }
 
-  public static async diagnose() {
+  private buildDiagnosticRuntime(): DiagnosticRuntime {
+    const cfg = vscode.workspace.getConfiguration('acmWorkflow');
+    return {
+      extensionVersion: String((this.context.extension as any)?.packageJSON?.version || 'unknown'),
+      vscodeVersion: vscode.version,
+      platform: process.platform,
+      nodeVersion: process.version,
+      baseDir: resolveBaseDir(),
+      dbPath: resolveDbPath(),
+      proxy: cfg.get<string>('proxy', '') || ''
+    };
+  }
+
+  public async diagnose() {
     const out = WorkbenchSidebarProvider.getOutput();
     out.clear();
-    out.appendLine('== ACM Workflow 环境诊断 ==');
-    diagnoseEnv().forEach((l) => out.appendLine(l));
-    out.show();
-    vscode.window.showInformationMessage('环境诊断已输出到 "ACM Workflow" 输出面板');
+    out.appendLine('== ACM Workflow 工作流诊断 ==');
+    trace('service', 'diagnose', 'start');
+    try {
+      const runtime = this.buildDiagnosticRuntime();
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'ACM Workflow 工作流诊断', cancellable: true },
+        async (progress, token) => {
+          const controller = new AbortController();
+          const sub = token.onCancellationRequested(() => controller.abort());
+          try {
+            progress.report({ message: '收集环境与网络信息…' });
+            const collected = await collectDiagnosticReport(runtime, { signal: controller.signal });
+            progress.report({ message: '选择报告保存目录…' });
+            const dirs = await vscode.window.showOpenDialog({
+              canSelectFiles: false,
+              canSelectFolders: true,
+              canSelectMany: false,
+              openLabel: '保存诊断报告到此目录'
+            });
+            if (!dirs || dirs.length === 0) {
+              trace('service', 'diagnose', 'cancel');
+              out.appendLine('已取消保存报告。');
+              out.show();
+              return null;
+            }
+            const files = await writeDiagnosticFiles(dirs[0].fsPath, collected);
+            trace('service', 'diagnose', 'ok');
+            progress.report({ message: '完成' });
+            return { collected, files };
+          } finally {
+            sub.dispose();
+          }
+        }
+      );
+      if (!result) return;
+      const { collected, files } = result;
+      out.appendLine('');
+      out.appendLine('== 环境信息 ==');
+      for (const line of collected.environment) out.appendLine(line);
+      out.appendLine('');
+      out.appendLine('== 网络诊断 ==');
+      for (const line of collected.network) out.appendLine(line);
+      out.appendLine('');
+      out.appendLine('== 发现的问题 ==');
+      if (collected.issues.length === 0) {
+        out.appendLine('未发现轨迹异常。');
+      } else {
+        for (const issue of collected.issues) out.appendLine(`[${issue.id}] ${issue.title}: ${issue.detail}`);
+      }
+      out.show();
+      vscode.window.showInformationMessage(`工作流诊断完成，报告已保存：${files.markdownPath}`);
+      const translationFailed = (collected.translation || []).some((l) => l.includes('[FAIL]') || l.includes('[WARN]'));
+      if (translationFailed) {
+        await runSetupGuide(this.context);
+      }
+    } catch (e: any) {
+      trace('service', 'diagnose', `fail: ${e?.message || e}`);
+      out.appendLine(`诊断失败：${e?.message || e}`);
+      out.show();
+      vscode.window.showErrorMessage(`工作流诊断失败：${e?.message || e}`);
+    }
+  }
+
+  /** 在失败提示里提供“运行工作流诊断”入口。 */
+  public static offerDiagnose(message: string): void {
+    const answer = vscode.window.showInformationMessage(message, '运行工作流诊断');
+    if (answer && typeof (answer as Promise<string | undefined>).then === 'function') {
+      (answer as Promise<string | undefined>).then((choice) => {
+        if (choice === '运行工作流诊断') {
+          vscode.commands.executeCommand('acmWorkflow.diagnose');
+        }
+      });
+    }
   }
 
   public async pushRecords() {
+    trace('service', 'pushRecords', 'start');
     try {
+      let handle = vscode.workspace.getConfiguration('acmWorkflow').get<string>('cfHandle', '') || '';
+      if (!handle) {
+        try {
+          const session = await getStoredSession(this.context);
+          if (session && session.handle && session.handle !== 'unknown') handle = session.handle;
+        } catch { /* 读失败按未登录处理 */ }
+      }
+      this.view?.webview.postMessage({ type: 'cfBound', handle });
       const [records, stats] = await Promise.all([
         listRecords(),
         getStats()
@@ -704,7 +800,9 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
       }
       this.view?.webview.postMessage({ type: 'recordsList', records, stats });
       await this.pushTodayStats();
+      trace('service', 'pushRecords', 'ok');
     } catch (e: any) {
+      trace('service', 'pushRecords', `fail: ${e?.message || e}`);
       this.view?.webview.postMessage({
         type: 'recordsList',
         records: [],
@@ -760,7 +858,6 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     installContest(this);
     installDatagen(this);
     installVerifier(this);
-    installSubmit(this);
     installUrlimport(this);
     installPick(this);
     installTest(this);
@@ -823,6 +920,7 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
         <span class="spacer"></span>
         <button class="btn cf-s-btn" id="cf-s-login" style="display:none" title="打开浏览器登录 Codeforces（手动输入账号密码）">登录</button>
         <button class="btn danger cf-s-btn" id="cf-s-logout" style="display:none" title="清除本地保存的 CF 会话">退出</button>
+        <button class="btn cf-s-btn" id="diag-btn" title="运行工作流诊断（环境/网络/操作轨迹/已知 Bug 检查）">诊断</button>
       </div>
       <div class="view active" id="view-manual">
         <div class="manual-layout">
@@ -901,13 +999,14 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
           <div class="st-section" id="st-section">
             <div class="st-toolbar">
               <span class="spacer"></span>
-              <button class="btn" id="st-translate-btn" title="抓取题面并翻译为中文（MyMemory/Google）">翻译</button>
+              <button class="btn" id="st-refetch-btn" title="重新抓取当前题面并更新本地缓存">重新获取</button>
               <button class="btn" id="st-mode-btn" title="切换 双语 / 仅译文 / 仅原文">双语</button>
             </div>
             <!-- Bug3：带图题提示（点击打开 CF 官网） -->
             <button class="st-img-hint" id="st-img-hint" style="display:none">⚠️ 本题包含图片，请前往 CF 官网查看完整题面</button>
-            <div id="st-body" class="st-body"><div class="muted st-empty">请在编辑器中打开一个题目文件<br>（如 979E.cpp / P1001.cpp），这里自动显示对应题面<br>点击「翻译」可切换中文对照</div></div>
+            <div id="st-body" class="st-body"><div class="muted st-empty">请在编辑器中打开一个题目文件<br>（如 979E.cpp / P1001.cpp），这里自动显示对应题面<br>点击「重新获取」可更新题面缓存</div></div>
             <div id="st-error" class="st-error"></div>
+            <div id="st-translation-status" class="st-info"></div>
           </div>
           <!-- Bug5：可拖动分隔条（题面 / 测试用例比例，min 20%，globalState 持久化） -->
           <div class="test-splitter" id="test-splitter" title="拖动调整题面与测试用例的比例"></div>
@@ -917,7 +1016,6 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
               <button class="btn" id="test-save-btn">保存</button>
               <span class="spacer"></span>
               <button class="btn danger" id="test-cancel-btn" style="display:none">取消</button>
-              <button class="btn" id="test-submit-btn" title="提交当前题目到 Codeforces（凭证存系统密钥链）">提交</button>
               <button class="primary-btn" id="test-run-btn">运行全部</button>
             </div>
             <div id="test-status" class="test-status"></div>
@@ -979,11 +1077,10 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
       <div class="view" id="view-history">
         <div class="rec-wrap">
           <div class="card cf-bind">
-            <span class="cf-bind-label">CF 账号</span>
-            <span class="mono cf-handle" id="cf-handle">未绑定</span>
+            <span class="cf-bind-label">CF 账号（登录态）</span>
+            <span class="mono cf-handle" id="cf-handle">未登录</span>
             <span class="spacer"></span>
-            <button class="btn" id="cf-bind-btn" title="输入 CF Handle，拉取 AC 历史并作为薄弱点推荐依据">绑定 / 更换</button>
-            <button class="btn" id="cf-import-btn" title="重新拉取该账号的 AC 历史并导入本地库">导入历史</button>
+            <button class="btn" id="cf-import-btn" title="拉取当前登录账号的 AC 历史并导入本地库">导入历史</button>
           </div>
           <div class="card chart-row">
             <div class="chart-block">
@@ -1000,7 +1097,6 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
             <select id="rec-platform" title="按平台筛选">
               <option value="all">全部平台</option>
               <option value="codeforces">Codeforces</option>
-              <option value="luogu">洛谷</option>
             </select>
           </div>
           <div class="rec-filters" id="rec-filters">

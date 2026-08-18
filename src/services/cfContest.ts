@@ -54,6 +54,8 @@ const LIST_CACHE_TTL_MS = 60 * 1000;
 export const TOP_N = 20;
 
 let contestListCache: { at: number; contests: CfContest[] } | null = null;
+const participantsCache = new Map<number, { at: number; count: number }>();
+const PARTICIPANTS_CACHE_TTL_MS = 60 * 1000;
 
 interface CfContestRaw {
   id: number;
@@ -148,24 +150,27 @@ export async function listCfContests(context: vscode.ExtensionContext): Promise<
  * （from/count/showUnofficial 会返回 400），因此直接取返回的 rows 末位 rank。
  */
 export async function fetchContestParticipants(context: vscode.ExtensionContext, contestId: number): Promise<number> {
+  const hit = participantsCache.get(contestId);
+  if (hit && Date.now() - hit.at < PARTICIPANTS_CACHE_TTL_MS) {
+    return hit.count;
+  }
   const data = await cfApiGet<CfStandingsRaw>(context, 'contest.standings', { contestId });
   const rows = data.rows || [];
-  if (rows.length === 0) return 0;
-  const lastRank = Number(rows[rows.length - 1]?.rank);
-  return Number.isFinite(lastRank) && lastRank > 0 ? lastRank : rows.length;
+  let count = 0;
+  if (rows.length > 0) {
+    const lastRank = Number(rows[rows.length - 1]?.rank);
+    count = Number.isFinite(lastRank) && lastRank > 0 ? lastRank : rows.length;
+  }
+  participantsCache.set(contestId, { at: Date.now(), count });
+  return count;
 }
 
 /**
- * 获取比赛题目列表（含 Rating/标签）+ 参赛人数 + 榜单（前 20 + 关注）。
- * handles：关注列表（自己 cfHandle + 自定义关注），用于"我的关注"详细行。
- * 注意：非 Gym 比赛 standings 匿名访问只允许 contestId 一个参数
- * （from/count/showUnofficial 会返回 400），全量 rows 由扩展侧就地截取，
- * 只把 top/mine 传给前端，不传输/展示全量榜单。
+ * 获取比赛题目列表（含 Rating/标签）+ 参赛人数。精简版：不拉取/不返回榜单与关注行。
  */
 export async function getContestDetail(
   context: vscode.ExtensionContext,
-  contestId: number,
-  opts: { handles?: string[] } = {}
+  contestId: number
 ): Promise<ContestDetail> {
   const data = await cfApiGet<CfStandingsRaw>(context, 'contest.standings', { contestId });
   const problems = (data.problems || [])
@@ -184,7 +189,6 @@ export async function getContestDetail(
     const lastRank = Number(rows[rows.length - 1]?.rank);
     participants = Number.isFinite(lastRank) && lastRank > 0 ? lastRank : rows.length;
   }
-  const { top, mine } = extractStandingsRows(rows, problems, opts.handles || []);
   return {
     contest: {
       id: data.contest.id,
@@ -195,8 +199,8 @@ export async function getContestDetail(
     },
     problems,
     participants,
-    top,
-    mine
+    top: [],
+    mine: []
   };
 }
 

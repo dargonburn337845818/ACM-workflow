@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { getCodeforcesProblems } from '../../services/fetchers/codeforces';
 import { fetchUserStats } from '../../services/fetchers/userStats/codeforces';
+import { getStoredSession } from '../../services/cfSession';
 import { bulkImport, ensureRecord, listRecords, removeRecord } from '../../services/records';
 import { createProblemFile, listProblemCpps } from '../../services/template';
 import type { WorkbenchHost } from '../../core/workbench';
@@ -13,7 +14,6 @@ import type { Problem } from '../../types';
 
 export function installRecords(host: WorkbenchHost): void {
   host.handlers['recordAction'] = (msg: any) => handleRecordAction(host, msg?.payload);
-  host.handlers['bindCfHandle'] = (msg: any) => handleBindCfHandle(host);
   host.handlers['importCfHistory'] = (msg: any) => handleImportCfHistory(host);
 }
 
@@ -24,14 +24,9 @@ async function handleRecordAction(host: WorkbenchHost, payload: any) {
   if (!id || !action) return;
   try {
     if (action === 'delete') {
-      // V0.10：仅「未开始」题目可删除（已 AC 的题目不能删除）
-      const records = await listRecords();
-      const rec = records.find((r) => r.id === id);
-      if (rec && rec.status === 'untouched') {
-        await removeRecord(id);
-        await host.pushRecords();
-        await host.pushHistoryData();
-      }
+      await removeRecord(id);
+      await host.pushRecords();
+      await host.pushHistoryData();
       return;
     }
     if (action !== 'open') return; // V0.10：记录仅保留「打开题目」+ 未开始的「删除」
@@ -72,27 +67,16 @@ async function handleRecordAction(host: WorkbenchHost, payload: any) {
 }
 
 
-async function handleBindCfHandle(host: WorkbenchHost, ) {
-  const handle = await vscode.window.showInputBox({
-    prompt: '输入 Codeforces Handle（用于拉取 AC 历史与薄弱点推荐）',
-    placeHolder: '例如 tourist',
-    ignoreFocusOut: true,
-    validateInput: (v) => (v && v.trim().length > 0 ? null : 'Handle 不能为空')
-  });
-  if (!handle) return;
-  const cfg = vscode.workspace.getConfiguration('acmWorkflow');
-  await cfg.update('cfHandle', handle.trim(), vscode.ConfigurationTarget.Global);
-  host.view?.webview.postMessage({ type: 'cfBound', handle: handle.trim() });
-  await importAndNotify(host, handle.trim());
-  await host.pushRecords();
-  await host.pushHistoryData();
-}
-
-
 async function handleImportCfHistory(host: WorkbenchHost, ) {
-  const handle = vscode.workspace.getConfiguration('acmWorkflow').get<string>('cfHandle', '') || '';
+  let handle = vscode.workspace.getConfiguration('acmWorkflow').get<string>('cfHandle', '') || '';
   if (!handle) {
-    host.view?.webview.postMessage({ type: 'status', message: '请先绑定 CF 账号', isError: true });
+    try {
+      const session = await getStoredSession(host.context);
+      if (session && session.handle && session.handle !== 'unknown') handle = session.handle;
+    } catch { /* 读失败按未登录处理 */ }
+  }
+  if (!handle) {
+    host.view?.webview.postMessage({ type: 'status', message: '请先登录 Codeforces（工作台顶部登录）', isError: true });
     return;
   }
   await importAndNotify(host, handle);
