@@ -1,25 +1,6 @@
 # ACM Workflow 工具脚本
 
-本目录包含 WSL 环境准备和本地离线翻译两类脚本。
-
-## WSL 环境准备
-
-在 WSL（Ubuntu/Debian）里一键安装扩展运行/开发所需的基础环境：
-
-```bash
-bash tools/setup_wsl.sh                  # g++ / curl / python3 / 浏览器
-bash tools/setup_wsl.sh --with-translate # 额外安装本地离线翻译
-```
-
-脚本会自动安装 `g++`、`curl`、`python3`、`python3-venv`，并尝试安装 Chromium。
-如果 apt 的 Chromium 不可用，也可以在 VS Code 设置里把 `acmWorkflow.browserPath`
-指向 Windows 侧浏览器，例如：
-
-```jsonc
-{
-  "acmWorkflow.browserPath": "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-}
-```
+本目录包含本地离线翻译相关脚本。
 
 ## 本地离线翻译（Local Translate）
 
@@ -60,7 +41,6 @@ bash tools/start_local_translate.sh --port 5000
 
 | 文件 | 作用 |
 |---|---|
-| `setup_wsl.sh` | WSL 基础环境一键安装（g++ / curl / python3 / 浏览器），可选本地翻译 |
 | `local_translate_server.py` | 极简本地翻译 HTTP 服务，实现 `GET /languages` 和 `POST /translate` |
 | `setup_local_translate.sh` | 一键准备虚拟环境、安装 Argos en->zh 模型与 MiniSBD 句切分模型 |
 | `start_local_translate.sh` | 启动本地翻译服务（自动选择已装好的 venv） |

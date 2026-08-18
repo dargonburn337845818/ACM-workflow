@@ -6,19 +6,16 @@
 
 | 项目 | 要求 | 说明 |
 |---|---|---|
-| VS Code | ≥ 1.85 | 任意平台（Windows / macOS / Linux / WSL） |
-| C++ 编译器 | g++（可选但强烈建议） | Windows: MinGW-w64 / MSYS2；macOS: `xcode-select --install`；Linux/WSL: `sudo apt install g++` 或 `bash tools/setup_wsl.sh`。扩展会自动探测 PATH 与常见安装位置 |
-| 浏览器（可选） | Chrome / Edge / Chromium | 用于 CF 登录、提交；WSL 可装 Chromium 或配置 `acmWorkflow.browserPath` 指向 Windows 浏览器 |
+| VS Code | ≥ 1.85 | Windows / macOS / Linux |
+| C++ 编译器 | g++（可选但强烈建议） | Windows: MinGW-w64 / MSYS2；macOS: `xcode-select --install`；Linux: `sudo apt install g++`。扩展会自动探测 PATH 与常见安装位置 |
+| 浏览器（可选） | Chrome / Edge / Chromium | 用于 CF 登录态抓取；留空自动探测 |
 | 网络 | 可访问 codeforces.com | 国内网络一般直连可用；慢的话见 troubleshooting 的代理方案 |
 
 > 没有 g++ 也可以先体验：选题、题面、翻译、记录都能用，只是「运行测试」需要编译器。
-> WSL 用户建议先执行 `bash tools/setup_wsl.sh` 一键准备环境。
 
 ## 1. 安装扩展
 
-**方式 A（推荐）**：扩展商店搜索 `ACM Workflow` → 安装。
-
-**方式 B**：下载 `acm-workflow-*.vsix` → 扩展面板 `...` → 从 VSIX 安装。
+从 [Releases](https://github.com/dargonburn337845818/ACM-workflow/releases) 下载 `acm-workflow-*.vsix` → 扩展面板 `...` → **从 VSIX 安装**。
 
 安装后：
 - 活动栏出现 ACM 图标（墨色括号图标）
@@ -37,7 +34,7 @@
 - 比赛面板「我的关注」榜单
 
 > 💡 可选：工作台顶部状态条点 **登录**，打开浏览器登录 Codeforces（手动输账号密码）。
-> 会话 Cookie 加密存系统密钥链，约 30 天有效；登录后抓取更稳、可一键提交。
+> 会话 Cookie 加密存系统密钥链，约 30 天有效；登录后抓取更稳。
 
 ## 3. 第二步：获得第一道题
 
@@ -63,7 +60,7 @@ https://codeforces.com/problemset/problem/1791/E
 「CF 比赛」视图 → 展开某场 Round → **一键创建** → 生成全部题目
 （`code/Codeforces/Contest_{id}/contest_{id}_{字母}.cpp`），自动抓样例，打开 A 题。
 
-## 4. 第三步：测试与提交
+## 4. 第三步：测试与对拍
 
 打开题目 cpp，「测试」视图自动加载：
 
@@ -71,13 +68,12 @@ https://codeforces.com/problemset/problem/1791/E
 [题面（英文 + 中文翻译按钮）]
 ─────────────────────────────  ← 可拖动分隔条
 [测试用例 1]  [测试用例 2] ...
-[▶ 运行全部] [提交]
+[▶ 运行全部]
 ```
 
 1. 点 **▶ 运行全部**：自动编译 → 逐用例运行 → 每个用例显示 通过/失败/超时/运行错误
 2. 全过 → 记录自动标记 **已AC**，状态栏出现 **「下一题 ▸」** 保持刷题节奏
 3. 题面点 **翻译** → 中英对照（可切 双语/仅译文/仅原文）
-4. 有把握了点 **提交**：首次输入 Handle 与密码（存系统密钥链）→ 自动提交并轮询判定
 
 ### 对拍验证（进阶）
 

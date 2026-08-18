@@ -17,7 +17,7 @@
 | `acmWorkflow.libreEndpoint` | string | `https://libretranslate.com/translate` | LibreTranslate 翻译端点。自建实例填 `http://localhost:5000/translate`。 |
 | `acmWorkflow.localEndpoint` | string | `http://127.0.0.1:5000/translate` | 本地离线翻译端点。配合 `tools/local_translate_server.py` 或自建 LibreTranslate 实例。 |
 | `acmWorkflow.localAutoStart` | boolean | `true` | 使用 `local` 后端时，若本地服务未启动，扩展自动用 `tools/start_local_translate.sh` 拉起。 |
-| `acmWorkflow.browserPath` | string | `""` | Puppeteer 使用的浏览器可执行文件路径。留空自动探测；WSL 可填 `/usr/bin/chromium` 或 `/mnt/c/Program Files/.../msedge.exe`。 |
+| `acmWorkflow.browserPath` | string | `""` | Puppeteer 使用的浏览器可执行文件路径。留空自动探测 Edge/Chrome/Chromium。 |
 | `acmWorkflow.followHandles` | string[] | `[]` | 比赛面板「我的关注」榜单的额外关注 handle（逗号分隔编辑；自己的 `cfHandle` 自动包含，大小写不敏感）。 |
 | `acmWorkflow.proxy` | string | `""` | CF 网络代理地址，如 `http://127.0.0.1:7890`。**VS Code 扩展进程的请求不跟随系统代理**，需要代理访问 CF 时在此填写；留空则尝试环境变量 `HTTPS_PROXY` / `HTTP_PROXY`。 |
 
@@ -29,24 +29,6 @@
 |---|---|---|
 | `cf.session` | CF 登录会话（全量 Cookie + localStorage + 登录时间） | 工作台顶部「登录」成功后 |
 | `acmWorkflow.deepseekKey` | DeepSeek API Key | 首次使用 deepseek 翻译时输入 |
-| `acmWorkflow.cfHandle`（SecretStorage） | 提交用 Handle | 首次提交时输入 |
-| `acmWorkflow.cfPassword`（SecretStorage） | 提交用密码 | 首次提交时输入 |
-
-> 注意：`acmWorkflow.cfHandle` 同时存在于「设置项」（用于看板统计等，非敏感）与
-> SecretStorage（用于提交，敏感），两者独立，用途不同。
-
-## WSL 路径自动适配
-
-在 WSL 里使用本扩展时，路径类配置（`baseDir` / `templatePath` / `dbPath` / `browserPath`）
-可以直接沿用 Windows 风格路径，例如 `D:\CF\work` 会自动转换成 `/mnt/d/CF/work`。
-因此从 Windows 迁移到 WSL 时不需要手动改路径设置。
-
-```jsonc
-{
-  "acmWorkflow.baseDir": "D:\\CF\\work",           // WSL 下自动变成 /mnt/d/CF/work
-  "acmWorkflow.browserPath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
-}
-```
 
 ## 数据目录结构（默认 `~/.acm-workflow`）
 
@@ -83,19 +65,7 @@
 }
 ```
 
-**场景三：WSL 环境准备**
-
-在 WSL 里使用或开发本扩展时，先安装基础环境：
-
-```bash
-bash tools/setup_wsl.sh                  # g++ / curl / python3 / 浏览器
-bash tools/setup_wsl.sh --with-translate # 需要本地离线翻译时
-```
-
-如果不想在 Linux 里装浏览器，可以把 `acmWorkflow.browserPath` 指向 Windows 侧浏览器：
-`/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe`。
-
-**场景四：本地离线翻译（推荐，完全不走外网）**
+**场景三：本地离线翻译（推荐，完全不走外网）**
 
 1. 安装本地环境并启动服务：
    ```bash
@@ -112,12 +82,12 @@ bash tools/setup_wsl.sh --with-translate # 需要本地离线翻译时
    ```
    之后打开 VS Code 首次使用翻译时会自动拉起本地服务；也可以手动运行 `bash tools/start_local_translate.sh --port 5000`。
 
-**场景五：DeepSeek 翻译**
+**场景四：DeepSeek 翻译**
 
 1. 设置 `acmWorkflow.translateProvider` 为 `deepseek`
 2. 首次翻译时输入 API Key（存系统密钥链，之后无需再输）
 
-**场景六：走代理访问 CF**
+**场景五：走代理访问 CF**
 
 ```jsonc
 {

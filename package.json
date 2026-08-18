@@ -167,7 +167,7 @@
         "acmWorkflow.browserPath": {
           "type": "string",
           "default": "",
-          "description": "Puppeteer 使用的浏览器可执行文件路径（留空自动探测 Edge/Chrome/Chromium；WSL 可填 /usr/bin/chromium 或 /mnt/c/... 下的 Windows 浏览器）。"
+          "description": "Puppeteer 使用的浏览器可执行文件路径（留空自动探测 Edge/Chrome/Chromium）。"
         },
         "acmWorkflow.followHandles": {
           "type": "array",
@@ -188,7 +188,7 @@
       {
         "id": "acmWorkflow.getStarted",
         "title": "ACM Workflow 快速上手",
-        "description": "三步开始刷题：配置 CF Handle → 拉取或导入题目 → 测试、对拍与提交",
+        "description": "三步开始刷题：配置 CF Handle → 拉取或导入题目 → 测试、对拍",
         "steps": [
           {
             "id": "acmWorkflow.stepHandle",
@@ -204,8 +204,8 @@
           },
           {
             "id": "acmWorkflow.stepTest",
-            "title": "③ 测试、对拍与提交",
-            "description": "生成题目后样例自动写入测试面板：一键运行、单用例运行、造数据与对拍器，全部通过后可直接提交到 Codeforces。",
+            "title": "③ 测试、对拍",
+            "description": "生成题目后样例自动写入测试面板：一键运行、单用例运行、造数据与对拍器，全过后自动标记已AC。",
             "media": "media/walkthrough/step3.md"
           }
         ]

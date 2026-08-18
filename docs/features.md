@@ -38,11 +38,11 @@ https://codeforces.com/gym/104053/problem/A         # gym
 
 **入口**：工作台「CF 比赛」视图
 
-- 列表：即将开始（BEFORE）/ 进行中（CODING）的 Round，含开始时间、时长、参赛人数（60s 缓存）
+- 列表：即将开始（BEFORE）/ 进行中（CODING）的 Round，自动加载，含开始时间、时长、参赛人数（60s 缓存）
 - 展开：题目列表（题号/名称/Rating/标签）+ 前 20 名榜单 + **我的关注**详细行
   （rank/过题/罚时 + 每题状态格：✓通过时间 / ✗被拒次数 / ·未提交）
 - **关注**：点击「关注…」编辑 handle 列表（逗号分隔，自己的 cfHandle 自动加入）
-- **一键创建**：生成 `Contest_{id}/contest_{id}_{index}.cpp` + 人读 .prob + CPH .cph 双盘符配置，
+- **一键创建**：生成 `Contest_{id}/contest_{id}_{index}.cpp` + 人读 .prob + CPH .cph 配置，
   随后**串行抓取每道题样例**（题间 800ms 防风控；有缓存跳过），生成即登记记录
 - 每题可「翻译」：抓题面 → 中英对照快速预览（复用题面排版）
 
@@ -121,25 +121,22 @@ https://codeforces.com/gym/104053/problem/A         # gym
 
 **实现**：`src/features/session/index.ts` + `src/services/cfSession.ts`
 
-## 9. 🚀 一键提交（submit）
+## 9. 🛠 环境配置引导（setupGuide）
 
-**入口**：测试工具栏「提交」按钮
+**入口**：命令面板 → `ACM Workflow: 环境配置引导`
 
-1. 定位题目（.prob → 文件名兜底）
-2. 凭证：SecretStorage（`acmWorkflow.cfHandle` / `cfPassword`），首次 showInputBox 收集（密码掩码）
-3. 有头浏览器打开提交页 → 选 G++20 → 填码提交 → 轮询判定（≤90s）
-4. 判定 OK → 记录 AC；其余 → trying（attempts+1）；提交中按钮禁用防重复
+- 自动检测本地翻译模型 / 服务等环境依赖是否就绪
+- 缺失时询问是否安装，并提供可操作的安装命令
+- 安装失败时展示具体原因，方便继续排查
 
-> 浏览器会真实打开 CF 页面（依赖系统 Chrome/Edge），这是 CF 无官方提交 API 下的稳妥方案。
-
-**实现**：`src/features/submit/index.ts` + `src/services/submitter.ts`
+**实现**：`src/services/setupGuide.ts`
 
 ## 10. 📊 刷题记录（records）
 
 **入口**：工作台「记录」视图
 
 - 数据：SQLite（sql.js WASM，**零原生依赖**），路径见 `dbPath`
-- 自动登记：生成题目 / 打开题目 / 测试全过 / 提交判定
+- 自动登记：生成题目 / 打开题目 / 测试全过 / AC 状态更新
 - 手动操作：未开始的题可「删除」；已 AC 不可删
 - 统计：总计 / 已AC / 尝试中 / AC率 / 今日 AC / **连续刷题天数**（rail 底部）
 - 图表：各标签 AC 数环形饼图 + **CF 难度分布柱状图**（800~3500 共 11 档 + 未定分）
@@ -175,3 +172,13 @@ https://codeforces.com/gym/104053/problem/A         # gym
 - 浅色主题下应用前会提示切换深色主题
 
 **实现**：`src/services/beautify.ts`
+
+## 14. 🔍 工作流诊断（diagnostics）
+
+命令面板 → `ACM Workflow: 工作流诊断`：
+
+- 检查平台 / Node 版本 / PATH / curl / g++ / 网络连通性
+- 记录最近操作轨迹，自动分析可能的问题
+- 导出 Markdown + JSON 双份报告，方便提交 Issue 时附上
+
+**实现**：`src/services/diagnostics.ts`
