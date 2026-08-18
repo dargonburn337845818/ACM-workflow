@@ -37,7 +37,7 @@ export async function storeCredentials(context: vscode.ExtensionContext, handle:
 async function launchBrowser() {
   const exe = getBrowserPath();
   if (!exe) {
-    throw new Error('未找到 Edge/Chrome 浏览器，无法提交');
+    throw new Error('未找到 Edge/Chrome/Chromium 浏览器，无法提交。WSL 可运行 bash tools/setup_wsl.sh 或配置 acmWorkflow.browserPath');
   }
   return puppeteer.launch({
     executablePath: exe,

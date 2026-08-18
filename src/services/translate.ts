@@ -17,6 +17,7 @@ const MYMEMORY = 'https://api.mymemory.translated.net/get';
 const GOOGLE = 'https://translate.googleapis.com/translate_a/single';
 const DEEPSEEK_API = 'https://api.deepseek.com/chat/completions';
 const DEFAULT_LIBRE = 'https://libretranslate.com/translate';
+const DEFAULT_LOCAL = 'http://127.0.0.1:5000/translate';
 const CONCURRENCY = 4;
 const MAX_PARAS = 30;          // 最多翻译段落数（防长题面超时/耗配额）
 const MAX_PARA_LEN = 480;      // MyMemory 免费版单请求长度限制（保守值）
@@ -26,11 +27,13 @@ const RETRY_DELAY_MS = 1000;      // 重试间隔（Bug1）
 
 const cache = new Map<string, string>();
 
-/** 翻译后端（V0.22）：auto=MyMemory+Google 兜底 / libre=LibreTranslate（端点可配）/ deepseek=DeepSeek API（密钥存 SecretStorage） */
+/** 翻译后端（V0.22）：auto=MyMemory+Google 兜底 / libre=LibreTranslate（端点可配）/ deepseek=DeepSeek API（密钥存 SecretStorage）/ local=本地离线 Argos（端点可配） */
 import * as vscode from 'vscode';
 import * as cheerio from 'cheerio';
+import * as path from 'path';
+import { spawn } from 'child_process';
 
-export type TranslateProvider = 'auto' | 'libre' | 'deepseek';
+export type TranslateProvider = 'auto' | 'libre' | 'deepseek' | 'local';
 
 export const DEEPSEEK_SECRET_KEY = 'acmWorkflow.deepseekKey';
 
@@ -80,13 +83,13 @@ function splitSentences(text: string): string[] {
 
 /**
  * 读取当前配置的翻译后端（V0.22）：acmWorkflow.translateProvider
- * auto（默认）/ libre / deepseek；deepseek 密钥从 SecretStorage 读取。
+ * auto（默认）/ libre / deepseek / local；deepseek 密钥从 SecretStorage 读取。
  */
 export async function resolveProvider(context?: import('vscode').ExtensionContext): Promise<{ provider: TranslateProvider; apiKey?: string }> {
   let provider: TranslateProvider = 'auto';
   try {
     const p = vscode.workspace.getConfiguration('acmWorkflow').get<string>('translateProvider', 'auto');
-    if (p === 'libre' || p === 'deepseek') provider = p;
+    if (p === 'libre' || p === 'deepseek' || p === 'local') provider = p;
   } catch {
     /* 无 VS Code 环境（单测）时用 auto */
   }
@@ -118,6 +121,8 @@ async function translateOne(text: string, provider: TranslateProvider = 'auto', 
         let zh: string | null = null;
         if (provider === 'libre') {
           zh = await libreTranslate(seg) || await mymemoryTranslate(seg) || await googleTranslate(seg);
+        } else if (provider === 'local') {
+          zh = await localTranslate(seg);
         } else if (provider === 'deepseek' && apiKey) {
           zh = await deepseekTranslate(seg, apiKey) || await mymemoryTranslate(seg) || await googleTranslate(seg);
         } else {
@@ -184,6 +189,94 @@ async function libreTranslate(text: string): Promise<string | null> {
     try {
       endpoint = vscode.workspace.getConfiguration('acmWorkflow').get<string>('libreEndpoint', DEFAULT_LIBRE) || DEFAULT_LIBRE;
     } catch { /* 单测环境用默认 */ }
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q: text, source: 'en', target: 'zh', format: 'text' }),
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const t = String(data?.translatedText || '').trim();
+    return t && t !== text ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 本地离线翻译（V0.23，端点可配置 acmWorkflow.localEndpoint，默认本机 Argos/LibreTranslate 服务） */
+
+let localServerStarting: Promise<boolean> | null = null;
+
+function getLocalProbeUrl(endpoint: string): string {
+  return endpoint.replace(/\/+$/, '').replace(/\/translate$/, '') + '/languages';
+}
+
+function getLocalPort(endpoint: string): number {
+  try {
+    const u = new URL(endpoint);
+    return u.port ? Number(u.port) : 5000;
+  } catch {
+    return 5000;
+  }
+}
+
+function getLocalServerScript(): string {
+  return path.resolve(__dirname, '..', '..', 'tools', 'start_local_translate.sh');
+}
+
+async function probeLocalServer(probeUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(probeUrl, { signal: AbortSignal.timeout(1200) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureLocalServer(endpoint: string): Promise<boolean> {
+  const probeUrl = getLocalProbeUrl(endpoint);
+  if (await probeLocalServer(probeUrl)) return true;
+  if (localServerStarting) return localServerStarting;
+
+  let autoStart = true;
+  try {
+    autoStart = vscode.workspace.getConfiguration('acmWorkflow').get<boolean>('localAutoStart', true) !== false;
+  } catch { /* 单测环境默认 true */ }
+  if (!autoStart) return false;
+
+  localServerStarting = (async () => {
+    const script = getLocalServerScript();
+    const port = getLocalPort(endpoint);
+    console.log(`[ACM-Workflow][翻译] 本地翻译服务未启动，尝试自动拉起: ${script} --port ${port}`);
+    let spawnFailed = false;
+    const child = spawn('bash', [script, '--port', String(port)], {
+      cwd: path.resolve(__dirname, '..', '..'),
+      stdio: 'ignore',
+      detached: false,
+    });
+    child.on('error', (err) => {
+      spawnFailed = true;
+      console.warn(`[ACM-Workflow][翻译] 自动启动本地翻译服务失败：`, err);
+    });
+    for (let i = 0; i < 16; i++) {
+      if (spawnFailed) return false;
+      await new Promise((r) => setTimeout(r, 500));
+      if (await probeLocalServer(probeUrl)) return true;
+    }
+    console.warn('[ACM-Workflow][翻译] 本地翻译服务自动启动超时，请手动运行 tools/start_local_translate.sh');
+    return false;
+  })();
+  return localServerStarting;
+}
+
+async function localTranslate(text: string): Promise<string | null> {
+  try {
+    let endpoint = DEFAULT_LOCAL;
+    try {
+      endpoint = vscode.workspace.getConfiguration('acmWorkflow').get<string>('localEndpoint', DEFAULT_LOCAL) || DEFAULT_LOCAL;
+    } catch { /* 单测环境用默认 */ }
+    if (!(await ensureLocalServer(endpoint))) return null;
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -271,7 +364,7 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
       const $m = $(node);
       const src = $m.text();
       const block = $m.hasClass('acm-math-block');
-      $m.replaceWith(`\u0000MATH${math.length}\u0000`);
+      $m.replaceWith(`\u0000☃${math.length}☃\u0000`);
       math.push({ src, block });
     });
     const text = $el.find('.st-en').first().text().replace(/\s+/g, ' ').trim();
@@ -294,9 +387,9 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
     if (!results[k]) { out[j.index] = null; return; }
     let zh = results[k];
     const used = new Set<number>();
-    // V0.21：宽容匹配占位符——翻译 API 常剥掉 \u0000 控制符（甚至插入空格），
-    // 旧严格正则 /\u0000MATH(\d+)\u0000/ 匹配不上导致 MATH0 泄漏到译文
-    zh = zh.replace(/\u0000?MATH\s*(\d+)\s*\u0000?/g, (_m, n) => {
+    // V0.21：宽容匹配占位符——翻译 API 常剥掉 \u0000 控制符（甚至插入空格）；
+    // V0.24：改用 ☃ 符号占位符，避免 Argos 等本地翻译把 "MATH" 音译成 "马特" 导致泄漏
+    zh = zh.replace(/\u0000?☃\s*(\d+)\s*☃\u0000?/g, (_m, n) => {
       const mi = Number(n);
       used.add(mi);
       const math = j.math[mi];

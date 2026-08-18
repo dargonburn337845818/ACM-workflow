@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
 import initSqlJs, { Database } from 'sql.js';
 import { Problem } from '../types';
 import { resolveDbPath } from '../utils/paths';

@@ -10,22 +10,39 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
+/**
+ * 把配置里的路径转成当前平台可用的绝对路径。
+ *
+ * WSL 下用户可能沿用 Windows 设置里的 `C:\...` / `D:\...` 路径，
+ * 这里统一转成 `/mnt/<盘符>/...`，避免 path.resolve 把反斜杠当普通字符。
+ */
+export function normalizePath(p: string): string {
+  const trimmed = (p || '').trim();
+  if (!trimmed) return '';
+  if (process.platform === 'linux' && /^[A-Za-z]:[\\/]/.test(trimmed)) {
+    const drive = trimmed[0].toLowerCase();
+    const rest = trimmed.slice(2).replace(/\\/g, '/').replace(/^\/+/, '');
+    return `/mnt/${drive}/${rest}`;
+  }
+  return path.resolve(trimmed);
+}
+
 /** 数据根目录：配置 acmWorkflow.baseDir；留空 → ~/.acm-workflow */
 export function resolveBaseDir(): string {
   const custom = vscode.workspace.getConfiguration('acmWorkflow').get<string>('baseDir', '');
-  return custom && custom.trim() ? path.resolve(custom.trim()) : path.join(os.homedir(), '.acm-workflow');
+  return custom && custom.trim() ? normalizePath(custom) : path.join(os.homedir(), '.acm-workflow');
 }
 
 /** 题目模板路径：配置 acmWorkflow.templatePath；留空 → 使用内置默认模板 */
 export function resolveTemplatePath(): string {
   const custom = vscode.workspace.getConfiguration('acmWorkflow').get<string>('templatePath', '');
-  return custom && custom.trim() ? path.resolve(custom.trim()) : '';
+  return custom && custom.trim() ? normalizePath(custom) : '';
 }
 
 /** 刷题记录数据库路径：配置 acmWorkflow.dbPath；留空 → {baseDir}/records.db */
 export function resolveDbPath(): string {
   const custom = vscode.workspace.getConfiguration('acmWorkflow').get<string>('dbPath', '');
-  if (custom && custom.trim()) return path.resolve(custom.trim());
+  if (custom && custom.trim()) return normalizePath(custom);
   return path.join(resolveBaseDir(), 'records.db');
 }
 

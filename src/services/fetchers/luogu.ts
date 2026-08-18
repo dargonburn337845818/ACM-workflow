@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { resolveBaseDir } from '../../utils/paths';
+import * as vscode from 'vscode';
+import { resolveBaseDir, normalizePath } from '../../utils/paths';
 import puppeteer, { Browser } from 'puppeteer-core';
 import { Problem } from '../../types';
 
@@ -61,21 +62,38 @@ function writeCache(p: string, data: any): void {
   }
 }
 
-/** 探测系统可用的浏览器（Edge/Chrome，供 puppeteer 兜底使用） */
+/** 探测系统可用的浏览器（Edge/Chrome/Chromium，供 puppeteer 兜底使用） */
 export function getBrowserPath(): string | null {
+  try {
+    const custom = vscode.workspace.getConfiguration('acmWorkflow').get<string>('browserPath', '');
+    if (custom && custom.trim()) {
+      const p = normalizePath(custom);
+      if (fs.existsSync(p)) return p;
+    }
+  } catch { /* 非 VS Code 环境忽略 */ }
   const candidates = [
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    '/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    '/mnt/c/Program Files/Microsoft/Edge/Application/msedge.exe',
+    '/mnt/c/Program Files/Google/Chrome/Application/chrome.exe',
+    '/mnt/c/Program Files (x86)/Google/Chrome/Application/chrome.exe',
     '/usr/bin/microsoft-edge',
     '/usr/bin/microsoft-edge-stable',
     '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/opt/google/chrome/chrome',
+    '/snap/bin/chromium',
     '/usr/bin/chromium',
-    '/usr/bin/chromium-browser'
+    '/usr/bin/chromium-browser',
+    '/usr/local/bin/chromium'
   ];
   for (const c of candidates) {
-    if (fs.existsSync(c)) return c;
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch { /* ignore */ }
   }
   return null;
 }
@@ -87,7 +105,7 @@ export function getBrowserPath(): string | null {
 async function launchBrowser(): Promise<Browser> {
   const exe = getBrowserPath();
   if (!exe) {
-    throw new Error('未找到 Edge/Chrome 浏览器，无法访问洛谷（请安装 Microsoft Edge）');
+    throw new Error('未找到 Edge/Chrome/Chromium 浏览器，无法访问洛谷。WSL 可运行 bash tools/setup_wsl.sh 或配置 acmWorkflow.browserPath 指向 /mnt/c/... 下的 Windows 浏览器');
   }
   console.log('[ACM-Workflow] 洛谷抓取：启动有头浏览器（窗口移出屏幕）…');
   const browser = await puppeteer.launch({
