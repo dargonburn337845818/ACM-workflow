@@ -19,11 +19,13 @@ const DEEPSEEK_API = 'https://api.deepseek.com/chat/completions';
 const DEFAULT_LIBRE = 'https://libretranslate.com/translate';
 const DEFAULT_LOCAL = 'http://127.0.0.1:5000/translate';
 const CONCURRENCY = 4;
-const MAX_PARAS = 30;          // 最多翻译段落数（防长题面超时/耗配额）
-const MAX_PARA_LEN = 480;      // MyMemory 免费版单请求长度限制（保守值）
-const MAX_SEGMENTS = 6;        // 单段最多拆句数（再长放弃，保留原文）
+const DEFAULT_MAX_PARAS = 200;    // 默认最多翻译段落数（可配置，防长题面超时/耗配额）
+const DEFAULT_MAX_SEGMENTS = 50;  // 默认单段最多拆句数（可配置，长提示不再被截断）
+const MAX_PARA_LEN = 480;         // MyMemory 免费版单请求长度限制（保守值）
 const MAX_TRANSLATE_ATTEMPTS = 3; // 单段最多尝试次数（Bug1：失败自动重试）
 const RETRY_DELAY_MS = 1000;      // 重试间隔（Bug1）
+// Argos 会把 ☃ 改写成 XQ，导致公式占位符无法还原；ZZnZZ 在 Argos 实测能原样保留。
+const MATH_PLACEHOLDER = 'ZZ';
 
 const cache = new Map<string, string>();
 
@@ -37,13 +39,33 @@ export type TranslateProvider = 'auto' | 'libre' | 'deepseek' | 'local';
 
 export const DEEPSEEK_SECRET_KEY = 'acmWorkflow.deepseekKey';
 
+/** 读取可配置的最大翻译段落数（默认 200，<=0 时回退默认） */
+function getMaxTranslateParagraphs(): number {
+  try {
+    const v = vscode.workspace.getConfiguration('acmWorkflow').get<number>('maxTranslateParagraphs', DEFAULT_MAX_PARAS);
+    return Number.isFinite(v) && (v ?? 0) > 0 ? Math.floor(v ?? DEFAULT_MAX_PARAS) : DEFAULT_MAX_PARAS;
+  } catch {
+    return DEFAULT_MAX_PARAS;
+  }
+}
+
+/** 读取可配置的单段最大拆句数（默认 50，<=0 时回退默认） */
+function getMaxTranslateSegments(): number {
+  try {
+    const v = vscode.workspace.getConfiguration('acmWorkflow').get<number>('maxTranslateSegments', DEFAULT_MAX_SEGMENTS);
+    return Number.isFinite(v) && (v ?? 0) > 0 ? Math.floor(v ?? DEFAULT_MAX_SEGMENTS) : DEFAULT_MAX_SEGMENTS;
+  } catch {
+    return DEFAULT_MAX_SEGMENTS;
+  }
+}
+
 /** 判断一段纯文本是否需要翻译 */
 function isTranslatable(raw: string): boolean {
   const t = raw.trim();
   if (!t) return false;
   if (/^```/.test(t) || /^~~~/.test(t)) return false;          // 代码块
   if (/\$\$/.test(t)) return false;                            // 块级公式
-  if (t.length > MAX_PARA_LEN * MAX_SEGMENTS) return false;
+  if (t.length > MAX_PARA_LEN * getMaxTranslateSegments()) return false;
   if (/^#{1,6}\s/.test(t)) return false;                       // 标题段落保留原文
   if (/^[\s\d\W_]+$/.test(t)) return false;                    // 纯符号/数字
   if (!/[A-Za-z]{3,}/.test(t)) return false;                   // 不含英文单词（中文题面）
@@ -65,6 +87,7 @@ export function countTranslatableParagraphs(html: string): number {
 
 /** 长段落按句子拆分（保留原顺序），每句 ≤ MAX_PARA_LEN */
 function splitSentences(text: string): string[] {
+  const maxSegments = getMaxTranslateSegments();
   if (text.length <= MAX_PARA_LEN) return [text];
   const parts = text.split(/(?<=[.!?])\s+|\n/);
   const segs: string[] = [];
@@ -78,7 +101,7 @@ function splitSentences(text: string): string[] {
     }
   }
   if (cur) segs.push(cur.trim());
-  return segs.slice(0, MAX_SEGMENTS);
+  return segs.slice(0, maxSegments);
 }
 
 /**
@@ -100,9 +123,24 @@ export async function resolveProvider(context?: import('vscode').ExtensionContex
   return { provider, apiKey };
 }
 
+/** 按当前后端翻译一个句子；失败返回 null */
+async function translateSegment(seg: string, provider: TranslateProvider, apiKey?: string): Promise<string | null> {
+  if (provider === 'libre') {
+    return libreTranslate(seg) || await mymemoryTranslate(seg) || await googleTranslate(seg);
+  }
+  if (provider === 'local') {
+    return localTranslate(seg);
+  }
+  if (provider === 'deepseek' && apiKey) {
+    return deepseekTranslate(seg, apiKey) || await mymemoryTranslate(seg) || await googleTranslate(seg);
+  }
+  return mymemoryTranslate(seg) || await googleTranslate(seg);
+}
+
 /**
  * 翻译单段（按配置后端 → auto 兜底）。
  * Bug1：对 null / undefined / 空字符串一律视为失败，自动重试最多 3 次，间隔 1s；
+ * 若部分句子成功，则保留成功译文、失败句子保留英文，避免整段丢失。
  * 全部失败返回 null（由上层给出「翻译暂不可用」降级提示与手动重试入口）。
  */
 async function translateOne(text: string, provider: TranslateProvider = 'auto', apiKey?: string): Promise<string | null> {
@@ -116,22 +154,17 @@ async function translateOne(text: string, provider: TranslateProvider = 'auto', 
     }
     try {
       const parts: string[] = [];
-      let ok = true;
+      let okCount = 0;
       for (const seg of segs) {
-        let zh: string | null = null;
-        if (provider === 'libre') {
-          zh = await libreTranslate(seg) || await mymemoryTranslate(seg) || await googleTranslate(seg);
-        } else if (provider === 'local') {
-          zh = await localTranslate(seg);
-        } else if (provider === 'deepseek' && apiKey) {
-          zh = await deepseekTranslate(seg, apiKey) || await mymemoryTranslate(seg) || await googleTranslate(seg);
+        const zh = await translateSegment(seg, provider, apiKey);
+        if (zh) {
+          okCount++;
+          parts.push(zh);
         } else {
-          zh = await mymemoryTranslate(seg) || await googleTranslate(seg);
+          parts.push(seg);
         }
-        if (!zh) { ok = false; break; } // null/空串 → 失败，进入重试
-        parts.push(zh);
       }
-      if (ok) {
+      if (okCount > 0) {
         const joined = parts.join(' ').trim();
         if (joined) {
           cache.set(key, joined);
@@ -245,15 +278,18 @@ async function ensureLocalServer(endpoint: string): Promise<boolean> {
   } catch { /* 单测环境默认 true */ }
   if (!autoStart) return false;
 
-  localServerStarting = (async () => {
+  const p = (async () => {
     const script = getLocalServerScript();
     const port = getLocalPort(endpoint);
     console.log(`[ACM-Workflow][翻译] 本地翻译服务未启动，尝试自动拉起: ${script} --port ${port}`);
     let spawnFailed = false;
     const child = spawn('bash', [script, '--port', String(port)], {
       cwd: path.resolve(__dirname, '..', '..'),
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', 'pipe'],
       detached: false,
+    });
+    child.stderr?.on('data', (d) => {
+      console.warn(`[ACM-Workflow][翻译] 本地翻译服务 stderr: ${String(d).trim()}`);
     });
     child.on('error', (err) => {
       spawnFailed = true;
@@ -267,7 +303,13 @@ async function ensureLocalServer(endpoint: string): Promise<boolean> {
     console.warn('[ACM-Workflow][翻译] 本地翻译服务自动启动超时，请手动运行 tools/start_local_translate.sh');
     return false;
   })();
-  return localServerStarting;
+  localServerStarting = p;
+  try {
+    return await p;
+  } finally {
+    // 启动结束后清除状态，下次失败/服务退出后允许重新尝试自动拉起。
+    if (localServerStarting === p) localServerStarting = null;
+  }
 }
 
 async function localTranslate(text: string): Promise<string | null> {
@@ -364,13 +406,13 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
       const $m = $(node);
       const src = $m.text();
       const block = $m.hasClass('acm-math-block');
-      $m.replaceWith(`\u0000☃${math.length}☃\u0000`);
+      $m.replaceWith(`${MATH_PLACEHOLDER}${math.length}${MATH_PLACEHOLDER}`);
       math.push({ src, block });
     });
     const text = $el.find('.st-en').first().text().replace(/\s+/g, ' ').trim();
     if (isTranslatable(text)) {
       jobs.push({ index: i, text, math });
-      if (jobs.length >= MAX_PARAS) return;
+      if (jobs.length >= getMaxTranslateParagraphs()) return;
     }
   });
 
@@ -387,9 +429,8 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
     if (!results[k]) { out[j.index] = null; return; }
     let zh = results[k];
     const used = new Set<number>();
-    // V0.21：宽容匹配占位符——翻译 API 常剥掉 \u0000 控制符（甚至插入空格）；
-    // V0.24：改用 ☃ 符号占位符，避免 Argos 等本地翻译把 "MATH" 音译成 "马特" 导致泄漏
-    zh = zh.replace(/\u0000?☃\s*(\d+)\s*☃\u0000?/g, (_m, n) => {
+    // V0.25：ZZnZZ 占位符在 Argos 下能原样保留；同时兼容旧版 MATH/☃ 占位符。
+    zh = zh.replace(/\u0000?(?:MATH|ZZ|☃)\s*(\d+)\s*(?:MATH|ZZ|☃)\u0000?/g, (_m, n) => {
       const mi = Number(n);
       used.add(mi);
       const math = j.math[mi];

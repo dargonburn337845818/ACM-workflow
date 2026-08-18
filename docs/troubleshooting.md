@@ -93,6 +93,7 @@ mingw-w64 安装器默认路径 → `/usr/bin/g++`。安装后重启 VS Code 再
 | 端口 27121 被占用 | 配置 `acmWorkflow.companionPort` 换端口，浏览器插件同步修改 |
 | 批量补样例失败 | 命令「批量补充测试数据」会逐题抓取（洛谷风控严格，批量易挂，建议只用于 CF） |
 | 翻译为空 | 免费后端有日限额（MyMemory ~5000 字符/天），换 `libre`/`deepseek` 或次日再试 |
+| 本地翻译丢失公式/截断 | 升级到 0.18.3；确认 `localAutoStart` 为 `true` 或手动运行 `bash tools/start_local_translate.sh --port 5000`；可在设置中调大 `maxTranslateSegments` |
 | 扩展更新后行为异常 | 重启 VS Code；仍异常可查看输出面板 `ACM Workflow` 频道日志 |
 | 想反馈 Bug / 提需求 | GitHub Issues（附「环境诊断」输出与复现步骤） |
 

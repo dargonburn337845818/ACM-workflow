@@ -17,6 +17,8 @@
 | `acmWorkflow.libreEndpoint` | string | `https://libretranslate.com/translate` | LibreTranslate 翻译端点。自建实例填 `http://localhost:5000/translate`。 |
 | `acmWorkflow.localEndpoint` | string | `http://127.0.0.1:5000/translate` | 本地离线翻译端点。配合 `tools/local_translate_server.py` 或自建 LibreTranslate 实例。 |
 | `acmWorkflow.localAutoStart` | boolean | `true` | 使用 `local` 后端时，若本地服务未启动，扩展自动用 `tools/start_local_translate.sh` 拉起。 |
+| `acmWorkflow.maxTranslateParagraphs` | number | `200` | 单次题面翻译最多翻译的段落数，防止超长题面超时/耗配额。 |
+| `acmWorkflow.maxTranslateSegments` | number | `50` | 单个长段落最多拆成几句进行翻译，防止提示等长段落被截断。 |
 | `acmWorkflow.browserPath` | string | `""` | Puppeteer 使用的浏览器可执行文件路径。留空自动探测；WSL 可填 `/usr/bin/chromium` 或 `/mnt/c/Program Files/.../msedge.exe`。 |
 | `acmWorkflow.followHandles` | string[] | `[]` | 比赛面板「我的关注」榜单的额外关注 handle（逗号分隔编辑；自己的 `cfHandle` 自动包含，大小写不敏感）。 |
 | `acmWorkflow.proxy` | string | `""` | CF 网络代理地址，如 `http://127.0.0.1:7890`。**VS Code 扩展进程的请求不跟随系统代理**，需要代理访问 CF 时在此填写；留空则尝试环境变量 `HTTPS_PROXY` / `HTTP_PROXY`。 |

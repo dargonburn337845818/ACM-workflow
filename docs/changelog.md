@@ -2,6 +2,15 @@
 
 版本号遵循语义化版本。本文件记录全部迭代历史（含内部开发记录提炼）。
 
+## 0.18.3 — 本地翻译稳定性修复（2026-08-18）
+
+- `src/services/translate.ts`：公式占位符从 `☃0☃` 改为 `ZZnZZ`，修复 Argos 把 `☃` 改写成 `XQ` 导致公式无法还原的问题；同时兼容旧版 `MATH` / `☃` 占位符
+- `src/services/translate.ts`：默认翻译段落数从 30 提升到 200、单段拆句数从 6 提升到 50，并新增 `acmWorkflow.maxTranslateParagraphs` / `acmWorkflow.maxTranslateSegments` 配置项
+- `src/services/translate.ts`：部分句子翻译失败时保留成功译文、失败句子保留英文，避免整段中文丢失
+- `src/services/translate.ts`：本地翻译服务自动启动失败后清除状态，允许下次重试；同时输出启动脚本 stderr 便于排查
+- `media/main.js`：Webview 兜底还原公式占位符时兼容 `ZZnZZ` / `MATH` / `☃`
+- 文档：README / configuration 增加新配置项说明
+
 ## 0.18.2 — WSL 适配与题面公式修复（2026-08-18）
 
 - 新增 `tools/setup_wsl.sh`：一键安装 g++ / curl / python3 / Chromium，可选本地离线翻译

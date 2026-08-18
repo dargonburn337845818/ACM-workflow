@@ -103,6 +103,8 @@ WSL 下如果不想在 Linux 里装浏览器，可以直接复用 Windows 的 Ed
 | `acmWorkflow.libreEndpoint` | LibreTranslate 官方 | 自建 LibreTranslate 实例端点 |
 | `acmWorkflow.localEndpoint` | `http://127.0.0.1:5000/translate` | 本地离线翻译端点（配合 `tools/` 脚本） |
 | `acmWorkflow.localAutoStart` | `true` | `local` 后端未启动时，扩展自动拉起本地服务 |
+| `acmWorkflow.maxTranslateParagraphs` | `200` | 单次题面翻译最多段落数，防止超长题面超时/耗配额 |
+| `acmWorkflow.maxTranslateSegments` | `50` | 单段最多拆句数，防止长提示被截断 |
 | `acmWorkflow.browserPath` | `""`（自动探测） | Puppeteer 浏览器路径；WSL 可填 `/usr/bin/chromium` 或 `/mnt/c/...` 的 Windows 浏览器 |
 | `acmWorkflow.followHandles` | `[]` | 比赛「我的关注」额外 Handle（自己的自动包含） |
 | `acmWorkflow.proxy` | `""` | CF 网络代理（扩展请求不跟随系统代理，需代理时填写） |

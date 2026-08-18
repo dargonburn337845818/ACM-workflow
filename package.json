@@ -2,7 +2,7 @@
   "name": "acm-workflow",
   "displayName": "ACM Workflow",
   "description": "VSCode 中强大的 Codeforces 刷题助手：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录，全部在编辑器内完成",
-  "version": "0.18.2",
+  "version": "0.18.3",
   "publisher": "deepseekharness",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -158,6 +158,16 @@
           "type": "boolean",
           "default": true,
           "description": "使用 local 翻译后端时，如果本地服务未启动，是否由扩展自动拉起（需要 tools/ 随扩展发布）。"
+        },
+        "acmWorkflow.maxTranslateParagraphs": {
+          "type": "number",
+          "default": 200,
+          "description": "单次题面翻译最多翻译的段落数（防止超长题面超时/耗配额）。"
+        },
+        "acmWorkflow.maxTranslateSegments": {
+          "type": "number",
+          "default": 50,
+          "description": "单个长段落最多拆成几句进行翻译（防止提示等长段落被截断）。"
         },
         "acmWorkflow.browserPath": {
           "type": "string",

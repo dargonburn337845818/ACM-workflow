@@ -154,9 +154,9 @@
         // V0.21：兜底还原 MATHn 占位符——若翻译侧还原失败（API 剥掉掩码控制符），
         // 直接从该段落英文侧的 .acm-math 源码按索引取回公式，绝不把 MATH0 泄漏给用户
         let zh = stZh[i];
-        if (/\u0000?MATH\s*\d+\s*\u0000?/.test(zh)) {
+        if (/\u0000?(?:MATH|ZZ|☃)\s*\d+\s*(?:MATH|ZZ|☃)\u0000?/.test(zh)) {
           const mathEls = el.querySelectorAll('.acm-math');
-          zh = zh.replace(/\u0000?MATH\s*(\d+)\s*\u0000?/g, (m, n) => {
+          zh = zh.replace(/\u0000?(?:MATH|ZZ|☃)\s*(\d+)\s*(?:MATH|ZZ|☃)\u0000?/g, (m, n) => {
             const me = mathEls[Number(n)];
             if (!me) return m;
             const block = me.classList.contains('acm-math-block');
@@ -1386,9 +1386,9 @@
       blocks.forEach((el, i) => {
         if (!zh[i]) return;
         let t = zh[i];
-        if (/\u0000?MATH\s*\d+\s*\u0000?/.test(t)) {
+        if (/\u0000?(?:MATH|ZZ|☃)\s*\d+\s*(?:MATH|ZZ|☃)\u0000?/.test(t)) {
           const mathEls = el.querySelectorAll('.acm-math');
-          t = t.replace(/\u0000?MATH\s*(\d+)\s*\u0000?/g, (m, n) => {
+          t = t.replace(/\u0000?(?:MATH|ZZ|☃)\s*(\d+)\s*(?:MATH|ZZ|☃)\u0000?/g, (m, n) => {
             const me = mathEls[Number(n)];
             if (!me) return m;
             const block = me.classList.contains('acm-math-block');
