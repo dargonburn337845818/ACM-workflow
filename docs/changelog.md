@@ -2,6 +2,22 @@
 
 版本号遵循语义化版本。本文件记录全部迭代历史（含内部开发记录提炼）。
 
+## 0.18.2 — WSL 适配与题面公式修复（2026-08-18）
+
+- 新增 `tools/setup_wsl.sh`：一键安装 g++ / curl / python3 / Chromium，可选本地离线翻译
+- `src/utils/paths.ts` 新增 `normalizePath`：WSL 下自动把 `C:\...` / `D:\...` 转成 `/mnt/c/...` / `/mnt/d/...`，`baseDir` / `templatePath` / `dbPath` / `browserPath` 全部生效
+- `src/services/dataGen.ts`：`.py` 造数据脚本在非 Windows 平台优先使用 `python3`，找不到再回退 `python`
+- `src/services/fetchers/luogu.ts`：浏览器探测增加 Chromium / Google Chrome / `/mnt/c` 路径，支持 `acmWorkflow.browserPath` 自定义；错误提示指向 `setup_wsl.sh`
+- `src/services/runner.ts`：环境诊断增加 `/bin/curl` 与 python3 探测
+- `src/services/cfSession.ts` / `submitter.ts`：WSL 浏览器启动加 `--no-sandbox`，错误提示更可操作
+- `src/services/template.ts`：CPH `.prob` 同时生成 WSL `/mnt/...` 与 Windows `C:\...` 路径变体，WSL/Windows 两端都能命中
+- `src/services/statementFiles.ts`：生成题目文件夹时同时写出 `题面.md`（由 HTML 转换），方便外部查看/分享
+- `src/services/translate.ts`：公式占位符从 `MATH0` 改为 `☃0☃`，避免 Argos 等本地翻译把 `MATH` 音译成“马特”导致译文泄漏
+- `src/services/statementHtml.ts`：修复 CF 题面 `$$$...$$$` 行内公式被误判为 `$$...$$` 块级公式，导致 “s and t of length n” 被拆成公式碎片、KaTeX 渲染乱版的问题；`statementFiles.ts` 同步提升题面 HTML 缓存版本，旧乱版缓存自动失效重抓
+- `src/core/workbench.ts`：打开题目时自动从 CF 题集补全难度，URL 导入/本地打开也能显示 rating
+- `src/features/records/index.ts` / `src/features/contest/index.ts`：记录导入与比赛“我的关注”直接使用 CF 登录态 handle，移除记录页手动“绑定 / 更换”按钮
+- 文档：README / getting-started / configuration / troubleshooting / tools 增加 WSL 章节
+
 ## 0.18.0 — 开源首版（2026-08-18）
 
 **结构重组完成**（V0.18 遗留收尾）：

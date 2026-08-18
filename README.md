@@ -60,14 +60,33 @@
 2. VS Code 扩展面板 → `...` → **从 VSIX 安装...** → 选择文件
 3. 安装后按 `Ctrl+Alt+A` 打开工作台（首次安装会自动弹出三步入门指引）
 
+> 每次推送 `vX.Y.Z` tag 到 `main`，GitHub Actions 会自动构建 VSIX 并发布到 Releases。
+
 ### 方式三：源码运行（开发模式）
 
 ```bash
 git clone https://github.com/dargonburn337845818/ACM-workflow.git
-cd ACM-work
+cd ACM-workflow
 npm install --include=dev   # NODE_ENV=production 环境下必须加 --include=dev
 npm run compile
 # 按 F5 启动 Extension Development Host
+```
+
+### WSL 用户
+
+如果你通过 VS Code 的 WSL 插件在 WSL 里使用/开发本扩展，先准备 WSL 环境：
+
+```bash
+bash tools/setup_wsl.sh                  # g++ / curl / python3 / 浏览器
+bash tools/setup_wsl.sh --with-translate # 需要本地离线翻译时
+```
+
+WSL 下如果不想在 Linux 里装浏览器，可以直接复用 Windows 的 Edge/Chrome，在设置里填写：
+
+```jsonc
+{
+  "acmWorkflow.browserPath": "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+}
 ```
 
 ## ⚙️ 配置项
@@ -80,8 +99,11 @@ npm run compile
 | `acmWorkflow.cfHandle` | `""` | Codeforces Handle（看板统计/薄弱点推荐/关注榜单） |
 | `acmWorkflow.testTimeoutMs` | `5000` | 单用例运行超时（毫秒），有题面时间限制时自动用题面值+1s |
 | `acmWorkflow.companionPort` | `27121` | competitive-companion 接收端口 |
-| `acmWorkflow.translateProvider` | `auto` | 翻译后端：`auto` / `libre` / `deepseek`（DeepSeek 密钥存系统密钥链） |
+| `acmWorkflow.translateProvider` | `auto` | 翻译后端：`auto` / `libre` / `local` / `deepseek`（DeepSeek 密钥存系统密钥链） |
 | `acmWorkflow.libreEndpoint` | LibreTranslate 官方 | 自建 LibreTranslate 实例端点 |
+| `acmWorkflow.localEndpoint` | `http://127.0.0.1:5000/translate` | 本地离线翻译端点（配合 `tools/` 脚本） |
+| `acmWorkflow.localAutoStart` | `true` | `local` 后端未启动时，扩展自动拉起本地服务 |
+| `acmWorkflow.browserPath` | `""`（自动探测） | Puppeteer 浏览器路径；WSL 可填 `/usr/bin/chromium` 或 `/mnt/c/...` 的 Windows 浏览器 |
 | `acmWorkflow.followHandles` | `[]` | 比赛「我的关注」额外 Handle（自己的自动包含） |
 | `acmWorkflow.proxy` | `""` | CF 网络代理（扩展请求不跟随系统代理，需代理时填写） |
 
@@ -100,7 +122,8 @@ npm run compile
 ## ❓ 常见问题（FAQ）
 
 - **题面空白 / 抓取失败？** 运行命令 `ACM Workflow: 环境诊断` 查看网络与工具链状态；题面有 30 天磁盘缓存，断网也可读缓存。
-- **编译失败？** 需要 g++。Windows 装 [MinGW-w64](https://www.mingw-w64.org/) 或 MSYS2，Linux/macOS 装 gcc；扩展自动探测 PATH 与常见安装位置。
+- **编译失败？** 需要 g++。Windows 装 [MinGW-w64](https://www.mingw-w64.org/) 或 MSYS2，Linux/macOS 装 gcc；WSL 可运行 `bash tools/setup_wsl.sh`；扩展自动探测 PATH 与常见安装位置。
+- **WSL 里打不开浏览器？** 先运行 `bash tools/setup_wsl.sh` 安装 Chromium，或在设置里把 `acmWorkflow.browserPath` 指向 Windows 侧 Edge/Chrome（`/mnt/c/...`）。
 - **CF 访问慢？** 扩展请求不跟随系统代理：有代理请配置 `acmWorkflow.proxy`；无代理时扩展已强制 IPv4 直连（规避 IPv6 半通问题）。
 - **洛谷题目？** 支持洛谷题面/样例抓取与历史记录（浏览器直连 + 缓存兜底）；选题专注 Codeforces。
 - **隐私？** 账号密码/Cookie/DeepSeek Key 全部存系统密钥链（`vscode.SecretStorage`），不写入任何配置文件与代码仓库。
@@ -138,6 +161,7 @@ src/
 ├── types/                    # 统一类型定义
 └── utils/
     └── paths.ts              # 路径解析（配置化，跨平台默认）
+tools/                        # WSL 环境脚本 + 本地离线翻译：安装脚本 + 极简 Argos HTTP 服务
 media/                        # 工作台前端（main.js / style.css / icon / walkthrough）
 tests/smoke.js                # 冒烟测试（无 VS Code 环境可跑）
 docs/                         # 完整文档

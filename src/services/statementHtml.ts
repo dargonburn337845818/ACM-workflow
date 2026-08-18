@@ -47,8 +47,26 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** 文本中的 LaTeX 边界：$$..$$ | \[..\] | \(..\) | $..$（按此顺序匹配，互不拆分） */
-const MATH_TEXT_RE = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]+\$/g;
+/** 去掉 LaTeX 定界符（$$$..$$$ / $$..$$ / \[..\] / \(..\) / $..$），供 KaTeX 直接渲染 */
+function stripMathDelimiters(src: string): string {
+  const s = src.trim();
+  const pairs: [string, string][] = [
+    ['$$$', '$$$'],
+    ['$$', '$$'],
+    ['\\[', '\\]'],
+    ['\\(', '\\)'],
+    ['$', '$']
+  ];
+  for (const [left, right] of pairs) {
+    if (s.startsWith(left) && s.endsWith(right) && s.length >= left.length + right.length) {
+      return s.slice(left.length, s.length - right.length).trim();
+    }
+  }
+  return s;
+}
+
+/** 文本中的 LaTeX 边界：$$$..$$$ | $$..$$ | \[..\] | \(..\) | $..$（按此顺序匹配，互不拆分） */
+const MATH_TEXT_RE = /\$\$\$[\s\S]*?\$\$\$|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]+\$/g;
 
 /**
  * 把纯文本中的公式片段替换为 acm-math 标签（其余部分做 HTML 转义）。
@@ -62,10 +80,12 @@ function protectMathText(text: string): string {
   while ((m = re.exec(text))) {
     parts.push(escapeHtml(text.slice(last, m.index)));
     const raw = m[0];
-    const block = raw.startsWith('$$') || raw.startsWith('\\[');
-    // 定界符长度：$$..$$ / \[..\] / \(..\) 都是 2 字符；$..$ 是 1 字符
+    // CF 题面用 $$$..$$$ 表示行内公式，必须先于 $$..$$ 识别，且按行内处理
+    const triple = raw.startsWith('$$$');
+    const block = !triple && (raw.startsWith('$$') || raw.startsWith('\\['));
+    // 定界符长度：$$$..$$$ 是 3 字符；$$..$$ / \[..\] / \(..\) 都是 2 字符；$..$ 是 1 字符
     const dbl = block || raw.startsWith('\\(');
-    const inner = raw.slice(dbl ? 2 : 1, raw.length - (dbl ? 2 : 1)).trim();
+    const inner = raw.slice(triple ? 3 : (dbl ? 2 : 1), raw.length - (triple ? 3 : (dbl ? 2 : 1))).trim();
     parts.push(block
       ? `<div class="acm-math acm-math-block">${escapeHtml(inner)}</div>`
       : `<span class="acm-math">${escapeHtml(inner)}</span>`);
@@ -148,8 +168,8 @@ function renderInlineNode($: cheerio.CheerioAPI, node: AnyNode, ctx: BuildCtx): 
   if (name === 'span') {
     const cls = String($el.attr('class') || '');
     if (cls.includes('tex-span')) {
-      // CF 行内公式：取 span 内文本作为 LaTeX 源码（不拆分、不折叠内部）
-      const src = $el.text().replace(THIN_SPACES, ' ').replace(/\s+/g, ' ').trim();
+      // CF 行内公式：取 span 内文本作为 LaTeX 源码（不拆分、不折叠内部），去掉外层定界符
+      const src = stripMathDelimiters($el.text().replace(THIN_SPACES, ' ').replace(/\s+/g, ' ').trim());
       if (!src) return { html: '', text: '' };
       return { html: `<span class="acm-math">${escapeHtml(src)}</span>`, text: src };
     }

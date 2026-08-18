@@ -12,6 +12,7 @@ import { findProbFile, updateProblemTests, listProblemCpps, saveProblemTests } f
 import { compileCpp } from '../services/runner';
 import { diagnoseEnv } from '../services/runner';
 import { listRecords, ensureRecord, getStats, ProblemRecord } from '../services/records';
+import { getStoredSession } from '../services/cfSession';
 import { computeDifficultyBins } from '../services/statistics';
 import { ContestDetail } from '../services/cfContest';
 import { Problem } from '../types';
@@ -262,6 +263,20 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     } catch { /* 记录不可用时难度显示 — */ }
   }
 
+  /** 确保 CF 题目难度进入 difficultyById：URL 导入/本地打开没有 difficulty 时从题集补 */
+  private async ensureDifficulty(problem: Problem): Promise<void> {
+    if (problem.difficulty) {
+      this.difficultyById.set(problem.id, problem.difficulty);
+      return;
+    }
+    if (problem.platform !== 'codeforces') return;
+    try {
+      const all = await getCodeforcesProblems();
+      const p = all.find((x) => x.id === problem.id);
+      if (p && p.difficulty) this.difficultyById.set(problem.id, p.difficulty);
+    } catch { /* 题集不可用时保持未定 */ }
+  }
+
   public resolveWebviewView(webviewView: vscode.WebviewView) {
     this.view = webviewView;
     this.disposables = [];
@@ -478,6 +493,11 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     }
     if (!problem) { empty(); return; }
     console.log(`[ACM-Workflow][题面] 解析成功: ${problem.platform} ${problem.id}（${filePath}）`);
+    // 最多等 1.2s 补难度，避免 CF 题集未缓存且网络慢时阻塞题面显示
+    await Promise.race([
+      this.ensureDifficulty(problem),
+      new Promise((r) => setTimeout(r, 1200))
+    ]);
 
     // V0.20：题目文件夹落盘（排版 HTML）优先——切换界面直接读盘；手动刷新时跳过
     if (!force) {
@@ -695,6 +715,14 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
 
   public async pushRecords() {
     try {
+      let handle = vscode.workspace.getConfiguration('acmWorkflow').get<string>('cfHandle', '') || '';
+      if (!handle) {
+        try {
+          const session = await getStoredSession(this.context);
+          if (session && session.handle && session.handle !== 'unknown') handle = session.handle;
+        } catch { /* 读失败按未登录处理 */ }
+      }
+      this.view?.webview.postMessage({ type: 'cfBound', handle });
       const [records, stats] = await Promise.all([
         listRecords(),
         getStats()
@@ -979,11 +1007,10 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
       <div class="view" id="view-history">
         <div class="rec-wrap">
           <div class="card cf-bind">
-            <span class="cf-bind-label">CF 账号</span>
-            <span class="mono cf-handle" id="cf-handle">未绑定</span>
+            <span class="cf-bind-label">CF 账号（登录态）</span>
+            <span class="mono cf-handle" id="cf-handle">未登录</span>
             <span class="spacer"></span>
-            <button class="btn" id="cf-bind-btn" title="输入 CF Handle，拉取 AC 历史并作为薄弱点推荐依据">绑定 / 更换</button>
-            <button class="btn" id="cf-import-btn" title="重新拉取该账号的 AC 历史并导入本地库">导入历史</button>
+            <button class="btn" id="cf-import-btn" title="拉取当前登录账号的 AC 历史并导入本地库">导入历史</button>
           </div>
           <div class="card chart-row">
             <div class="chart-block">

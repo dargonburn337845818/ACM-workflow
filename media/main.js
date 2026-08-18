@@ -1071,15 +1071,11 @@
     if (streakEl) streakEl.textContent = ts && ts.streak != null ? ts.streak : '–';
   }
 
-  // ===== CF 账号绑定 / 专题饼图（纯 SVG 环形图，零依赖；标签中文，V0.8） =====
+  // ===== CF 账号（登录态）/ 专题饼图（纯 SVG 环形图，零依赖；标签中文，V0.8） =====
   const cfHandleEl = document.getElementById('cf-handle');
-  const cfBindBtn = document.getElementById('cf-bind-btn');
   const cfImportBtn = document.getElementById('cf-import-btn');
   const pieChartEl = document.getElementById('pie-chart');
 
-  if (cfBindBtn) {
-    cfBindBtn.addEventListener('click', () => vscode.postMessage({ type: 'bindCfHandle' }));
-  }
   if (cfImportBtn) {
     cfImportBtn.addEventListener('click', () => vscode.postMessage({ type: 'importCfHistory' }));
   }
@@ -1172,7 +1168,7 @@
 
   function renderCfHandle(handle) {
     if (cfHandleEl) {
-      cfHandleEl.textContent = handle || '未绑定';
+      cfHandleEl.textContent = handle || '未登录';
       cfHandleEl.classList.toggle('bound', !!handle);
     }
   }

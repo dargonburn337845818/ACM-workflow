@@ -5,7 +5,7 @@ cache/
 code/
 records.db
 dist/
-tools/
+tools/shots/
 tests/
 .git/
 .gitignore

@@ -16,7 +16,9 @@ const COMPILER_CANDIDATES = [
   'C:\\mingw64\\bin\\g++.exe',
   'C:\\msys64\\mingw64\\bin\\g++.exe',
   'C:\\Program Files\\mingw-w64\\x86_64-8.1.0-posix-seh-rt_v6-rev0\\mingw64\\bin\\g++.exe',
-  '/usr/bin/g++'
+  '/usr/bin/g++',
+  '/usr/local/bin/g++',
+  '/opt/homebrew/bin/g++'
 ];
 
 let cachedCompiler: string | null | undefined;
@@ -52,7 +54,9 @@ let compileCache: CompileCacheEntry | null = null;
 export function compileCpp(srcPath: string): { ok: boolean; exePath?: string; message: string } {
   const compiler = findCompiler();
   if (!compiler) {
-    return { ok: false, message: '未找到 g++ 编译器。请安装 MinGW（如 C:\\mingw64）或把 g++ 加入 PATH。' };
+    return { ok: false, message: process.platform === 'win32'
+      ? '未找到 g++ 编译器。请安装 MinGW（如 C:\\mingw64）或把 g++ 加入 PATH。'
+      : '未找到 g++ 编译器。请安装 g++（如 sudo apt install g++）或把 g++ 加入 PATH。' };
   }
 
   let srcMtime = 0;
@@ -74,7 +78,7 @@ export function compileCpp(srcPath: string): { ok: boolean; exePath?: string; me
 
   const exeDir = path.join(os.tmpdir(), 'acm-workflow');
   fs.mkdirSync(exeDir, { recursive: true });
-  const exePath = path.join(exeDir, path.parse(srcPath).name + '_' + Date.now() + '.exe');
+  const exePath = path.join(exeDir, path.parse(srcPath).name + '_' + Date.now() + (process.platform === 'win32' ? '.exe' : ''));
   try {
     execFileSync(compiler, ['-O2', '-std=c++17', srcPath, '-o', exePath], {
       encoding: 'utf8',
@@ -149,7 +153,17 @@ export function diagnoseEnv(): string[] {
   lines.push('PATH:');
   (process.env.PATH || '').split(path.delimiter).filter((p) => p.length > 0).forEach((p) => lines.push('  ' + p));
   lines.push('curl:');
-  for (const c of ['C:\\Windows\\System32\\curl.exe', '/usr/bin/curl', 'curl.exe', 'curl']) {
+  for (const c of ['C:\\Windows\\System32\\curl.exe', '/usr/bin/curl', '/bin/curl', '/usr/local/bin/curl', 'curl.exe', 'curl']) {
+    try {
+      const v = execFileSync(c, ['--version'], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
+        .split('\n')[0];
+      lines.push(`  [OK] ${c} -> ${v}`);
+    } catch {
+      lines.push(`  [NO] ${c}`);
+    }
+  }
+  lines.push('python:');
+  for (const c of ['python3', 'python']) {
     try {
       const v = execFileSync(c, ['--version'], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] })
         .split('\n')[0];

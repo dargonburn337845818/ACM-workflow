@@ -199,6 +199,25 @@ function genPermutation(spec: DataGenSpec, rng: Rng): string {
 
 const SCRIPT_RUN_TIMEOUT_MS = 15000;
 
+let cachedPythonCommand: string | null = null;
+
+/** WSL/Linux 通常只有 python3；Windows 通常用 python；找不到 python3 时回退 python */
+function pythonCommand(): string {
+  if (cachedPythonCommand) return cachedPythonCommand;
+  const candidates = process.platform === 'win32' ? ['python'] : ['python3', 'python'];
+  for (const c of candidates) {
+    try {
+      execFileSync(c, ['--version'], { stdio: 'ignore', windowsHide: true });
+      cachedPythonCommand = c;
+      return c;
+    } catch {
+      /* try next */
+    }
+  }
+  cachedPythonCommand = candidates[0];
+  return cachedPythonCommand;
+}
+
 async function runScript(scriptPath: string): Promise<string> {
   if (!scriptPath || !fs.existsSync(scriptPath)) {
     throw new Error(`生成脚本不存在：${scriptPath || '(未填写)'}`);
@@ -211,7 +230,7 @@ async function runScript(scriptPath: string): Promise<string> {
     cmd = process.execPath; // 用扩展宿主自己的 Node
     args = [scriptPath];
   } else if (ext === '.py') {
-    cmd = 'python';
+    cmd = pythonCommand();
     args = [scriptPath];
   } else if (ext === '.cpp' || ext === '.cc') {
     const compiler = findCompiler();

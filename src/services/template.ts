@@ -1,6 +1,5 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vscode from 'vscode';
 import { createHash, randomUUID } from 'crypto';
 import { Problem } from '../types';
 import { resolveBaseDir, resolveTemplatePath } from '../utils/paths';
@@ -26,6 +25,27 @@ function sanitizeFileName(name: string): string {
     .replace(/\s+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
+}
+
+/** 把 WSL 路径 /mnt/c/... 转成 Windows 路径 C:\...；非 /mnt 路径原样返回 null */
+function windowsPathOf(p: string): string | null {
+  const m = /^\/mnt\/([a-zA-Z])\/(.*)$/.exec(p);
+  if (m) {
+    return `${m[1].toUpperCase()}:\\${m[2].replace(/\//g, '\\')}`;
+  }
+  return null;
+}
+
+/** CPH .prob 的 srcPath 候选：同时覆盖 WSL 路径、Windows 盘符大小写，保证两端都能命中 */
+function cphSrcPathVariants(filePath: string): Set<string> {
+  const variants = new Set<string>([filePath]);
+  const win = windowsPathOf(filePath);
+  if (win) {
+    variants.add(win);
+    variants.add(win.replace(/^([A-Za-z])(?=:)/, (_m, c: string) => c.toLowerCase()));
+  }
+  variants.add(filePath.replace(/^([A-Za-z])(?=:)/, (_m, c: string) => c.toLowerCase()));
+  return variants;
 }
 
 /** 解析最终模板内容：用户模板文件（存在时）→ 内置默认模板（带题号/URL 头注释） */
@@ -70,15 +90,13 @@ export function createProblemFile(problem: Problem, tests: { input: string; outp
   // CPH 按 document.fileName 的 md5 生成/查找 .prob 文件名，而 VS Code 在
   // Windows 上返回的盘符大小写并不稳定（大写和小写盘符都可能出现），
   // 大小写不一致会导致 CPH 找不到 .prob、侧边栏没有测试用例。
-  // 因此这里同时生成大写盘符和小写盘符两份 .prob，保证两种情况都能命中。
+  // 因此这里同时生成大写盘符和小写盘符两份 .prob；WSL 下额外生成 /mnt 对应的
+  // Windows 路径，保证 WSL 与 Windows 两端都能命中。
   const cphDir = path.join(problemDir, '.cph');
   fs.mkdirSync(cphDir, { recursive: true });
 
   const batchId = randomUUID();
-  const srcPathVariants = new Set<string>([
-    filePath,
-    filePath.replace(/^([A-Za-z])(?=:)/, (_m, c: string) => c.toLowerCase())
-  ]);
+  const srcPathVariants = cphSrcPathVariants(filePath);
 
   for (const cphSrcPath of srcPathVariants) {
     const prob = {
@@ -124,10 +142,7 @@ export function createProblemFile(problem: Problem, tests: { input: string; outp
 export function saveProblemTests(filePath: string, tests: { id: number; input: string; output: string }[]): boolean {
   const cphDir = path.join(path.dirname(filePath), '.cph');
   const fileName = path.basename(filePath);
-  const variants = new Set<string>([
-    filePath,
-    filePath.replace(/^([A-Za-z])(?=:)/, (_m, c: string) => c.toLowerCase())
-  ]);
+  const variants = cphSrcPathVariants(filePath);
   let updated = false;
   for (const v of variants) {
     const md5 = createHash('md5').update(v).digest('hex');
@@ -192,10 +207,7 @@ export function findProblemCppById(problemId: string): string | null {
 export function findProbFile(filePath: string): string | null {
   const cphDir = path.join(path.dirname(filePath), '.cph');
   const fileName = path.basename(filePath);
-  const variants = new Set<string>([
-    filePath,
-    filePath.replace(/^([A-Za-z])(?=:)/, (_m, c: string) => c.toLowerCase())
-  ]);
+  const variants = cphSrcPathVariants(filePath);
   for (const v of variants) {
     const md5 = createHash('md5').update(v).digest('hex');
     const probPath = path.join(cphDir, `.${fileName}_${md5}.prob`);
@@ -213,10 +225,7 @@ export function findProbFile(filePath: string): string | null {
 export function updateProblemTests(filePath: string, tests: { input: string; output: string }[]): boolean {
   const cphDir = path.join(path.dirname(filePath), '.cph');
   const fileName = path.basename(filePath);
-  const variants = new Set<string>([
-    filePath,
-    filePath.replace(/^([A-Za-z])(?=:)/, (_m, c: string) => c.toLowerCase())
-  ]);
+  const variants = cphSrcPathVariants(filePath);
   let updated = false;
   const now = Date.now();
   for (const v of variants) {
@@ -252,10 +261,7 @@ function writeCphProbForContest(filePath: string, prob: { name: string; url: str
   fs.mkdirSync(cphDir, { recursive: true });
   const fileName = path.basename(filePath);
   const batchId = randomUUID();
-  const srcPathVariants = new Set<string>([
-    filePath,
-    filePath.replace(/^([A-Za-z])(?=:)/, (_m, c: string) => c.toLowerCase())
-  ]);
+  const srcPathVariants = cphSrcPathVariants(filePath);
   for (const cphSrcPath of srcPathVariants) {
     const cphProb = {
       name: prob.name,
@@ -366,13 +372,10 @@ export function markSamplesFetchFailed(filePath: string): void {
       fs.writeFileSync(probPath, JSON.stringify(prob, null, 2), 'utf8');
     } catch { /* 忽略 */ }
   }
-  // .cph 双盘符
+  // .cph 双盘符（WSL 下含 /mnt 对应的 Windows 路径）
   const cphDir = path.join(path.dirname(filePath), '.cph');
   const fileName = path.basename(filePath);
-  const variants = new Set<string>([
-    filePath,
-    filePath.replace(/^([A-Za-z])(?=:)/, (_m, c: string) => c.toLowerCase())
-  ]);
+  const variants = cphSrcPathVariants(filePath);
   for (const v of variants) {
     const md5 = createHash('md5').update(v).digest('hex');
     const cphPath = path.join(cphDir, `.${fileName}_${md5}.prob`);

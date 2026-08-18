@@ -129,13 +129,16 @@ export async function clearSession(context: vscode.ExtensionContext): Promise<vo
 async function launchVisibleBrowser() {
   const exe = getBrowserPath();
   if (!exe) {
-    throw new CfSessionError('未找到 Edge/Chrome 浏览器，无法打开 Codeforces 登录页', 'login-failed');
+    throw new CfSessionError(
+      '未找到 Edge/Chrome/Chromium 浏览器，无法打开 Codeforces 登录页。WSL 可运行 bash tools/setup_wsl.sh 或配置 acmWorkflow.browserPath',
+      'login-failed'
+    );
   }
   return puppeteer.launch({
     executablePath: exe,
     headless: false, // 有头：用户需要手动输入账号密码
     args: [
-      '--disable-gpu', '--disable-dev-shm-usage',
+      '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
       '--lang=en',
       '--window-size=1100,850',

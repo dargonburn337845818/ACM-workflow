@@ -125,7 +125,18 @@ console.log('== 6. 知识图谱结构 ==');
   assert(bad.length === 0, '每个算法含 name/cpp/complexity', bad.map((b) => b.name).join(','));
 }
 
-console.log('== 7. 扩展激活链路（模拟 VS Code） ==');
+console.log('== 7. WSL 路径适配 ==');
+{
+  const { normalizePath } = require(out('utils/paths.js'));
+  if (process.platform === 'linux') {
+    assert(normalizePath('D:\\CF\\work') === '/mnt/d/CF/work', 'Windows 盘符路径转 WSL /mnt');
+    assert(normalizePath('C:/Program Files/Edge/msedge.exe') === '/mnt/c/Program Files/Edge/msedge.exe', '正斜杠 Windows 路径转 WSL');
+  } else {
+    assert(normalizePath('D:\\CF\\work') === path.resolve('D:\\CF\\work'), 'Windows 平台保留原路径');
+  }
+}
+
+console.log('== 8. 扩展激活链路（模拟 VS Code） ==');
 (async () => {
   const vscodeMock = require('./mock-vscode');
   const { activate, deactivate } = require(out('extension.js'));
@@ -151,6 +162,20 @@ console.log('== 7. 扩展激活链路（模拟 VS Code） ==');
     console.log('  扩展激活与释放完成');
   } catch (e) {
     assert(false, '扩展激活', e.message);
+  }
+})();
+
+console.log('== 9. 题面 LaTeX 排版（CF $$$ 行内公式） ==');
+(async () => {
+  try {
+    const { parseCfStatementHtml } = require(out('services/statementHtml.js'));
+    const html = `<div class="problem-statement"><div class="header"><div class="title">T</div><div class="time-limit"><div class="property-title">time limit per test</div>2 seconds</div><div class="memory-limit"><div class="property-title">memory limit per test</div>256 megabytes</div></div><div class="legend"><p>Naman has two binary strings $$$s$$$ and $$$t$$$ of length $$$n$$$.</p></div><div class="sample-tests"><div class="sample-test"><div class="input"><pre>1</pre></div><div class="output"><pre>1</pre></div></div></div></div>`;
+    const res = await parseCfStatementHtml(html, async () => null);
+    assert(res.html.includes('<span class="acm-math">s</span> and <span class="acm-math">t</span> of length <span class="acm-math">n</span>'),
+      'CF $$$ 公式被识别为行内公式');
+    assert(!res.html.includes('acm-math-block'), 'CF $$$ 行内公式不会误判为块级公式', res.html);
+  } catch (e) {
+    assert(false, '题面 LaTeX 排版', e.message);
   }
 })();
 
