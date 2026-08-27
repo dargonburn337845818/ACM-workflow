@@ -194,7 +194,7 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
         try {
           url = this.view?.webview.asWebviewUri(vscode.Uri.file(p)).toString() || p;
         } catch { /* keep raw */ }
-        this.post({ type: 'wallpaperPicked', path: url, isVideo });
+        this.post({ type: 'wallpaperPicked', path: url, localPath: p, isVideo });
       }
       return;
     }

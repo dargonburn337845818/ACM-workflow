@@ -2520,9 +2520,10 @@
       // ===== 通过 URL 导入题目（V0.23）=====
       case 'wallpaperPicked': {
         if (msg.path) {
-          wallpaperUrl.value = msg.path;
+          const local = msg.localPath || msg.path;
+          wallpaperUrl.value = local;
           applyWallpaper(msg.path, msg.isVideo || /\.(mp4|webm|mov|m4v)$/i.test(msg.path));
-          vscode.postMessage({ type: 'setWallpaper', url: msg.path, isVideo: msg.isVideo || /\.(mp4|webm|mov|m4v)$/i.test(msg.path) });
+          vscode.postMessage({ type: 'setWallpaper', url: local, isVideo: msg.isVideo || /\.(mp4|webm|mov|m4v)$/i.test(local) });
         }
         break;
       }
