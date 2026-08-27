@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>第 2 档内容质量报告</title>
+<style>
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f3f4f8; color: #1c1f26; margin: 0; padding: 32px; }
+  .wrap { max-width: 1100px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 28px 32px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  .meta { color: #6d7482; font-size: 13px; margin-bottom: 20px; }
+  .summary { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .card { background: #f4f5f9; border: 1px solid #e2e5ec; border-radius: 12px; padding: 12px 18px; }
+  .card b { font-size: 22px; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eef0f4; vertical-align: top; }
+  th { background: #f4f5f9; font-weight: 600; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.complete { color: #2f9e6e; background: rgba(47,158,110,0.1); }
+  .badge.skeleton { color: #c77f2a; background: rgba(199,127,42,0.1); }
+  .badge.todo { color: #d65a5a; background: rgba(214,90,90,0.1); }
+  .note { margin-top: 20px; font-size: 12px; color: #6d7482; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>第 2 档 · 内容质量报告</h1>
+  <div class="meta">1400 – 1600 · 核心训练：思维转换力 · 生成时间：2026-08-27 22:47</div>
+
+  <div class="summary">
+    <div class="card"><b>21</b>算法节点</div>
+    <div class="card"><b>21</b>完整</div>
+    <div class="card"><b>0</b>骨架</div>
+    <div class="card"><b>0</b>待补</div>
+  </div>
+
+  <h2 style="margin-top: 22px; font-size: 18px;">信息论操作分布</h2>
+  <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px;">
+    <div class="card"><b>6</b>编码压缩</div><div class="card"><b>7</b>传播松弛</div><div class="card"><b>7</b>剪枝决策</div><div class="card"><b>4</b>变换域映射</div><div class="card"><b>2</b>基线/暴力</div>
+  </div>
+
+  <h2 style="margin-top: 8px; font-size: 18px;">档位知识点</h2>
+  <table>
+    <thead>
+      <tr><th>标签</th><th>说明</th><th>CF 标签</th><th>关联模板数</th></tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td>双指针</td>
+          <td>双指针 / 滑动窗口维护区间性质</td>
+          <td>two pointers</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td>前缀和与差分</td>
+          <td>一维/二维前缀和与差分数组</td>
+          <td></td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td>构造</td>
+          <td>奇偶性/模运算构造解</td>
+          <td>constructive algorithms</td>
+          <td>1</td>
+        </tr>
+        <tr>
+          <td>排序 + 贪心</td>
+          <td>排序后带反悔/优先队列贪心</td>
+          <td>greedy</td>
+          <td>2</td>
+        </tr>
+        <tr>
+          <td>数论</td>
+          <td>唯一分解定理、欧拉筛、逆元·费马小定理</td>
+          <td>number theory</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td>动态规划（限定）</td>
+          <td>0/1 背包、完全背包、LIS 的 O(n log n)</td>
+          <td>dp</td>
+          <td>4</td>
+        </tr>
+        <tr>
+          <td>数据结构（限定）</td>
+          <td>栈、队列、单调栈、单调队列</td>
+          <td>data structures</td>
+          <td>5</td>
+        </tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top: 28px; font-size: 18px;">算法节点明细</h2>
+  <table>
+    <thead>
+      <tr><th>算法</th><th>分类</th><th>质量</th><th>简介</th><th>复杂度</th><th>模板长度</th></tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td>双指针（滑动窗口）</td>
+          <td>基础算法 / 双指针</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>维护左右端点，窗口满足条件时移动左端并更新答案，常用于子数组/子串问题。</td>
+          <td>O(n)</td>
+          <td>206</td>
+        </tr>
+        <tr>
+          <td>一维前缀和</td>
+          <td>基础算法 / 前缀和与差分</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>预处理前缀和数组，O(1) 求任意区间 [l,r] 的和。</td>
+          <td>O(n) 预处理 / O(1) 查询</td>
+          <td>116</td>
+        </tr>
+        <tr>
+          <td>二维前缀和</td>
+          <td>基础算法 / 前缀和与差分</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>用容斥预处理二维前缀和，O(1) 求子矩阵和。</td>
+          <td>O(nm) 预处理 / O(1) 查询</td>
+          <td>232</td>
+        </tr>
+        <tr>
+          <td>差分数组</td>
+          <td>基础算法 / 前缀和与差分</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>区间加 O(1) 更新，最后求前缀和还原原数组。</td>
+          <td>O(n+q)</td>
+          <td>119</td>
+        </tr>
+        <tr>
+          <td>构造算法</td>
+          <td>基础算法 / 构造</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>利用奇偶性、模运算或特殊性质直接构造一组满足条件的解。</td>
+          <td>O(n) 或 O(1)（视题目）</td>
+          <td>138</td>
+        </tr>
+        <tr>
+          <td>反悔贪心（带堆维护）</td>
+          <td>基础算法 / 贪心</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>当前贪心选择可能被更优解替换，用小根堆维护已选集合中“反悔代价最小”的元素。</td>
+          <td>O(n log n)</td>
+          <td>326</td>
+        </tr>
+        <tr>
+          <td>排序后取最值（基础贪心）</td>
+          <td>基础算法 / 贪心</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>先按某个关键字排序，再顺序取当前最优值；适用于排序后直接选最大/最小的基础贪心。</td>
+          <td>O(n log n)（排序）</td>
+          <td>208</td>
+        </tr>
+        <tr>
+          <td>唯一分解定理</td>
+          <td>数论 / 进阶数论</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>每个正整数可唯一写成质因数乘积；试除分解 O(√n)。</td>
+          <td>O(√n)</td>
+          <td>246</td>
+        </tr>
+        <tr>
+          <td>线性筛（欧拉筛）</td>
+          <td>数论 / 素数筛</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>每个合数只被最小质因子筛掉一次，同时可求最小质因子与欧拉函数。</td>
+          <td>O(n)</td>
+          <td>284</td>
+        </tr>
+        <tr>
+          <td>费马小定理求逆元</td>
+          <td>数论 / 快速幂与逆元</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>模数为素数 p 时，a 的逆元为 a^(p-2) mod p。</td>
+          <td>O(log p)</td>
+          <td>74</td>
+        </tr>
+        <tr>
+          <td>欧拉函数</td>
+          <td>数论 / 欧拉函数</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>φ(n) = n × ∏(1 - 1/p)；分解质因数 O(√n) 单点求，线性筛可批量求。</td>
+          <td>O(√n) 单点 / O(n) 批量</td>
+          <td>681</td>
+        </tr>
+        <tr>
+          <td>扩展欧几里得 (exgcd)</td>
+          <td>数论 / 快速幂与逆元</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>求解 ax + by = gcd(a,b) 的一组整数解；x 即 a 模 b 的逆元（互素时）。</td>
+          <td>O(log min(a,b))</td>
+          <td>238</td>
+        </tr>
+        <tr>
+          <td>0/1 背包</td>
+          <td>动态规划 / 线性 DP</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>每件物品最多选一次，滚动数组倒序枚举容量实现一维空间。</td>
+          <td>O(n·W)</td>
+          <td>252</td>
+        </tr>
+        <tr>
+          <td>完全背包</td>
+          <td>动态规划 / 线性 DP</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>物品无限，滚动数组正序枚举容量即可重复选取。</td>
+          <td>O(n·W)</td>
+          <td>218</td>
+        </tr>
+        <tr>
+          <td>LIS（最长上升子序列）</td>
+          <td>动态规划 / 线性 DP</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>求序列中最长的严格递增子序列长度；tail 数组维护各长度末尾最小值。</td>
+          <td>O(n log n)</td>
+          <td>223</td>
+        </tr>
+        <tr>
+          <td>LCS（最长公共子序列）</td>
+          <td>动态规划 / 线性 DP</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>求两个序列的最长公共子序列长度，经典二维 DP。</td>
+          <td>O(n·m)</td>
+          <td>315</td>
+        </tr>
+        <tr>
+          <td>栈（基础）</td>
+          <td>数据结构 / 栈</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>后进先出，常用 vector 模拟；典型应用括号匹配、表达式求值。</td>
+          <td>O(1) 入栈/出栈</td>
+          <td>82</td>
+        </tr>
+        <tr>
+          <td>队列（基础）</td>
+          <td>数据结构 / 队列</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>先进先出，BFS 与拓扑排序的基础容器。</td>
+          <td>O(1) 入队/出队</td>
+          <td>56</td>
+        </tr>
+        <tr>
+          <td>单调栈</td>
+          <td>数据结构 / 栈</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>维护单调递减栈，O(n) 求每个元素右侧第一个更大元素（存下标）。</td>
+          <td>O(n)</td>
+          <td>296</td>
+        </tr>
+        <tr>
+          <td>单调队列（滑动窗口）</td>
+          <td>数据结构 / 队列</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>窗口滑过数组，队头为窗口最大值；过期下标从队头弹出。</td>
+          <td>O(n)</td>
+          <td>351</td>
+        </tr>
+        <tr>
+          <td>堆（Top-K）</td>
+          <td>数据结构 / 堆</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>小根堆维护前 K 大：比堆顶大就替换，堆内即答案。</td>
+          <td>O(n log k)</td>
+          <td>267</td>
+        </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    说明：质量标记为「完整」表示简介、复杂度、C++ 模板都已具备；「骨架」表示仅有核心思路或不完整代码；「待补」表示尚未处理。
+    本批次主要参考 OI-Wiki 与 CP-Algorithms 进行核对。
+  </div>
+</div>
+</body>
+</html>

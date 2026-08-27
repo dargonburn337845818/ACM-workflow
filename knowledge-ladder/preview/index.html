@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CF 难度阶梯 · UI 预览</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-dark">
+  <div class="app">
+    <!-- 左侧边栏 -->
+    <aside class="sidebar">
+      <div class="app-title">CF 难度阶梯</div>
+      <div class="global-progress">总进度：12 / 120</div>
+
+      <div class="tier-list">
+        <div class="tier-item active">
+          <span class="tier-dot" style="--tier-color:#9A928A"></span>
+          <div class="tier-text">
+            <div class="tier-name">第 1 档</div>
+            <div class="tier-range">1200 – 1400 · 灰→绿</div>
+            <div class="tier-progress">已掌握 3/6</div>
+          </div>
+        </div>
+        <div class="tier-item">
+          <span class="tier-dot" style="--tier-color:#8B9A6B"></span>
+          <div class="tier-text">
+            <div class="tier-name">第 2 档</div>
+            <div class="tier-range">1400 – 1600 · 绿→蓝</div>
+            <div class="tier-progress">已掌握 2/7</div>
+          </div>
+        </div>
+        <div class="tier-item">
+          <span class="tier-dot" style="--tier-color:#6B8FA3"></span>
+          <div class="tier-text">
+            <div class="tier-name">第 3 档</div>
+            <div class="tier-range">1600 – 1800 · 蓝→紫</div>
+            <div class="tier-progress">已掌握 0/7</div>
+          </div>
+        </div>
+        <div class="tier-item">
+          <span class="tier-dot" style="--tier-color:#9A6B8B"></span>
+          <div class="tier-text">
+            <div class="tier-name">第 4 档</div>
+            <div class="tier-range">1800 – 2000 · 紫→橙</div>
+            <div class="tier-progress">已掌握 1/7</div>
+          </div>
+        </div>
+        <div class="tier-item">
+          <span class="tier-dot" style="--tier-color:#C25E5E"></span>
+          <div class="tier-text">
+            <div class="tier-name">第 5 档</div>
+            <div class="tier-range">2000 – 2200 · 橙→红</div>
+            <div class="tier-progress">已掌握 0/7</div>
+          </div>
+        </div>
+        <div class="tier-item">
+          <span class="tier-dot" style="--tier-color:#C79A6B"></span>
+          <div class="tier-text">
+            <div class="tier-name">第 6 档</div>
+            <div class="tier-range">2200 – 2400 · 红名冲刺</div>
+            <div class="tier-progress">已掌握 0/7</div>
+          </div>
+        </div>
+        <div class="tier-item">
+          <span class="tier-dot" style="--tier-color:#A94442"></span>
+          <div class="tier-text">
+            <div class="tier-name">第 7 档</div>
+            <div class="tier-range">2400 – 2800 · 红→黑红</div>
+            <div class="tier-progress">已掌握 0/7</div>
+          </div>
+        </div>
+        <div class="tier-item">
+          <span class="tier-dot" style="--tier-color:#3E2723"></span>
+          <div class="tier-text">
+            <div class="tier-name">第 8 档</div>
+            <div class="tier-range">2800 – 3500+ · 黑红→传说</div>
+            <div class="tier-progress">已掌握 0/34</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="btn" id="themeToggle">风格：深色现代</button>
+        <button class="btn danger">重置进度</button>
+      </div>
+    </aside>
+
+    <!-- 右侧主内容 -->
+    <main class="content">
+      <div class="tier-header">
+        <div class="tier-stripe"></div>
+        <div class="tier-title-row">
+          <h2>第 1 档 <span class="range">1200 – 1400</span></h2>
+          <span class="tier-goal">核心训练：代码实现力</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width: 50%"></div>
+          <span class="progress-label">已掌握 3 / 6</span>
+        </div>
+      </div>
+
+      <div class="tag-list">
+        <div class="tag-row">
+          <label class="checkbox">
+            <input type="checkbox" checked>
+            <span class="checkmark"></span>
+          </label>
+          <div class="tag-body">
+            <div class="tag-name">暴力枚举</div>
+            <div class="tag-desc">嵌套循环、位掩码子集枚举</div>
+          </div>
+          <span class="cf-tag">brute force</span>
+          <button class="btn small" data-modal="brute">模板</button>
+        </div>
+
+        <div class="tag-row">
+          <label class="checkbox">
+            <input type="checkbox" checked>
+            <span class="checkmark"></span>
+          </label>
+          <div class="tag-body">
+            <div class="tag-name">排序</div>
+            <div class="tag-desc">重载运算符 / 结构体排序</div>
+          </div>
+          <span class="cf-tag">sortings</span>
+          <button class="btn small" data-modal="sort">模板</button>
+        </div>
+
+        <div class="tag-row">
+          <label class="checkbox">
+            <input type="checkbox">
+            <span class="checkmark"></span>
+          </label>
+          <div class="tag-body">
+            <div class="tag-name">基础贪心</div>
+            <div class="tag-desc">排序后取最值</div>
+          </div>
+          <span class="cf-tag">greedy</span>
+          <button class="btn small" data-modal="greedy">模板</button>
+        </div>
+
+        <div class="tag-row">
+          <label class="checkbox">
+            <input type="checkbox">
+            <span class="checkmark"></span>
+          </label>
+          <div class="tag-body">
+            <div class="tag-name">二分答案</div>
+            <div class="tag-desc">整数域简单 check</div>
+          </div>
+          <span class="cf-tag">binary search</span>
+          <button class="btn small" data-modal="binary">模板</button>
+        </div>
+
+        <div class="tag-row">
+          <label class="checkbox">
+            <input type="checkbox">
+            <span class="checkmark"></span>
+          </label>
+          <div class="tag-body">
+            <div class="tag-name">基础数学</div>
+            <div class="tag-desc">GCD/LCM、素数判定、埃氏筛、快速幂</div>
+          </div>
+          <span class="cf-tag">math</span>
+          <button class="btn small" data-modal="math">模板</button>
+        </div>
+
+        <div class="tag-row">
+          <label class="checkbox">
+            <input type="checkbox">
+            <span class="checkmark"></span>
+          </label>
+          <div class="tag-body">
+            <div class="tag-name">纯模拟</div>
+            <div class="tag-desc">按题意复现流程</div>
+          </div>
+          <span class="cf-tag">implementation</span>
+          <button class="btn small" data-modal="impl">模板</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 模板详情弹窗 -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="quality-badge complete">完整</span>
+        <h3 id="modalTitle">暴力枚举</h3>
+        <button class="modal-close" id="modalClose">×</button>
+      </div>
+
+      <div class="tabs" id="modalTabs">
+        <button class="tab active">暴力枚举</button>
+        <button class="tab">位掩码子集枚举</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="path" id="modalPath">基础算法 / 枚举</div>
+        <div class="alg-name" id="modalAlgName">暴力枚举</div>
+        <div class="intro" id="modalIntro">数据范围小或答案空间有限时，直接枚举所有情况并验证。</div>
+        <div class="complexity" id="modalComplexity">复杂度：O(n²)（本例）</div>
+        <div class="code-toolbar">
+          <button class="btn small primary">复制模板</button>
+        </div>
+        <pre class="code" id="modalCode">int maxSubarray(const vector&lt;int&gt;&amp; a) {
+  int n = (int)a.size(), ans = INT_MIN;
+  for (int l = 0; l &lt; n; l++) {
+    int s = 0;
+    for (int r = l; r &lt; n; r++) {
+      s += a[r];
+      ans = max(ans, s);
+    }
+  }
+  return ans;
+}</pre>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn primary" id="modalClose2">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="preview.js"></script>
+</body>
+</html>

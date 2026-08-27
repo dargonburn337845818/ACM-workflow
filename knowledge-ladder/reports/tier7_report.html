@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>第 7 档内容质量报告</title>
+<style>
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f3f4f8; color: #1c1f26; margin: 0; padding: 32px; }
+  .wrap { max-width: 1100px; margin: 0 auto; background: #fff; border-radius: 16px; padding: 28px 32px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+  h1 { margin: 0 0 4px; font-size: 24px; }
+  .meta { color: #6d7482; font-size: 13px; margin-bottom: 20px; }
+  .summary { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .card { background: #f4f5f9; border: 1px solid #e2e5ec; border-radius: 12px; padding: 12px 18px; }
+  .card b { font-size: 22px; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eef0f4; vertical-align: top; }
+  th { background: #f4f5f9; font-weight: 600; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.complete { color: #2f9e6e; background: rgba(47,158,110,0.1); }
+  .badge.skeleton { color: #c77f2a; background: rgba(199,127,42,0.1); }
+  .badge.todo { color: #d65a5a; background: rgba(214,90,90,0.1); }
+  .note { margin-top: 20px; font-size: 12px; color: #6d7482; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>第 7 档 · 内容质量报告</h1>
+  <div class="meta">2400 – 2800 · 核心训练：深度融合力 · 生成时间：2026-08-27 22:47</div>
+
+  <div class="summary">
+    <div class="card"><b>29</b>算法节点</div>
+    <div class="card"><b>29</b>完整</div>
+    <div class="card"><b>0</b>骨架</div>
+    <div class="card"><b>0</b>待补</div>
+  </div>
+
+  <h2 style="margin-top: 22px; font-size: 18px;">信息论操作分布</h2>
+  <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px;">
+    <div class="card"><b>15</b>编码压缩</div><div class="card"><b>8</b>传播松弛</div><div class="card"><b>7</b>剪枝决策</div><div class="card"><b>23</b>变换域映射</div><div class="card"><b>2</b>基线/暴力</div>
+  </div>
+
+  <h2 style="margin-top: 8px; font-size: 18px;">档位知识点</h2>
+  <table>
+    <thead>
+      <tr><th>标签</th><th>说明</th><th>CF 标签</th><th>关联模板数</th></tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td>数据结构（究极体）</td>
+          <td>Link-Cut Tree（LCT）、树链剖分（HLD）进阶、可持久化数据结构（主席树进阶）、线段树合并/分裂（高级应用）</td>
+          <td>data structures</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td>字符串（究极体）</td>
+          <td>后缀数组（SA）、后缀自动机（SAM）进阶、广义 SAM</td>
+          <td>string suffix structures</td>
+          <td>4</td>
+        </tr>
+        <tr>
+          <td>数学（究极体）</td>
+          <td>快速傅里叶变换（FFT）、快速数论变换（NTT）、生成函数、莫比乌斯反演、线性基进阶</td>
+          <td>math</td>
+          <td>6</td>
+        </tr>
+        <tr>
+          <td>计算几何（进阶）</td>
+          <td>半平面交、最小圆覆盖、三维凸包</td>
+          <td>geometry</td>
+          <td>3</td>
+        </tr>
+        <tr>
+          <td>高级图论</td>
+          <td>支配树、点分治/边分治、动态图连通性（离线）、仙人掌圆方树（动态维护）</td>
+          <td>graphs</td>
+          <td>4</td>
+        </tr>
+        <tr>
+          <td>复杂 DP</td>
+          <td>插头 DP（轮廓线进阶）、DP 套 DP、分治 DP、斜率优化（CHT）进阶</td>
+          <td>dp</td>
+          <td>5</td>
+        </tr>
+        <tr>
+          <td>高级网络流</td>
+          <td>上下界网络流、最小费用最大流</td>
+          <td>flows</td>
+          <td>2</td>
+        </tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top: 28px; font-size: 18px;">算法节点明细</h2>
+  <table>
+    <thead>
+      <tr><th>算法</th><th>分类</th><th>质量</th><th>简介</th><th>复杂度</th><th>模板长度</th></tr>
+    </thead>
+    <tbody>
+      
+        <tr>
+          <td>Link-Cut Tree (LCT)</td>
+          <td>数据结构 / 动态树</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>动态树：支持 link/cut/换根/链上信息维护，核心是 Splay 维护的虚实链剖分。</td>
+          <td>O(log n) 摊还</td>
+          <td>1290</td>
+        </tr>
+        <tr>
+          <td>树链剖分 (HLD)</td>
+          <td>数据结构 / 树链剖分</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>重链剖分把树上路径/子树映射成 DFS 序区间，配合线段树维护路径信息。</td>
+          <td>O(log^2 n) 每次路径操作</td>
+          <td>611</td>
+        </tr>
+        <tr>
+          <td>可持久化数据结构（主席树进阶）</td>
+          <td>数据结构 / 可持久化</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>在更新时新建节点保留历史版本，支持查询任意历史版本；主席树是可持久化权值线段树。</td>
+          <td>O(log n) 每次操作</td>
+          <td>577</td>
+        </tr>
+        <tr>
+          <td>线段树合并/分裂</td>
+          <td>数据结构 / 高级数据结构</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>动态开点线段树，合并两棵树或按权值分裂，用于树上颜色计数、区间排序等。</td>
+          <td>O(n log V) 总合并</td>
+          <td>138</td>
+        </tr>
+        <tr>
+          <td>主席树（区间第 k 小）</td>
+          <td>其他 / 主席树</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>每个前缀一棵权值线段树，差分求区间内第 k 小；值域离散化。</td>
+          <td>O((n+q) log n)</td>
+          <td>684</td>
+        </tr>
+        <tr>
+          <td>后缀数组 (SA)</td>
+          <td>字符串 / 后缀结构</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>倍增法对后缀排序；配合 height 数组可做 LCP、子串统计等问题。</td>
+          <td>O(n log n)</td>
+          <td>618</td>
+        </tr>
+        <tr>
+          <td>后缀自动机（SAM）进阶</td>
+          <td>字符串 / 后缀结构</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>在 SAM 上按 parent 树拓扑序累加 endpos 大小，可求每个子串出现次数、本质不同子串等。</td>
+          <td>O(n) 建图 / O(n) DP</td>
+          <td>1062</td>
+        </tr>
+        <tr>
+          <td>广义 SAM</td>
+          <td>字符串 / 后缀结构</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>对多个串建立后缀自动机：插入每个串前把 last 重置为根，或先建 Trie 再 BFS 扩展。</td>
+          <td>O(总字符数)</td>
+          <td>987</td>
+        </tr>
+        <tr>
+          <td>SAM（后缀自动机）</td>
+          <td>字符串 / 后缀结构</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>线性建图；本质不同子串数 = Σ(len[link[i]] - len[i])，两个串 LCS 可在 SAM 上跑匹配。</td>
+          <td>O(n) 建图 / O(n) 统计</td>
+          <td>678</td>
+        </tr>
+        <tr>
+          <td>FFT</td>
+          <td>数学 / 多项式</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>用复数单位根做 DFT/IDFT，O(n log n) 实现多项式乘法。</td>
+          <td>O(n log n)</td>
+          <td>936</td>
+        </tr>
+        <tr>
+          <td>NTT</td>
+          <td>数学 / 多项式</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>在模 998244353（原根 3）下做整数多项式卷积，避免浮点误差。</td>
+          <td>O(n log n)</td>
+          <td>730</td>
+        </tr>
+        <tr>
+          <td>生成函数</td>
+          <td>数学 / 组合计数</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>用形式幂级数表示数列，卷积对应组合计数；常配合 NTT 做多项式求逆/exp/ln。</td>
+          <td>O(n log n)（配合 NTT）</td>
+          <td>1277</td>
+        </tr>
+        <tr>
+          <td>莫比乌斯反演</td>
+          <td>数论 / 反演</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>利用莫比乌斯函数和整除卷积化简 gcd/lcm 类计数问题。</td>
+          <td>O(n log log n) 筛 + O(√n) 数论分块</td>
+          <td>429</td>
+        </tr>
+        <tr>
+          <td>线性基进阶</td>
+          <td>数论 / 线性基进阶</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>线性基进阶：维护区间线性基、支持第 k 小/最大值、可离线合并。</td>
+          <td>O(n log V)</td>
+          <td>399</td>
+        </tr>
+        <tr>
+          <td>线性基</td>
+          <td>数论 / 进阶数论</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>维护一组异或基，可求最大异或和与第 k 小。</td>
+          <td>O(n log V)</td>
+          <td>291</td>
+        </tr>
+        <tr>
+          <td>半平面交</td>
+          <td>计算几何 / 半平面交</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>把每个半平面按极角排序，用双端队列维护交点，求交集凸多边形。</td>
+          <td>O(n log n)</td>
+          <td>1401</td>
+        </tr>
+        <tr>
+          <td>最小圆覆盖</td>
+          <td>计算几何 / 圆</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>随机增量法：依次加入点，若不在当前圆内则重构圆，期望 O(n)。</td>
+          <td>O(n) 期望</td>
+          <td>1186</td>
+        </tr>
+        <tr>
+          <td>三维凸包</td>
+          <td>计算几何 / 三维</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>三维凸包常用增量法：每加入一个点，删除可见面并补上新面。</td>
+          <td>O(n^2)</td>
+          <td>1034</td>
+        </tr>
+        <tr>
+          <td>支配树</td>
+          <td>图论 / 支配树</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>有向图从源点出发，求每个点被哪些点支配；Lengauer-Tarjan 算法 O((n+m)α)。</td>
+          <td>O((n+m) α(n))</td>
+          <td>1202</td>
+        </tr>
+        <tr>
+          <td>点分治/边分治</td>
+          <td>图论 / 树分治</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>每次找树的重心，统计经过重心的路径，再递归子树，总复杂度 O(n log n)。</td>
+          <td>O(n log n)</td>
+          <td>375</td>
+        </tr>
+        <tr>
+          <td>动态图连通性（离线）</td>
+          <td>图论 / 离线动态图</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>用线段树分治把每条边的存活区间挂到线段树节点，配合可撤销并查集回答离线连通性。</td>
+          <td>O((n+q) log^2 n)</td>
+          <td>1339</td>
+        </tr>
+        <tr>
+          <td>仙人掌 / 圆方树</td>
+          <td>树 / 进阶树论</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>静态建圆方树：环建方点，把仙人掌转成树后跑树形 DP。</td>
+          <td>O(n+m)</td>
+          <td>462</td>
+        </tr>
+        <tr>
+          <td>插头 DP</td>
+          <td>动态规划 / 插头 DP</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>棋盘连通性/回路计数问题：用括号序列或最小表示法表示轮廓线上的插头状态。</td>
+          <td>O(n·m·状态数)</td>
+          <td>1727</td>
+        </tr>
+        <tr>
+          <td>DP 套 DP</td>
+          <td>动态规划 / DP 套 DP</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>把内层 DP 的转移表/结果作为外层 DP 的状态，常用于计数满足某 DP 性质的串/方案。</td>
+          <td>视内层状态数而定</td>
+          <td>746</td>
+        </tr>
+        <tr>
+          <td>分治 DP</td>
+          <td>动态规划 / 分治 DP</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>当 dp 转移满足决策单调性时，用分治确定最优决策点，复杂度 O(n log n·calc)。</td>
+          <td>O(n log n · cost)</td>
+          <td>316</td>
+        </tr>
+        <tr>
+          <td>斜率优化（CHT）</td>
+          <td>动态规划 / DP 优化</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>转移含 i*j 乘积项时，把候选决策看成直线，用单调队列维护凸壳。</td>
+          <td>O(n) 或 O(n log n)</td>
+          <td>208</td>
+        </tr>
+        <tr>
+          <td>轮廓线 DP（简单棋盘状压）</td>
+          <td>动态规划 / 轮廓线 DP</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>逐格转移，用二进制表示当前行/列轮廓线状态，常用于棋盘覆盖计数。</td>
+          <td>O(n·m·2^m)</td>
+          <td>578</td>
+        </tr>
+        <tr>
+          <td>上下界网络流</td>
+          <td>网络流 / 上下界网络流</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>把每条边的下界先流满，再建超级源汇跑附加网络判断可行流/最大流。</td>
+          <td>O(maxflow)</td>
+          <td>1412</td>
+        </tr>
+        <tr>
+          <td>最小费用最大流</td>
+          <td>网络流 / 费用流</td>
+          <td><span class="badge complete">完整</span></td>
+          <td>每次用 SPFA/Dijkstra 找单位费用最短的增广路并增广，累加费用。</td>
+          <td>O(F·E log V)</td>
+          <td>1152</td>
+        </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    说明：质量标记为「完整」表示简介、复杂度、C++ 模板都已具备；「骨架」表示仅有核心思路或不完整代码；「待补」表示尚未处理。
+    本批次主要参考 OI-Wiki 与 CP-Algorithms 进行核对。
+  </div>
+</div>
+</body>
+</html>

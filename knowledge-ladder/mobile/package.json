@@ -1,0 +1,18 @@
+{
+  "name": "knowledge-ladder-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "知识阶梯移动端 PWA / Capacitor 工程",
+  "scripts": {
+    "regenerate": "cd .. && python3 export_mobile_data.py",
+    "start": "npx serve www",
+    "cap:add": "npx cap add android",
+    "cap:sync": "npx cap sync android",
+    "apk": "cd android && ./gradlew assembleDebug"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/cli": "^6.1.0",
+    "@capacitor/core": "^6.1.0"
+  }
+}

@@ -1,0 +1,54 @@
+# GitHub Actions 云构建 APK 模板
+# 使用前：把 knowledge-ladder 作为一个独立仓库推送到 GitHub，
+# 或将本文件内容复制到仓库根目录 .github/workflows/build-apk.yml。
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor
+        working-directory: mobile
+        run: npm install
+
+      - name: Add Android platform
+        working-directory: mobile
+        run: npx cap add android || true
+
+      - name: Sync web assets
+        working-directory: mobile
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledge-ladder-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk

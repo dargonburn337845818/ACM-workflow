@@ -31,3 +31,11 @@ tools/shots/
 
 # 临时会话文件
 *.ses
+
+# Python
+__pycache__/
+*.pyc
+
+# 移动端 Capacitor 构建产物（CI 自动生成）
+knowledge-ladder/mobile/android/
+knowledge-ladder/mobile/node_modules/
