@@ -142,6 +142,13 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
         <button class="btn cf-s-btn" id="cf-s-login" style="display:none" title="打开浏览器登录 Codeforces（手动输入账号密码）">登录</button>
         <button class="btn danger cf-s-btn" id="cf-s-logout" style="display:none" title="清除本地保存的 CF 会话">退出</button>
         <button class="btn cf-s-btn" id="diag-btn" title="运行工作流诊断（环境/网络/操作轨迹/已知 Bug 检查）">诊断</button>
+        <button class="btn cf-s-btn" id="wallpaper-btn" title="设置壁纸 / 切换亚克力背景">壁纸</button>
+      </div>
+      <div id="wallpaper-bar" class="wallpaper-bar" style="display:none;">
+        <input id="wallpaper-url" class="wallpaper-url mono" placeholder="粘贴图片/视频 URL，或选择本地文件" autocomplete="off">
+        <button class="btn" id="wallpaper-apply">应用</button>
+        <button class="btn" id="wallpaper-pick">本机选择</button>
+        <button class="btn" id="wallpaper-clear">清除</button>
       </div>
       ${pickView}
       <div class="view" id="view-contest">

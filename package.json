@@ -2,7 +2,7 @@
   "name": "acm-workflow",
   "displayName": "ACM Workflow",
   "description": "VSCode 中强大的 Codeforces 刷题助手：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录，全部在编辑器内完成",
-  "version": "0.20.6",
+  "version": "0.20.7",
   "publisher": "deepseekharness",
   "license": "MIT",
   "icon": "media/icon.png",

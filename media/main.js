@@ -2060,6 +2060,63 @@
   }
 
   // ===== 接收扩展消息 =====
+  // ===== 壁纸控制（动态视频 / 静态图 / 清除）=====
+  const wallpaperBtn = document.getElementById('wallpaper-btn');
+  const wallpaperBar = document.getElementById('wallpaper-bar');
+  const wallpaperUrl = document.getElementById('wallpaper-url');
+  const wallpaperApply = document.getElementById('wallpaper-apply');
+  const wallpaperPick = document.getElementById('wallpaper-pick');
+  const wallpaperClear = document.getElementById('wallpaper-clear');
+
+  function applyWallpaper(url, isVideo) {
+    const old = document.querySelector('body > video.wallpaper-bg');
+    if (old) old.remove();
+    if (isVideo) {
+      const v = document.createElement('video');
+      v.className = 'wallpaper-bg';
+      v.autoplay = true;
+      v.loop = true;
+      v.muted = true;
+      v.setAttribute('playsinline', '');
+      v.src = url;
+      document.body.insertBefore(v, document.body.firstChild);
+    } else if (url) {
+      document.body.style.backgroundImage = `url("${url}")`;
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+    } else {
+      document.body.style.backgroundImage = '';
+      document.body.style.backgroundSize = '';
+      document.body.style.backgroundPosition = '';
+    }
+  }
+
+  if (wallpaperBtn) {
+    wallpaperBtn.addEventListener('click', () => {
+      wallpaperBar.style.display = wallpaperBar.style.display === 'none' ? 'flex' : 'none';
+    });
+  }
+  if (wallpaperApply) {
+    wallpaperApply.addEventListener('click', () => {
+      const url = (wallpaperUrl.value || '').trim();
+      const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(url) || url.startsWith('file://');
+      applyWallpaper(url, isVideo);
+      vscode.postMessage({ type: 'setWallpaper', url, isVideo });
+    });
+  }
+  if (wallpaperPick) {
+    wallpaperPick.addEventListener('click', () => {
+      vscode.postMessage({ type: 'pickWallpaper' });
+    });
+  }
+  if (wallpaperClear) {
+    wallpaperClear.addEventListener('click', () => {
+      wallpaperUrl.value = '';
+      applyWallpaper('', false);
+      vscode.postMessage({ type: 'setWallpaper', url: '' });
+    });
+  }
+
   window.addEventListener('message', (event) => {
     const msg = event.data;
     if (!msg) return;
@@ -2454,6 +2511,14 @@
         if (vpSpj) vpSpj.value = msg.path || '';
         break;
       // ===== 通过 URL 导入题目（V0.23）=====
+      case 'wallpaperPicked': {
+        if (msg.path) {
+          wallpaperUrl.value = msg.path;
+          applyWallpaper(msg.path, msg.isVideo || /\.(mp4|webm|mov|m4v)$/i.test(msg.path));
+          vscode.postMessage({ type: 'setWallpaper', url: msg.path, isVideo: msg.isVideo || /\.(mp4|webm|mov|m4v)$/i.test(msg.path) });
+        }
+        break;
+      }
       case 'urlImportStatus': {
         urlImporting = !!msg.busy;
         if (urlImportBtn) {
