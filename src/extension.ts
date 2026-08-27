@@ -105,9 +105,17 @@ export function activate(context: vscode.ExtensionContext) {
     const bgCfg = vscode.workspace.getConfiguration('background');
     await bgCfg.update('enabled', true, vscode.ConfigurationTarget.Global);
     await bgCfg.update('customImages', [wallpaperPath], vscode.ConfigurationTarget.Global);
+    await bgCfg.update('imagePath', wallpaperPath, vscode.ConfigurationTarget.Global);
     await bgCfg.update('style', ['cover', 'center', 'no-repeat', 'fixed'], vscode.ConfigurationTarget.Global);
+    await bgCfg.update('applyPatch', true, vscode.ConfigurationTarget.Global);
+    // 尝试触发常见背景插件的启用命令（不同 fork 命令名可能不同，失败不报错）
+    for (const cmd of ['background.applyPatch', 'background.enable', 'background.apply']) {
+      try {
+        await vscode.commands.executeCommand(cmd);
+      } catch { /* ignore */ }
+    }
     vscode.window.showInformationMessage(
-      '已将壁纸写入全局背景配置。\n\n如果还没安装全局背景插件，请安装 shalldie/vscode-background，然后执行 "Background: Enable" 生效。'
+      '已写入全局背景配置。\n\n请执行该背景插件的启用命令（如 "Background: Enable"），然后 Reload Window。'
     );
   });
 
