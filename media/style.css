@@ -1345,9 +1345,9 @@ html, body {
   background: #EEF1F6;
 }
 
-/* ===== 真·亚克力蒙版：深色、无背景色、只透背景 ===== */
+/* ===== 真·亚克力：常态深色，壁纸模式下不蒙版 ===== */
 body {
-  background: #1B1D22;
+  background: #131519;
 }
 
 .app,
@@ -1360,12 +1360,33 @@ body {
 .modal,
 .wallpaper-bar,
 .cf-session {
-  background-color: rgba(255,255,255,0.035) !important;
+  background-color: rgba(18,20,24,0.78) !important;
   backdrop-filter: blur(40px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
-  border: 1px solid rgba(255,255,255,0.08) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
 }
 
 .card, .btn, .primary-btn, .ghost-btn, .wallpaper-bar, .cf-session {
-  box-shadow: 0 16px 48px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.35) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.35) !important;
+}
+
+/* 有壁纸时：不盖蒙版，只压一点暗色保护文字 */
+body.has-wallpaper .app,
+body.has-wallpaper .rail,
+body.has-wallpaper .card,
+body.has-wallpaper .btn,
+body.has-wallpaper .primary-btn,
+body.has-wallpaper .ghost-btn,
+body.has-wallpaper .panel,
+body.has-wallpaper .modal,
+body.has-wallpaper .wallpaper-bar,
+body.has-wallpaper .cf-session {
+  background-color: rgba(0,0,0,0.16) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+}
+
+body.has-wallpaper {
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
 }

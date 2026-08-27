@@ -2071,6 +2071,7 @@
   function applyWallpaper(url, isVideo) {
     const old = document.querySelector('body > video.wallpaper-bg');
     if (old) old.remove();
+    document.body.classList.toggle('has-wallpaper', !!(url && url.trim()));
     if (isVideo) {
       const v = document.createElement('video');
       v.className = 'wallpaper-bg';

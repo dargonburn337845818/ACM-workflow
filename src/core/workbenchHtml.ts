@@ -108,7 +108,7 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
   ${glassBgStyle}
   <title>ACM Workflow</title>
 </head>
-<body>
+<body class="${glassBackground ? 'has-wallpaper' : ''}">
   ${glassBgVideo}
   <div class="app">
     <nav class="rail">
