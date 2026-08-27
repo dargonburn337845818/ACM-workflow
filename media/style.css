@@ -5,19 +5,29 @@
    ============================================================ */
 
 :root {
-  --bg: #1A1A1A;
-  --panel: #2D2D2D;
-  --surface: #3C3C3C;
-  --border: #4B4B4B;
-  --fg: #E8E0D5;
-  --muted: #9A928A;
-  --green: #8B9A6B;
-  --gold: #C79A6B;
-  --err: #C25E5E;
-  --hard: #0A0A0A;
-  --shadow: rgba(0, 0, 0, 0.8);
+  --bg: #0B1322;
+  --panel: #0E1828;
+  --surface: #16233A;
+  --border: #33517A;
+  --fg: #FFFFFF;
+  --muted: #7C9CC4;
+  --green: #8B9D77;
+  --gold: #E4B863;
+  --err: #C25644;
+  --hard: #060A13;
+  --shadow: rgba(3,7,18,0.5);
+  --font-size: 13px;
+  --line-height: 1.7;
+  --font-size-sm: 11px;
+  --font-size-md: 13px;
+  --font-size-lg: 15px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 18px;
+  --space-xl: 24px;
   --mono: "JetBrains Mono", Consolas, "Sarasa Mono SC", monospace;
-  --ui: "Segoe UI", system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --ui: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0 !important; }
@@ -26,10 +36,14 @@ html, body { height: 100%; }
 
 body {
   font-family: var(--ui);
-  background: var(--bg);
+  background:
+    radial-gradient(560px 560px at 85% 8%, rgba(124,156,196,0.28), transparent 65%),
+    radial-gradient(520px 520px at 8% 92%, rgba(51,81,122,0.35), transparent 65%),
+    radial-gradient(420px 420px at 50% 40%, rgba(228,184,99,0.10), transparent 60%),
+    linear-gradient(160deg, #0B1322, #060A13);
   color: var(--fg);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--font-size);
+  line-height: var(--line-height);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -68,7 +82,7 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 8px 6px;
+  padding: var(--space-sm) 6px;
   gap: 2px;
 }
 
@@ -189,7 +203,7 @@ a:focus-visible {
   background: var(--panel);
   border: 1px solid var(--border);
   box-shadow: 0 2px 0 var(--hard);
-  padding: 12px;
+  padding: var(--space-md);
 }
 
 .empty {
@@ -245,17 +259,18 @@ input:focus, select:focus, textarea:focus {
 }
 .st-file { font-size: 11px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-body { flex: 1; min-height: 0; overflow-y: auto; }
-/* V0.19：题面区与测试用例区可拖动分栏（Bug5），st-section 为上半区 */
+/* V0.24：题面页占满测试视图剩余高度，不再与用例分栏；
+   样例页切换为适应性窗口时，题面页仍由 .test-wrap 保持 720px 居中阅读宽度 */
 .st-section {
-  flex: 1 1 50%;
-  min-height: 20%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   border-bottom: none;
   margin-bottom: 0;
   padding-bottom: 0;
 }
-.st-section .st-body { max-height: none; }
+.st-section .st-body { flex: 1; min-height: 0; }
 .st-empty { font-size: 11.5px; padding: 20px 0; text-align: center; line-height: 1.8; }
 .st-error { color: var(--err); font-size: 11px; margin-top: 6px; }
 .st-info { color: var(--gold); font-size: 11px; margin-top: 6px; }
@@ -342,67 +357,6 @@ input:focus, select:focus, textarea:focus {
 #view-test.mode-zh .st-en { display: none; }
 
 /* ============================================================
-    知识导论（V0.6.1 层级树：一级 → 二级 → 算法 + 详情 + 搜索）
-    ============================================================ */
-.manual-layout { display: flex; flex-direction: column; gap: 8px; height: 100%; }
-.map-toolbar { display: flex; align-items: center; gap: 8px; padding: 4px 2px; font-size: 10.5px; }
-.k-search {
-  width: 200px; background: var(--surface); color: var(--fg);
-  border: 1px solid var(--border); padding: 5px 8px; font-size: 11.5px;
-}
-.k-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.k-body { flex: 1; min-height: 0; display: flex; gap: 10px; }
-.k-tree {
-  width: 46%; min-width: 180px; overflow-y: auto;
-  background: var(--bg); border: 1px solid var(--border);
-  box-shadow: 0 2px 0 var(--hard); padding: 6px;
-}
-.k-cat { margin-bottom: 4px; }
-.k-cat-head {
-  display: flex; align-items: baseline; gap: 6px; cursor: pointer;
-  padding: 5px 4px; border-bottom: 1px solid var(--border);
-}
-.k-cat-head:hover { color: var(--gold); }
-.k-arrow { font-size: 9px; color: var(--muted); flex: none; }
-.k-cat-name { font-size: 12px; font-weight: 600; color: var(--fg); }
-.k-cat-def { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.k-sub { padding-left: 10px; }
-.k-sub-head {
-  font-size: 10.5px; color: var(--gold); cursor: pointer;
-  padding: 4px 2px 2px; letter-spacing: 0.03em;
-}
-.k-alg {
-  display: block; width: 100%; text-align: left;
-  background: transparent; border: none; color: var(--muted);
-  font-size: 11.5px; padding: 3px 6px; cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.k-alg:hover { background: var(--surface); color: var(--fg); }
-.k-alg.active { color: var(--gold); box-shadow: inset 2px 0 0 var(--gold); }
-.k-alg.matched { color: var(--green); }
-.k-cat.collapsed .k-sub { display: none; }
-.k-sub.collapsed .k-alg { display: none; }
-
-.k-detail {
-  flex: 1; min-width: 0; overflow-y: auto;
-  background: var(--bg); border: 1px solid var(--border);
-  box-shadow: 0 2px 0 var(--hard); padding: 10px 12px;
-}
-.k-detail-empty { font-size: 11.5px; padding: 24px 0; text-align: center; }
-.kd-path { font-size: 10px; color: var(--muted); margin-bottom: 2px; }
-.kd-name { font-size: 15px; margin-bottom: 10px; }
-.kd-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
-.kd-label { font-size: 10px; color: var(--muted); letter-spacing: 0.05em; flex: none; width: 44px; }
-.kd-intro { font-size: 12px; line-height: 1.6; }
-.kd-complexity { font-size: 11.5px; color: var(--gold); }
-.kd-copy { margin-left: auto; }
-.kd-cpp {
-  background: var(--panel); border: 1px solid var(--border);
-  padding: 10px; font-size: 11.5px; line-height: 1.6;
-  overflow-x: auto; margin-top: 4px;
-}
-
-/* ============================================================
    选题视图
    ============================================================ */
 .pick-wrap { max-width: 640px; }
@@ -412,8 +366,8 @@ input:focus, select:focus, textarea:focus {
 .control-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .control-row > label { width: 64px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
@@ -473,7 +427,40 @@ input:focus, select:focus, textarea:focus {
   font-size: 10px; color: var(--muted); margin-top: 1px;
 }
 .diff-label { color: var(--gold); font-size: 11px; }
-.pick-actions { gap: 8px; }
+.pick-actions { gap: var(--space-sm); }
+
+/* 按算法标签选题（第 5 条） */
+.tag-row { flex-direction: column; align-items: stretch; gap: var(--space-sm); margin-bottom: var(--space-md); }
+.tag-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-sm); }
+.tag-head label { width: auto; }
+.pick-tag-search {
+  width: 190px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.pick-tag-search:focus { border-color: var(--gold); }
+.pick-tag-search::placeholder { color: var(--muted); }
+.pick-selected-tags { display: flex; flex-wrap: wrap; gap: 4px; min-height: 0; }
+.tag-chips { display: flex; flex-wrap: wrap; gap: 4px; max-height: 96px; overflow-y: auto; }
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+}
+.tag-chip:hover { color: var(--fg); border-color: var(--gold); }
+.tag-chip.active { color: var(--gold); border-color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); }
+.tag-chip .tag-remove { color: var(--muted); font-weight: 700; }
+.tag-chip .tag-remove:hover { color: var(--err); }
+.tag-empty { font-size: 10.5px; color: var(--muted); padding: 2px 0; }
 
 /* CF 账号绑定条 */
 .cf-bind { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 8px 12px; }
@@ -584,7 +571,7 @@ input:focus, select:focus, textarea:focus {
 .recent-rating { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 
 /* ============================================================
-   测试视图（Bug5：题面/用例分栏；Bug6：共用当前题目指示器）
+   测试视图（V0.24：题面/样例分页；Bug6：共用当前题目指示器）
    ============================================================ */
 #view-test.active {
   display: flex;
@@ -600,6 +587,9 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
 }
+
+/* 适应性窗口：样例页使用完整可用宽度，题面页保持 720px 居中阅读宽度 */
+#view-test.mode-samples .test-wrap { max-width: 100%; }
 
 /* V0.23.1：单测/对拍模式包裹层必须是 flex 列容器，
    否则 st-section/test-lower 的 flex:1 + min-height:0 失效，
@@ -629,22 +619,48 @@ input:focus, select:focus, textarea:focus {
 .cur-file .mono { color: var(--gold); }
 .cur-file .cur-diff { color: var(--green); }
 
-/* Bug5：分隔条（原生拖动，硬边） */
-.test-splitter {
-  flex: 0 0 6px;
-  cursor: ns-resize;
-  background: var(--panel);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  user-select: none;
-  -webkit-user-select: none;
-}
-.test-splitter:hover, .test-splitter.dragging { background: var(--gold); }
-
-.test-lower {
-  flex: 1 1 50%;
-  min-height: 20%;
+/* V0.24：题面 / 样例页面切换 */
+.test-page-tabs {
   display: flex;
+  width: fit-content;
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 0 var(--hard);
+}
+
+.test-page {
+  appearance: none;
+  background: var(--panel);
+  color: var(--muted);
+  border: none;
+  border-right: 1px solid var(--border);
+  padding: 4px 16px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.test-page:last-child { border-right: none; }
+.test-page:hover { color: var(--fg); }
+
+.test-page.active {
+  background: var(--surface);
+  color: var(--gold);
+  box-shadow: inset 0 -2px 0 var(--gold);
+}
+
+.test-page-panel { display: none; }
+.test-page-panel.active {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 注意：不要在这里写 display:flex；显示/隐藏由 .test-page-panel / .test-page-panel.active 控制，
+   否则会覆盖 .test-page-panel 的 display:none，导致样例运行区在题面页也显示。 */
+.test-lower {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
   flex-direction: column;
   overflow-y: auto;
 }
@@ -687,17 +703,24 @@ input:focus, select:focus, textarea:focus {
 .case-op:hover { color: var(--gold); border-color: var(--gold); }
 .case-op.danger:hover { color: var(--err); border-color: var(--err); }
 
-.test-case-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: stretch; }
+/* 适应性窗口：输入/期望输出随可用宽度自动 1 列或 2 列，不再依赖固定断点 */
+.test-case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
 
 .test-case-col { min-width: 0; display: flex; flex-direction: column; }
 
 .test-case-label { font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
 
-/* V0.6.1：resize:none（移除右下角角标）；高度随内容自适应（60~300px，超出滚动） */
+/* V0.6.1：resize:none（移除右下角角标）；高度随内容自适应（120~480px，超出滚动）
+   V0.20.5：拉长用例框，默认更舒适；上限同时受窗口高度约束 */
 .test-input, .test-output {
   width: 100%;
-  min-height: 60px;
-  max-height: 300px;
+  min-height: 120px;
+  max-height: max(120px, min(480px, 60vh));
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--fg);
@@ -862,8 +885,7 @@ input:focus, select:focus, textarea:focus {
    ============================================================ */
 @media (max-width: 480px) {
   .content { padding: 10px; }
-  .manual-layout { flex-direction: column; }
-  .test-case-grid { grid-template-columns: 1fr; }
+  /* 样例页输入/输出列已由 .test-case-grid 的 auto-fit 自适应，无需固定断点 */
   .rec-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
@@ -1269,4 +1291,19 @@ input:focus, select:focus, textarea:focus {
   max-height: 180px;
   overflow-y: auto;
   color: var(--fg);
+}
+
+/* 动态壁纸背景（Wallpaper Engine 视频） */
+body > video.wallpaper-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
 }

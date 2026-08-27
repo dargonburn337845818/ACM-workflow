@@ -267,38 +267,19 @@
   let testCases = []; // {id,input,output,status,actual,timeMs,message}
   let testFilePath = '';
 
-  // ===== Bug5：题面 / 测试用例可拖动分栏（原生 mousedown/mousemove/mouseup） =====
-  const testWrap = document.getElementById('test-wrap');
-  const stSectionEl = document.getElementById('st-section');
-  const testLowerEl = document.getElementById('test-lower');
-  const testSplitter = document.getElementById('test-splitter');
-  let stRatio = 0.5; // 题面区占比（0.2~0.8）
-  function applyLayoutRatio(r) {
-    if (!(r > 0)) return;
-    stRatio = Math.min(0.8, Math.max(0.2, r));
-    if (stSectionEl) stSectionEl.style.flex = stRatio + ' 1 0%';
-    if (testLowerEl) testLowerEl.style.flex = (1 - stRatio) + ' 1 0%';
-  }
-  if (testSplitter && testWrap && stSectionEl && testLowerEl) {
-    testSplitter.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      testSplitter.classList.add('dragging');
-      const rect = testWrap.getBoundingClientRect();
-      const onMove = (ev) => {
-        const ratio = rect.height > 0 ? (ev.clientY - rect.top) / rect.height : 0.5;
-        applyLayoutRatio(ratio);
-      };
-      const onUp = () => {
-        testSplitter.classList.remove('dragging');
-        window.removeEventListener('mousemove', onMove);
-        window.removeEventListener('mouseup', onUp);
-        // 持久化到 globalState（扩展侧保存），下次打开恢复
-        vscode.postMessage({ type: 'saveTestLayoutRatio', payload: { ratio: stRatio } });
-      };
-      window.addEventListener('mousemove', onMove);
-      window.addEventListener('mouseup', onUp);
+  // ===== V0.24：题面 / 样例页面切换 =====
+  function switchTestPage(page) {
+    document.querySelectorAll('.test-page').forEach((b) => {
+      b.classList.toggle('active', b.dataset.page === page);
     });
+    document.querySelectorAll('.test-page-panel').forEach((p) => {
+      p.classList.toggle('active', p.dataset.page === page);
+    });
+    // V0.20.5：样例页切换为适应性窗口（占满可用宽度），题面页保持 720px 居中
+    const testView = document.getElementById('view-test');
+    if (testView) testView.classList.toggle('mode-samples', page === 'samples');
   }
+
   let testRunning = false;
   let autoSaveTimer = null;
 
@@ -395,14 +376,22 @@
     }
   }
 
-  /** 用例框自适应高度：每行约 18px，60~300px 之间，超出滚动（配合 resize:none） */
+  /** 用例框自适应高度：每行约 20px，120~480px 之间，超出滚动；上限随窗口高度收缩（配合 resize:none） */
   function autoSizeTextareas() {
+    const maxH = Math.min(480, Math.max(120, Math.floor(window.innerHeight * 0.6)));
     document.querySelectorAll('.test-input, .test-output').forEach((ta) => {
       const lines = (ta.value.match(/\n/g) || []).length + 1;
-      const h = Math.min(300, Math.max(60, lines * 18 + 14));
+      const h = Math.min(maxH, Math.max(120, lines * 20 + 16));
       ta.style.height = h + 'px';
     });
   }
+
+  // 适应性窗口：窗口尺寸变化时重新计算用例框高度
+  let autoSizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(autoSizeTimer);
+    autoSizeTimer = setTimeout(autoSizeTextareas, 80);
+  });
 
   function renderTestCases() {
     if (!testCasesEl) return;
@@ -503,6 +492,10 @@
     const addBtn = document.getElementById('test-add-btn');
     const saveBtn = document.getElementById('test-save-btn');
 
+    document.querySelectorAll('.test-page').forEach((btn) => {
+      btn.addEventListener('click', () => switchTestPage(btn.dataset.page));
+    });
+
     if (addBtn) {
       addBtn.addEventListener('click', () => {
         testCases.push({ id: Date.now(), input: '', output: '' });
@@ -558,163 +551,6 @@
     });
   });
 
-  // ===== 知识导论（V0.6.1 层级树）：一级 → 二级 → 算法；点击算法看详情；搜索过滤 =====
-  const kTree = document.getElementById('k-tree');
-  const kDetail = document.getElementById('k-detail');
-  const kSearch = document.getElementById('k-search');
-  let kData = null; // KNOWLEDGE_CATEGORIES 完整数据
-
-  function renderKnowledgeTree() {
-    if (!kTree || !kData) return;
-    let html = '';
-    kData.forEach((cat, ci) => {
-      html += '<div class="k-cat">' +
-        '<div class="k-cat-head" data-toggle="' + ci + '">' +
-        '<span class="k-arrow">▾</span><span class="k-cat-name">' + escapeHtml(cat.name) + '</span>' +
-        '<span class="k-cat-def">' + escapeHtml(cat.def) + '</span></div>';
-      cat.subs.forEach((sub, si) => {
-        html += '<div class="k-sub" data-sub="' + ci + '-' + si + '">' +
-          '<div class="k-sub-head">' + escapeHtml(sub.name) + '</div>';
-        sub.algorithms.forEach((alg, ai) => {
-          const key = ci + '-' + si + '-' + ai;
-          html += '<button class="k-alg" data-key="' + key + '">' + escapeHtml(alg.name) + '</button>';
-        });
-        html += '</div>';
-      });
-      html += '</div>';
-    });
-    kTree.innerHTML = html;
-
-    // 一级分类折叠/展开
-    kTree.querySelectorAll('.k-cat-head').forEach((head) => {
-      head.addEventListener('click', () => {
-        const cat = head.closest('.k-cat');
-        cat.classList.toggle('collapsed');
-        const arrow = head.querySelector('.k-arrow');
-        if (arrow) arrow.textContent = cat.classList.contains('collapsed') ? '▸' : '▾';
-      });
-    });
-    // 二级分类折叠/展开
-    kTree.querySelectorAll('.k-sub-head').forEach((head) => {
-      head.addEventListener('click', () => {
-        const sub = head.closest('.k-sub');
-        sub.classList.toggle('collapsed');
-      });
-    });
-    // 算法点击 → 详情
-    kTree.querySelectorAll('.k-alg').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        kTree.querySelectorAll('.k-alg').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        renderKnowledgeDetail(btn.dataset.key);
-      });
-    });
-  }
-
-  function algByKey(key) {
-    if (!kData) return null;
-    const [ci, si, ai] = key.split('-').map(Number);
-    const cat = kData[ci];
-    if (!cat) return null;
-    const sub = cat.subs[si];
-    if (!sub) return null;
-    return { cat, sub, alg: sub.algorithms[ai] };
-  }
-
-  function renderKnowledgeDetail(key) {
-    if (!kDetail) return;
-    const hit = algByKey(key);
-    if (!hit) {
-      kDetail.scrollTop = 0;
-      kDetail.innerHTML = '<div class="muted k-detail-empty">← 在左侧选择一个算法查看详情</div>';
-      return;
-    }
-    const { cat, sub, alg } = hit;
-    kDetail.innerHTML =
-      '<div class="kd-head">' +
-      '<div class="kd-path mono">' + escapeHtml(cat.name) + ' / ' + escapeHtml(sub.name) + '</div>' +
-      '<h3 class="kd-name">' + escapeHtml(alg.name) + '</h3>' +
-      '</div>' +
-      '<div class="kd-row"><span class="kd-label">简介</span><p class="kd-intro">' + escapeHtml(alg.intro) + '</p></div>' +
-      '<div class="kd-row"><span class="kd-label">复杂度</span><span class="mono kd-complexity">' + escapeHtml(alg.complexity) + '</span></div>' +
-      '<div class="kd-row"><span class="kd-label">C++ 模板</span>' +
-      '<button class="btn kd-copy" title="复制模板到剪贴板">复制</button></div>' +
-      '<pre class="kd-cpp mono">' + escapeHtml(alg.cpp) + '</pre>';
-    // V0.16：内容替换完成后强制回顶——点底部算法后模板立即可见，无需手动上滑
-    kDetail.scrollTop = 0;
-
-    const copyBtn = kDetail.querySelector('.kd-copy');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', () => {
-        const text = alg.cpp;
-        const done = () => {
-          copyBtn.textContent = '已复制 ✓';
-          setTimeout(() => { copyBtn.textContent = '复制'; }, 1500);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
-        } else {
-          fallbackCopy(text, done);
-        }
-      });
-    }
-  }
-
-  function fallbackCopy(text, done) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); done(); } catch (e) { /* ignore */ }
-    document.body.removeChild(ta);
-  }
-
-  // 搜索：匹配名称/别名，自动展开命中路径并高亮
-  if (kSearch && kTree) {
-    kSearch.addEventListener('input', () => {
-      const q = kSearch.value.trim().toLowerCase();
-      if (!q) {
-        renderKnowledgeTree();
-        return;
-      }
-      let html = '';
-      kData.forEach((cat, ci) => {
-        let catHtml = '';
-        let catHit = false;
-        cat.subs.forEach((sub, si) => {
-          const hits = [];
-          sub.algorithms.forEach((alg, ai) => {
-            const names = [alg.name, ...(alg.aliases || [])].join(' ').toLowerCase();
-            if (names.includes(q)) hits.push({ ai, alg });
-          });
-          if (hits.length === 0) return;
-          catHit = true;
-          catHtml += '<div class="k-sub">' +
-            '<div class="k-sub-head">' + escapeHtml(sub.name) + '</div>' +
-            hits.map(({ ai, alg }) => {
-              const key = ci + '-' + si + '-' + ai;
-              return '<button class="k-alg matched" data-key="' + key + '">' + escapeHtml(alg.name) + '</button>';
-            }).join('') +
-            '</div>';
-        });
-        if (!catHit) return;
-        html += '<div class="k-cat">' +
-          '<div class="k-cat-head"><span class="k-arrow">▾</span><span class="k-cat-name">' + escapeHtml(cat.name) + '</span></div>' +
-          catHtml + '</div>';
-      });
-      kTree.innerHTML = html || '<div class="muted chart-empty">没有匹配的算法</div>';
-      kTree.querySelectorAll('.k-alg').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          kTree.querySelectorAll('.k-alg').forEach((b) => b.classList.remove('active'));
-          btn.classList.add('active');
-          renderKnowledgeDetail(btn.dataset.key);
-        });
-      });
-    });
-  }
-
   // ===== 选题 =====
   const pickBtn = document.getElementById('pick-btn');
   const weakBtn = document.getElementById('weak-btn');
@@ -724,6 +560,47 @@
   const minRange = document.getElementById('min-range');
   const maxRange = document.getElementById('max-range');
   const diffLabel = document.getElementById('diff-label');
+
+  // 第 5 条：常用 CF 标签（key 为 CF 原始标签，zh 用于界面展示）
+  const PICK_TAGS = [
+    { key: 'dp', zh: '动态规划' },
+    { key: 'greedy', zh: '贪心' },
+    { key: 'math', zh: '数学' },
+    { key: 'graphs', zh: '图论' },
+    { key: 'data structures', zh: '数据结构' },
+    { key: 'binary search', zh: '二分' },
+    { key: 'strings', zh: '字符串' },
+    { key: 'implementation', zh: '实现' },
+    { key: 'constructive algorithms', zh: '构造' },
+    { key: 'sortings', zh: '排序' },
+    { key: 'brute force', zh: '暴力' },
+    { key: 'combinatorics', zh: '组合数学' },
+    { key: 'two pointers', zh: '双指针' },
+    { key: 'dfs and similar', zh: '深搜' },
+    { key: 'bfs', zh: '广搜' },
+    { key: 'trees', zh: '树' },
+    { key: 'shortest paths', zh: '最短路' },
+    { key: 'dsu', zh: '并查集' },
+    { key: 'bitmasks', zh: '位运算' },
+    { key: 'number theory', zh: '数论' },
+    { key: 'geometry', zh: '计算几何' },
+    { key: 'probabilities', zh: '概率期望' },
+    { key: 'games', zh: '博弈' },
+    { key: 'flows', zh: '网络流' },
+    { key: 'hashing', zh: '哈希' },
+    { key: 'divide and conquer', zh: '分治' },
+    { key: 'matrices', zh: '矩阵' },
+    { key: 'knapsack', zh: '背包' },
+    { key: 'meet-in-the-middle', zh: '折半搜索' },
+    { key: 'ternary search', zh: '三分' },
+    { key: 'fft', zh: '快速傅里叶变换' },
+    { key: 'interactive', zh: '交互' },
+    { key: '2-sat', zh: '2-SAT' },
+    { key: 'string suffix structures', zh: '后缀结构' },
+    { key: 'graph matchings', zh: '图匹配' },
+    { key: 'chinese remainder theorem', zh: '中国剩余定理' }
+  ];
+  let selectedTags = []; // 当前选中的 CF 标签（多选）
 
   function sliderStep() { return 100; }
 
@@ -789,6 +666,60 @@
       }
       updateSliderUI();
     });
+  }
+
+  // ===== 第 5 条：按算法标签选题（多选 OR） =====
+  function getSelectedTags() {
+    return selectedTags.slice();
+  }
+
+  function pickTagLabel(tag) {
+    const hit = PICK_TAGS.find((t) => t.key.toLowerCase() === String(tag).toLowerCase());
+    return hit ? hit.zh : tag;
+  }
+
+  function togglePickTag(tag) {
+    const key = String(tag || '').trim();
+    if (!key) return;
+    const idx = selectedTags.indexOf(key);
+    if (idx >= 0) selectedTags.splice(idx, 1);
+    else selectedTags.push(key);
+    renderPickSelectedTags();
+    renderPickTagChips();
+    resetPicked(); // 标签变化 → 清空已试记录并恢复推荐按钮
+  }
+
+  function renderPickSelectedTags() {
+    const el = document.getElementById('pick-selected-tags');
+    if (!el) return;
+    if (!selectedTags.length) {
+      el.innerHTML = '<span class="tag-empty muted">未选择标签（不限制）</span>';
+      return;
+    }
+    el.innerHTML = selectedTags.map((t) =>
+      '<span class="tag-chip active" data-tag="' + escapeHtml(t) + '">' +
+        escapeHtml(pickTagLabel(t)) +
+        '<span class="tag-remove" data-remove="' + escapeHtml(t) + '">✕</span>' +
+      '</span>'
+    ).join('');
+  }
+
+  function renderPickTagChips() {
+    const el = document.getElementById('pick-tag-chips');
+    if (!el) return;
+    const searchEl = document.getElementById('pick-tag-search');
+    const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+    const list = PICK_TAGS.filter((t) =>
+      !q || t.key.toLowerCase().indexOf(q) !== -1 || t.zh.toLowerCase().indexOf(q) !== -1
+    );
+    if (!list.length) {
+      el.innerHTML = '<span class="tag-empty muted">没有匹配的常用标签，可直接在搜索框输入后回车</span>';
+      return;
+    }
+    el.innerHTML = list.map((t) => {
+      const active = selectedTags.indexOf(t.key) >= 0;
+      return '<span class="tag-chip' + (active ? ' active' : '') + '" data-tag="' + escapeHtml(t.key) + '">' + escapeHtml(t.zh) + '</span>';
+    }).join('');
   }
 
   function setStatus(text, isError) {
@@ -866,6 +797,12 @@
     if (minRange && state.minRating !== undefined) minRange.value = String(state.minRating);
     if (maxRange && state.maxRating !== undefined) maxRange.value = String(state.maxRating);
     updateSliderUI();
+    // 第 5 条：恢复已选标签
+    if (Array.isArray(state.tags)) {
+      selectedTags = state.tags.filter((t) => typeof t === 'string');
+      renderPickSelectedTags();
+      renderPickTagChips();
+    }
     if (state.problem) renderProblem(state.problem);
     if (state.recent) renderRecentList(state.recent);
   }
@@ -986,6 +923,8 @@
     const minRating = Number(minRange ? minRange.value : 800);
     const maxRating = Number(maxRange ? maxRange.value : 2400);
     const payload = { platform: 'codeforces', minRating, maxRating };
+    const tags = getSelectedTags();
+    if (tags.length > 0) payload.tags = tags;
     // Bug2：附带已尝试题目（后端据此排除）
     if (pickedIds.length > 0) payload.exclude = pickedIds.slice();
     return payload;
@@ -1014,6 +953,42 @@
       vscode.postMessage({ type: 'fetchWeakProblem' });
     });
   }
+
+  // ===== 第 5 条：标签选择交互（多选 OR） =====
+  const pickTagChips = document.getElementById('pick-tag-chips');
+  const pickSelectedTags = document.getElementById('pick-selected-tags');
+  const pickTagSearch = document.getElementById('pick-tag-search');
+
+  if (pickTagChips) {
+    pickTagChips.addEventListener('click', (e) => {
+      const chip = e.target.closest('.tag-chip');
+      if (chip && chip.dataset.tag) togglePickTag(chip.dataset.tag);
+    });
+  }
+  if (pickSelectedTags) {
+    pickSelectedTags.addEventListener('click', (e) => {
+      const remove = e.target.closest('.tag-remove');
+      if (remove && remove.dataset.remove) togglePickTag(remove.dataset.remove);
+    });
+  }
+  if (pickTagSearch) {
+    pickTagSearch.addEventListener('input', renderPickTagChips);
+    pickTagSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = pickTagSearch.value.trim();
+        if (val) {
+          if (selectedTags.indexOf(val) < 0) selectedTags.push(val);
+          pickTagSearch.value = '';
+          renderPickSelectedTags();
+          renderPickTagChips();
+          resetPicked();
+        }
+      }
+    });
+  }
+  renderPickSelectedTags();
+  renderPickTagChips();
 
   // ===== 通过 URL 导入题目（V0.23）=====
   const urlImportInput = document.getElementById('url-import-input');
@@ -1190,7 +1165,7 @@
     return CF_TAG_ZH[String(tag).toLowerCase()] || tag;
   }
 
-  const PIE_COLORS = ['#C79A6B', '#8B9A6B', '#C0392B', '#A67B5B', '#7A7A6B', '#4B4B4B'];
+  const PIE_COLORS = ['#E4B863', '#7C9CC4', '#33517A', '#8B9D77', '#C25644', '#16233A'];
 
   function renderPie(tagStats) {
     if (!pieChartEl) return;
@@ -1585,15 +1560,69 @@
   }
 
   // ===== 造数据视图（V0.22）=====
-  const dgTypeEl = document.getElementById('dg-type');
   const dgParamsEl = document.getElementById('dg-params');
   const dgGenBtn = document.getElementById('dg-gen-btn');
   const dgSaveBtn = document.getElementById('dg-save-btn');
   const dgStatusEl = document.getElementById('dg-status');
   const dgOutputEl = document.getElementById('dg-output');
   let lastGenerated = '';
+  // 组合流水线：只记录每步类型；表单值从 DOM 采集
+  let dgPipelineSteps = [];
+
+  const DG_TYPE_OPTIONS = [
+    ['line', '单行单数'],
+    ['int', '单个（不自动换行）'],
+    ['ints', '一行多个数'],
+    ['pairs', '每行两个数'],
+    ['text', '固定文本'],
+    ['newline', '换行'],
+    ['repeat', '重复块'],
+    ['array', '随机整数数组'],
+    ['tree', '随机树'],
+    ['graph', '随机图'],
+    ['string', '随机字符串'],
+    ['permutation', '随机排列'],
+    ['script', '自定义脚本']
+  ];
 
   const DG_FIELDS = {
+    line: [
+      { key: 'vMin', label: '值域下限', type: 'num', def: 1 },
+      { key: 'vMax', label: '值域上限', type: 'num', def: 100 },
+      { key: 'varName', label: '变量名（供后面数量引用）', type: 'text', def: '' }
+    ],
+    int: [
+      { key: 'vMin', label: '值域下限', type: 'num', def: 1 },
+      { key: 'vMax', label: '值域上限', type: 'num', def: 100 },
+      { key: 'newline', label: '末尾换行', type: 'check', def: false },
+      { key: 'varName', label: '变量名（供后面 repeat 引用）', type: 'text', def: '' }
+    ],
+    ints: [
+      { key: 'nMin', label: '个数最小值 n（或填变量名）', type: 'num', def: 5 },
+      { key: 'nMax', label: '个数最大值 n', type: 'num', def: 10 },
+      { key: 'countRef', label: '个数变量名（引用单行单数）', type: 'text', def: '' },
+      { key: 'vMin', label: '值域下限', type: 'num', def: 1 },
+      { key: 'vMax', label: '值域上限', type: 'num', def: 100 },
+      { key: 'sep', label: '分隔符（空格/逗号/空）', type: 'text', def: ' ', raw: true },
+      { key: 'newline', label: '末尾换行', type: 'check', def: true }
+    ],
+    pairs: [
+      { key: 'nMin', label: '行数最小值（或填变量名）', type: 'num', def: 2 },
+      { key: 'nMax', label: '行数最大值', type: 'num', def: 5 },
+      { key: 'countRef', label: '行数变量名（引用单行单数）', type: 'text', def: '' },
+      { key: 'vMin', label: '第一个数下限', type: 'num', def: 1 },
+      { key: 'vMax', label: '第一个数上限', type: 'num', def: 100 },
+      { key: 'wMin', label: '第二个数下限', type: 'num', def: 1 },
+      { key: 'wMax', label: '第二个数上限', type: 'num', def: 1000 }
+    ],
+    text: [
+      { key: 'text', label: '固定文本（可多行）', type: 'textarea', def: '' }
+    ],
+    newline: [],
+    repeat: [
+      { key: 'countRef', label: '重复次数变量名（引用前面“单个数”填的变量名）', type: 'text', def: '' },
+      { key: 'count', label: '固定重复次数（二选一）', type: 'num', def: 1 }
+    ],
     array: [
       { key: 'nMin', label: '长度最小值 n', type: 'num', def: 5 },
       { key: 'nMax', label: '长度最大值 n', type: 'num', def: 10 },
@@ -1630,58 +1659,252 @@
     ]
   };
 
-  function dgFieldHtml(f) {
+  function dgFieldHtml(f, value) {
     const showIf = f.showIf ? ' data-showif="' + f.showIf + '"' : '';
+    const val = value !== undefined ? value : f.def;
     if (f.type === 'check') {
-      return '<label class="dg-field' + showIf + '"><input type="checkbox" data-key="' + f.key + '"' + (f.def ? ' checked' : '') + '> ' + f.label + '</label>';
+      return '<label class="dg-field' + showIf + '"><input type="checkbox" data-key="' + f.key + '"' + (val ? ' checked' : '') + '> ' + f.label + '</label>';
     }
     if (f.type === 'select') {
-      const opts = f.options.map((o) => '<option value="' + o[0] + '"' + (o[0] === f.def ? ' selected' : '') + '>' + o[1] + '</option>').join('');
+      const opts = f.options.map((o) => '<option value="' + o[0] + '"' + (String(val) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('');
       return '<label class="dg-field' + showIf + '"><span>' + f.label + '</span><select data-key="' + f.key + '">' + opts + '</select></label>';
     }
-    return '<label class="dg-field' + showIf + '"><span>' + f.label + '</span><input type="' + (f.type === 'text' ? 'text' : 'number') + '" data-key="' + f.key + '" value="' + f.def + '"' + (f.type === 'text' ? ' style="flex:1"' : '') + '></label>';
+    if (f.type === 'textarea') {
+      return '<label class="dg-field' + showIf + '"><span>' + f.label + '</span><textarea data-key="' + f.key + '" rows="2" style="flex:1">' + escapeHtml(val || '') + '</textarea></label>';
+    }
+    const rawAttr = f.raw ? ' data-raw="1"' : '';
+    return '<label class="dg-field' + showIf + '"><span>' + f.label + '</span><input type="' + (f.type === 'text' ? 'text' : 'number') + '" data-key="' + f.key + '" value="' + escapeHtml(val ?? '') + '"' + rawAttr + (f.type === 'text' ? ' style="flex:1"' : '') + '></label>';
+  }
+
+  function dgTypeOptionsHtml(selected) {
+    return DG_TYPE_OPTIONS.map((o) => '<option value="' + o[0] + '"' + (o[0] === selected ? ' selected' : '') + '>' + o[1] + '</option>').join('');
+  }
+
+  /** 事件委托绑定标志：DOM 重建后需要重新绑定到新的 #dg-steps */
+  let dgEventsBound = false;
+
+  /** 读取单个步骤（含 repeat 嵌套子步骤） */
+  function collectStepSpec(stepEl) {
+    const control = Array.from(stepEl.children).find((el) => el.classList.contains('control-row'));
+    const typeEl = control ? control.querySelector('.dg-step-type') : null;
+    const stepType = typeEl ? typeEl.value : 'int';
+    const st = { type: stepType };
+    const paramsEl = Array.from(stepEl.children).find((el) => el.classList.contains('dg-step-params'));
+    if (paramsEl) {
+      // 只收集当前步骤直接子级参数（.dg-field），不会混入嵌套 repeat 子流水线的字段
+      Array.from(paramsEl.querySelectorAll('.dg-field [data-key]')).forEach((el) => {
+        const label = el.closest('.dg-field');
+        if (label && label.parentElement === paramsEl) {
+          st[el.dataset.key] = readDgFieldValue(el);
+        }
+      });
+      if (stepType === 'repeat') {
+        const body = Array.from(paramsEl.children).find((el) => el.classList.contains('dg-step-list'));
+        st.steps = body
+          ? Array.from(body.children).filter((el) => el.classList.contains('dg-pipeline-step')).map((sub) => collectStepSpec(sub))
+          : [];
+      }
+    }
+    if (stepType === 'tree' || stepType === 'graph') {
+      if (st.n != null) { st.nMin = st.n; st.nMax = st.n; }
+    }
+    return st;
+  }
+
+  function readDgFieldValue(el) {
+    if (el.type === 'checkbox') return el.checked;
+    if (el.type === 'number') {
+      const v = Number(el.value);
+      return Number.isFinite(v) ? v : undefined;
+    }
+    if (el.tagName === 'TEXTAREA' || el.dataset.raw === '1') return el.value;
+    return el.value.trim();
+  }
+
+  /** 同步整个流水线 DOM 到状态（含嵌套 repeat），返回顶层步骤数组 */
+  function captureDgPipeline() {
+    const stepsEl = document.getElementById('dg-steps');
+    const steps = stepsEl
+      ? Array.from(stepsEl.children).filter((el) => el.classList.contains('dg-pipeline-step')).map((el) => collectStepSpec(el))
+      : [];
+    dgPipelineSteps = steps;
+    return steps;
+  }
+
+  function renderStepListHtml(steps, listPath) {
+    return (steps || []).map((step, idx) => {
+      const path = listPath ? listPath + '.' + idx : String(idx);
+      const type = step.type || 'int';
+      const fields = (DG_FIELDS[type] || []).map((f) => dgFieldHtml(f, step[f.key])).join('');
+      let bodyHtml = '';
+      if (type === 'repeat') {
+        const subListPath = path + '.repeat';
+        const subSteps = Array.isArray(step.steps) ? step.steps : [];
+        bodyHtml = '<div class="dg-step-list dg-repeat-body" data-list-path="' + subListPath + '">' +
+          '<button class="btn sm dg-step-add">+ 子步骤</button>' +
+          renderStepListHtml(subSteps, subListPath) +
+        '</div>';
+      }
+      return '<div class="dg-pipeline-step" data-path="' + path + '">' +
+        '<div class="control-row">' +
+          '<select class="dg-step-type">' + dgTypeOptionsHtml(type) + '</select>' +
+          '<button class="btn sm dg-step-del">删除</button>' +
+        '</div>' +
+        '<div class="dg-step-params">' + fields + bodyHtml + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderDgPipeline(steps) {
+    const stepsEl = document.getElementById('dg-steps');
+    if (!stepsEl) return;
+    dgPipelineSteps = steps || [];
+    stepsEl.innerHTML = renderStepListHtml(dgPipelineSteps, '');
+    bindDgPipelineEvents();
+  }
+
+  function getStepByPath(steps, pathStr) {
+    const parts = String(pathStr).split('.');
+    let arr = steps;
+    let node = null;
+    for (let i = 0; i < parts.length; i += 2) {
+      node = arr[Number(parts[i])];
+      if (!node) return null;
+      if (i + 1 < parts.length) {
+        if (parts[i + 1] !== 'repeat') return null;
+        arr = node.steps || (node.steps = []);
+      }
+    }
+    return node;
+  }
+
+  function getListByPath(steps, listPath) {
+    if (!listPath) return steps;
+    const parts = String(listPath).split('.');
+    let arr = steps;
+    for (let i = 0; i < parts.length; i += 2) {
+      const step = arr[Number(parts[i])];
+      if (!step) return null;
+      if (parts[i + 1] !== 'repeat') return null;
+      arr = step.steps || (step.steps = []);
+    }
+    return arr;
+  }
+
+  function removeStepByPath(steps, pathStr) {
+    const parts = String(pathStr).split('.');
+    let arr = steps;
+    for (let i = 0; i < parts.length; i += 2) {
+      const idx = Number(parts[i]);
+      const step = arr[idx];
+      if (!step) return false;
+      if (i + 1 < parts.length) {
+        if (parts[i + 1] !== 'repeat') return false;
+        arr = step.steps || (step.steps = []);
+      } else {
+        arr.splice(idx, 1);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function updateStepFieldFromEvent(t) {
+    const stepEl = t.closest('.dg-pipeline-step');
+    if (!stepEl || !t.dataset || !t.dataset.key) return;
+    const step = getStepByPath(dgPipelineSteps, stepEl.dataset.path || '');
+    if (step) step[t.dataset.key] = readDgFieldValue(t);
+  }
+
+  function bindDgPipelineEvents() {
+    const stepsEl = document.getElementById('dg-steps');
+    if (!stepsEl || dgEventsBound) return;
+    dgEventsBound = true;
+
+    stepsEl.addEventListener('change', (e) => {
+      const t = e.target;
+      // 步骤类型变化：直接改状态，其他步骤数据本来就在状态里，不会重置
+      if (t.classList && t.classList.contains('dg-step-type')) {
+        const stepEl = t.closest('.dg-pipeline-step');
+        if (!stepEl) return;
+        const step = getStepByPath(dgPipelineSteps, stepEl.dataset.path || '');
+        if (step) step.type = t.value;
+        renderDgPipeline(dgPipelineSteps);
+        return;
+      }
+      // 普通输入/选择/复选框：实时同步到状态
+      updateStepFieldFromEvent(t);
+      if (t.type === 'checkbox' && t.closest('.dg-field')) {
+        const container = t.closest('.dg-pipeline-step');
+        if (!container) return;
+        container.querySelectorAll('[data-showif="' + t.dataset.key + '"]').forEach((el) => {
+          el.style.display = t.checked ? '' : 'none';
+        });
+      }
+    });
+
+    // 输入过程中也同步（数字/文本/多行文本）
+    stepsEl.addEventListener('input', (e) => {
+      const t = e.target;
+      if (t.dataset && t.dataset.key) updateStepFieldFromEvent(t);
+    });
+
+    stepsEl.addEventListener('click', (e) => {
+      const delBtn = e.target.closest('.dg-step-del');
+      if (delBtn) {
+        const stepEl = delBtn.closest('.dg-pipeline-step');
+        if (stepEl) {
+          removeStepByPath(dgPipelineSteps, stepEl.dataset.path || '');
+          renderDgPipeline(dgPipelineSteps);
+        }
+        return;
+      }
+      const addBtn = e.target.closest('.dg-step-add');
+      if (addBtn) {
+        const listEl = addBtn.closest('.dg-step-list');
+        if (listEl) {
+          const list = getListByPath(dgPipelineSteps, listEl.dataset.listPath || '');
+          if (list) list.push({ type: 'int', vMin: 1, vMax: 100 });
+          renderDgPipeline(dgPipelineSteps);
+        }
+      }
+    });
   }
 
   function renderDgParams() {
-    if (!dgParamsEl || !dgTypeEl) return;
-    const type = dgTypeEl.value;
-    const fields = DG_FIELDS[type] || [];
-    dgParamsEl.innerHTML = fields.map(dgFieldHtml).join('');
-    dgParamsEl.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-      cb.addEventListener('change', () => {
-        const target = dgParamsEl.querySelectorAll('[data-showif="' + cb.dataset.key + '"]');
-        target.forEach((el) => { el.style.display = cb.checked ? '' : 'none'; });
+    if (!dgParamsEl) return;
+    dgEventsBound = false; // DOM 重建，重新绑定事件委托
+    dgParamsEl.innerHTML =
+      '<div class="control-row">' +
+        '<span class="muted">流水线拼装：按需添加步骤，每步保留自己的参数</span>' +
+        '<button class="btn sm" id="dg-step-add">+ 添加步骤</button>' +
+      '</div>' +
+      '<div id="dg-steps"></div>';
+    renderDgPipeline(dgPipelineSteps);
+    const add = document.getElementById('dg-step-add');
+    if (add) {
+      add.addEventListener('click', () => {
+        dgPipelineSteps.push({ type: 'int', vMin: 1, vMax: 100 });
+        renderDgPipeline(dgPipelineSteps);
       });
-    });
-    dgParamsEl.querySelectorAll('input[type="checkbox"]').forEach((cb) => {
-      const target = dgParamsEl.querySelectorAll('[data-showif="' + cb.dataset.key + '"]');
-      target.forEach((el) => { el.style.display = cb.checked ? '' : 'none'; });
+    }
+  }
+
+  function cloneSteps(steps) {
+    return (steps || []).map((s) => {
+      const c = { ...s };
+      if (Array.isArray(s.steps)) c.steps = cloneSteps(s.steps);
+      return c;
     });
   }
 
   function collectDgSpec() {
-    const type = dgTypeEl ? dgTypeEl.value : 'array';
-    const spec = { type };
-    dgParamsEl.querySelectorAll('[data-key]').forEach((el) => {
-      const key = el.dataset.key;
-      if (el.type === 'checkbox') {
-        spec[key] = el.checked;
-      } else if (el.type === 'number') {
-        const v = Number(el.value);
-        spec[key] = Number.isFinite(v) ? v : undefined;
-      } else {
-        spec[key] = el.value.trim();
-      }
-    });
-    if (type === 'tree' || type === 'graph') {
-      if (spec.n != null) { spec.nMin = spec.n; spec.nMax = spec.n; }
-    }
-    return spec;
+    // 直接使用实时维护的 JS 状态，不再依赖 DOM 树解析，避免嵌套参数丢失
+    return { type: 'pipeline', steps: cloneSteps(dgPipelineSteps) };
   }
 
   function initDataGenView() {
     renderDgParams();
-    if (dgTypeEl) dgTypeEl.addEventListener('change', () => { renderDgParams(); updateDgSummary(); });
     if (dgGenBtn) {
       dgGenBtn.addEventListener('click', () => {
         dgGenBtn.disabled = true;
@@ -1712,6 +1935,11 @@
   const vpIn = document.getElementById('vp-in');
   const vpSo = document.getElementById('vp-so');
   const vpBo = document.getElementById('vp-bo');
+  const vpCompare = document.getElementById('vp-compare');
+  const vpEps = document.getElementById('vp-eps');
+  const vpSpjRow = document.getElementById('vp-spj-row');
+  const vpSpj = document.getElementById('vp-spj');
+  const vpSpjBrowse = document.getElementById('vp-spj-browse');
   let lastMismatch = null;
 
   function switchTestMode(mode) {
@@ -1741,6 +1969,16 @@
     if (t === 'string') return '数据源：随机字符串 长度∈[' + (spec.lenMin || 5) + ',' + (spec.lenMax || 15) + ']';
     if (t === 'permutation') return '数据源：随机排列 n∈[' + (spec.nMin || 5) + ',' + (spec.nMax || 10) + ']';
     if (t === 'script') return '数据源：生成脚本 ' + (spec.scriptPath || '(未设置)');
+    if (t === 'line') return '数据源：单行单数 值域[' + (spec.vMin || 1) + ',' + (spec.vMax || 100) + ']';
+    if (t === 'int') return '数据源：单个数 值域[' + (spec.vMin || 1) + ',' + (spec.vMax || 100) + ']';
+    if (t === 'ints') return '数据源：一行' + (spec.nMin || 5) + '~' + (spec.nMax || 10) + '个数 值域[' + (spec.vMin || 1) + ',' + (spec.vMax || 100) + ']';
+    if (t === 'pairs') return '数据源：每行两个数 ' + (spec.nMin || 2) + '~' + (spec.nMax || 5) + ' 行';
+    if (t === 'text') return '数据源：固定文本';
+    if (t === 'newline') return '数据源：换行';
+    if (t === 'pipeline') {
+      const labels = (spec.steps || []).map((s) => s.type || '?').join(' + ');
+      return '数据源：组合流水线（' + (labels || '空') + '）';
+    }
     return '数据源：造数据面板当前设置';
   }
 
@@ -1760,6 +1998,21 @@
         if (nav) nav.click();
       });
     }
+
+    // 比对方式联动：float 显示误差输入，spj 显示 SPJ 路径输入
+    function updateCompareUi() {
+      const mode = vpCompare ? vpCompare.value : 'exact';
+      if (vpEps) vpEps.style.display = mode === 'float' ? '' : 'none';
+      if (vpSpjRow) vpSpjRow.style.display = mode === 'spj' ? '' : 'none';
+    }
+    if (vpCompare) {
+      vpCompare.addEventListener('change', updateCompareUi);
+      updateCompareUi();
+    }
+    if (vpSpjBrowse) {
+      vpSpjBrowse.addEventListener('click', () => vscode.postMessage({ type: 'verifierPickChecker' }));
+    }
+
     if (vpStart) {
       vpStart.addEventListener('click', () => {
         const solve = (vpSolve && vpSolve.value.trim()) || testFilePath;
@@ -1773,12 +2026,21 @@
           if (vpStatus) { vpStatus.textContent = '请填写暴力程序路径'; vpStatus.className = 'vp-status error'; }
           return;
         }
+        const mode = vpCompare ? vpCompare.value : 'exact';
+        const epsRaw = vpEps ? Number(vpEps.value) : NaN;
+        const checker = {
+          mode,
+          eps: Number.isFinite(epsRaw) && epsRaw >= 0 ? epsRaw : 1e-6
+        };
+        if (mode === 'spj') {
+          checker.checkerPath = vpSpj ? vpSpj.value.trim() : '';
+        }
         lastMismatch = null;
         if (vpMismatch) vpMismatch.style.display = 'none';
         if (vpStart) vpStart.disabled = true;
         if (vpStop) vpStop.style.display = '';
         if (vpProgress) vpProgress.textContent = '';
-        vscode.postMessage({ type: 'verifierStart', payload: { solvePath: solve, brutePath: brute, maxRounds: max, spec: collectDgSpec() } });
+        vscode.postMessage({ type: 'verifierStart', payload: { solvePath: solve, brutePath: brute, maxRounds: max, spec: collectDgSpec(), checker } });
       });
     }
     if (vpStop) {
@@ -1803,10 +2065,6 @@
     if (!msg) return;
 
     switch (msg.type) {
-      case 'testLayoutRatio':
-        // Bug5：恢复上次保存的分栏比例
-        applyLayoutRatio(Number((msg.payload || msg).ratio) || 0.5);
-        break;
       case 'statementLoading':
         console.log('[ACM-Workflow][题面] webview 收到 statementLoading');
         // V0.13：抓取中显示加载态；同时清除之前的缓存兜底提示（覆盖旧提示状态）
@@ -1888,42 +2146,44 @@
         if (stBody) stBody.innerHTML = '<div class="muted st-empty">题面抓取失败：' + escapeHtml(data.message || '未知错误') + '</div>';
         break;
       }
-      case 'knowledgeAll':
-        kData = msg.data || null;
-        renderKnowledgeTree();
-        break;
       case 'initState':
         applyState(msg.state);
         break;
-      case 'problemResult':
+      case 'problemResult': {
+        const tags = getSelectedTags();
         lastPickPayload = {
           platform: 'codeforces',
           minRating: Number(minRange ? minRange.value : 0),
           maxRating: Number(maxRange ? maxRange.value : 0)
         };
+        if (tags.length > 0) lastPickPayload.tags = tags;
         rememberPicked(msg.problem && msg.problem.id); // Bug2：记录已尝试
         endPickRequest();
         setPickButtonsDisabled(false);
         setStatus('');
         renderProblem(msg.problem);
         break;
-      case 'weakProblem':
+      }
+      case 'weakProblem': {
         if (!msg.problem) {
           setStatus(msg.error || '薄弱点推荐失败（可先绑定 CF 账号并导入历史）', true);
           setPickButtonsDisabled(false);
           break;
         }
+        const tags = getSelectedTags();
         lastPickPayload = {
           platform: 'codeforces',
           minRating: Number(minRange ? minRange.value : 800),
           maxRating: Number(maxRange ? maxRange.value : 2400)
         };
+        if (tags.length > 0) lastPickPayload.tags = tags;
         rememberPicked(msg.problem.id);
         endPickRequest();
         setPickButtonsDisabled(false);
         setStatus('薄弱专题：' + (msg.tag || '未知') + '（基于本地 AC 记录通过率）');
         renderProblem(msg.problem);
         break;
+      }
       case 'recentList':
         renderRecentList(msg.recent);
         break;
@@ -2144,14 +2404,7 @@
       case 'dataGenerated': {
         lastGenerated = msg.input || '';
         if (dgOutputEl) dgOutputEl.textContent = lastGenerated || '(空)';
-        // 自动填充测试面板第一个用例的输入框（无用例则新建一个）
-        if (lastGenerated) {
-          if (testCases.length === 0) {
-            testCases.push({ id: Date.now(), input: '', output: '' });
-          }
-          testCases[0].input = lastGenerated;
-          renderTestCases();
-        }
+        // 不再自动写入测试面板/样例，只保留生成预览，避免覆盖题目官方样例
         break;
       }
       case 'dataGenStatus': {
@@ -2196,6 +2449,9 @@
       }
       case 'verifierBrutePicked':
         if (vpBrute) vpBrute.value = msg.path || '';
+        break;
+      case 'verifierCheckerPicked':
+        if (vpSpj) vpSpj.value = msg.path || '';
         break;
       // ===== 通过 URL 导入题目（V0.23）=====
       case 'urlImportStatus': {
