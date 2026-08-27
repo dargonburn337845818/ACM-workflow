@@ -177,39 +177,6 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
       return;
     }
 
-    if (msg?.type === 'pickWallpaper') {
-      const picked = await vscode.window.showOpenDialog({
-        canSelectMany: false,
-        filters: {
-          '壁纸': ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'mp4', 'webm', 'mov', 'm4v']
-        }
-      });
-      if (picked && picked[0]) {
-        const p = picked[0].fsPath;
-        const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(p);
-        await vscode.workspace.getConfiguration('acmWorkflow')
-          .update('glassBackground', p, vscode.ConfigurationTarget.Global);
-        // 转成 webview 可访问 URI，让本地预览图/动态壁纸能真正显示
-        let url = p;
-        try {
-          url = this.view?.webview.asWebviewUri(vscode.Uri.file(p)).toString() || p;
-        } catch { /* keep raw */ }
-        this.post({ type: 'wallpaperPicked', path: url, localPath: p, isVideo });
-      }
-      return;
-    }
-
-    if (msg?.type === 'setWallpaper') {
-      await vscode.workspace.getConfiguration('acmWorkflow')
-        .update('glassBackground', msg.url || '', vscode.ConfigurationTarget.Global);
-      return;
-    }
-
-    if (msg?.type === 'applyGlobalWallpaper') {
-      await vscode.commands.executeCommand('acmWorkflow.applyGlobalWallpaper');
-      return;
-    }
-
     if (msg?.type === 'webviewReady') {
       this.restoreState();
       return;

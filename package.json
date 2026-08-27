@@ -96,11 +96,6 @@
         "command": "acmWorkflow.setupGuide",
         "title": "ACM Workflow: 环境配置引导",
         "category": "ACM Workflow"
-      },
-      {
-        "command": "acmWorkflow.applyGlobalWallpaper",
-        "title": "ACM Workflow: 设为全局壁纸",
-        "category": "ACM Workflow"
       }
     ],
     "keybindings": [
@@ -186,11 +181,6 @@
           "type": "string",
           "default": "",
           "description": "CF 网络代理地址（如 http://127.0.0.1:7890）。VS Code 扩展的请求不跟随系统代理，需要代理访问 CF 时在此填写；留空则尝试环境变量 HTTPS_PROXY/HTTP_PROXY。"
-        },
-        "acmWorkflow.glassBackground": {
-          "type": "string",
-          "default": "",
-          "description": "夜航玻璃拟态的背景图 URL（留空使用内置深夜景光源；可填 wallpaper 图库直链，最好 https）。"
         }
       }
     },
