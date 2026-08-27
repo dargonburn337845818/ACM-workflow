@@ -5,17 +5,17 @@
    ============================================================ */
 
 :root {
-  --bg: #EEF1F6;
-  --panel: rgba(255,255,255,0.72);
-  --surface: rgba(255,255,255,0.92);
-  --border: rgba(0,0,0,0.10);
-  --fg: #1A1C22;
-  --muted: #6B7280;
-  --green: #3BA776;
-  --gold: #4C6EF5;
-  --err: #D94F4F;
-  --hard: #1A1C22;
-  --shadow: rgba(31, 40, 80, 0.08);
+  --bg: #1B1D22;
+  --panel: rgba(255,255,255,0.06);
+  --surface: rgba(255,255,255,0.10);
+  --border: rgba(255,255,255,0.12);
+  --fg: #F5F6F8;
+  --muted: rgba(255,255,255,0.55);
+  --green: #6FBF87;
+  --gold: #F3DCA8;
+  --err: #F37B7B;
+  --hard: #0D0E11;
+  --shadow: rgba(0,0,0,0.4);
   --font-size: 13px;
   --line-height: 1.7;
   --font-size-sm: 11px;
@@ -36,7 +36,7 @@ html, body { height: 100%; }
 
 body {
   font-family: var(--ui);
-  background: #EEF1F6;
+  background: #1B1D22;
   color: var(--fg);
   font-size: var(--font-size);
   line-height: var(--line-height);
@@ -1343,4 +1343,29 @@ body > video.wallpaper-bg {
 
 html, body {
   background: #EEF1F6;
+}
+
+/* ===== 真·亚克力蒙版：深色、无背景色、只透背景 ===== */
+body {
+  background: #1B1D22;
+}
+
+.app,
+.rail,
+.card,
+.btn,
+.primary-btn,
+.ghost-btn,
+.panel,
+.modal,
+.wallpaper-bar,
+.cf-session {
+  background-color: rgba(255,255,255,0.035) !important;
+  backdrop-filter: blur(40px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(160%) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+.card, .btn, .primary-btn, .ghost-btn, .wallpaper-bar, .cf-session {
+  box-shadow: 0 16px 48px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.35) !important;
 }

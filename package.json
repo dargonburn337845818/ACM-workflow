@@ -96,6 +96,11 @@
         "command": "acmWorkflow.setupGuide",
         "title": "ACM Workflow: 环境配置引导",
         "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.applyGlobalWallpaper",
+        "title": "ACM Workflow: 设为全局壁纸",
+        "category": "ACM Workflow"
       }
     ],
     "keybindings": [

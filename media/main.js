@@ -2116,6 +2116,12 @@
       vscode.postMessage({ type: 'setWallpaper', url: '' });
     });
   }
+  const wallpaperGlobal = document.getElementById('wallpaper-global');
+  if (wallpaperGlobal) {
+    wallpaperGlobal.addEventListener('click', () => {
+      vscode.postMessage({ type: 'applyGlobalWallpaper' });
+    });
+  }
 
   window.addEventListener('message', (event) => {
     const msg = event.data;

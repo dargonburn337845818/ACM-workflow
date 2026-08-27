@@ -103,7 +103,7 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${webview.cspSource} https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; style-src ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; font-src https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; img-src ${webview.cspSource} data: https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${webview.cspSource} https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; style-src ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; font-src https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; img-src ${webview.cspSource} data: https: file:; media-src ${webview.cspSource} data: https: file: blob:;">
   <link rel="stylesheet" href="${styleUri}">
   ${glassBgStyle}
   <title>ACM Workflow</title>
@@ -148,6 +148,7 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
         <input id="wallpaper-url" class="wallpaper-url mono" placeholder="粘贴图片/视频 URL，或选择本地文件" autocomplete="off">
         <button class="btn" id="wallpaper-apply">应用</button>
         <button class="btn" id="wallpaper-pick">本机选择</button>
+        <button class="btn" id="wallpaper-global">设为全局</button>
         <button class="btn" id="wallpaper-clear">清除</button>
       </div>
       ${pickView}

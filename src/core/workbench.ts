@@ -89,9 +89,22 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     this.view = webviewView;
     this.disposables = [];
 
+    const wallpaperCfg = vscode.workspace.getConfiguration('acmWorkflow').get<string>('glassBackground', '');
+    const localRoots = [vscode.Uri.joinPath(this.extensionUri, 'media')];
+    if (wallpaperCfg && path.isAbsolute(wallpaperCfg)) {
+      localRoots.push(vscode.Uri.file(path.dirname(wallpaperCfg)));
+    }
+    for (const weRoot of [
+      'D:/steam/steamapps/workshop/content/431960',
+      'C:/Program Files (x86)/Steam/steamapps/workshop/content/431960',
+      'C:/Program Files/Steam/steamapps/workshop/content/431960'
+    ]) {
+      if (fs.existsSync(weRoot)) localRoots.push(vscode.Uri.file(weRoot));
+    }
+    const uniqueRoots = Array.from(new Map(localRoots.map(r => [r.toString(), r])).values());
     webviewView.webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')]
+      localResourceRoots: uniqueRoots
     };
 
     webviewView.webview.html = getWorkbenchHtml(webviewView.webview, this.extensionUri);
@@ -176,7 +189,12 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
         const isVideo = /\.(mp4|webm|mov|m4v)$/i.test(p);
         await vscode.workspace.getConfiguration('acmWorkflow')
           .update('glassBackground', p, vscode.ConfigurationTarget.Global);
-        this.post({ type: 'wallpaperPicked', path: p, isVideo });
+        // 转成 webview 可访问 URI，让本地预览图/动态壁纸能真正显示
+        let url = p;
+        try {
+          url = this.view?.webview.asWebviewUri(vscode.Uri.file(p)).toString() || p;
+        } catch { /* keep raw */ }
+        this.post({ type: 'wallpaperPicked', path: url, isVideo });
       }
       return;
     }
@@ -184,6 +202,11 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     if (msg?.type === 'setWallpaper') {
       await vscode.workspace.getConfiguration('acmWorkflow')
         .update('glassBackground', msg.url || '', vscode.ConfigurationTarget.Global);
+      return;
+    }
+
+    if (msg?.type === 'applyGlobalWallpaper') {
+      await vscode.commands.executeCommand('acmWorkflow.applyGlobalWallpaper');
       return;
     }
 
