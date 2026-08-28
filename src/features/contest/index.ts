@@ -4,52 +4,25 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CfContest, ContestDetail } from '../../services/cfContest';
-import { getContestDetail, listCfContests } from '../../services/cfContest';
-import { getStoredSession } from '../../services/cfSession';
-import { getCodeforcesProblemDetail } from '../../services/fetchers/codeforces';
-import { fetchStatement } from '../../services/fetchers/statement';
-import { ensureRecord } from '../../services/records';
-import { createContestProblemFiles, findProbFile, markSamplesFetchFailed, updateContestProblemSamples } from '../../services/template';
-import { translateStatementHtml } from '../../services/translate';
+import { Services } from '../../services';
 import type { WorkbenchHost } from '../../core/workbench';
 
 
-export function installContest(host: WorkbenchHost): void {
-  host.handlers['contestListReady'] = (msg: any) => pushContestList(host);
-  host.handlers['contestSelect'] = (msg: any) => handleContestSelect(host, msg?.payload);
-  host.handlers['followHandlesAsk'] = (msg: any) => handleFollowHandlesAsk(host);
-  host.handlers['contestCreateAll'] = (msg: any) => handleContestCreate(host, msg?.payload);
-  host.handlers['problemTranslate'] = (msg: any) => handleProblemTranslate(host, msg?.payload);
+export function installContest(host: WorkbenchHost, deps: Pick<Services, 'codeforces' | 'workspace' | 'statement' | 'records'>): void {
+  host.handlers['contestListReady'] = (msg: any) => pushContestList(host, deps);
+  host.handlers['contestSelect'] = (msg: any) => handleContestSelect(host, deps, msg?.payload);
+  host.handlers['followHandlesAsk'] = (msg: any) => handleFollowHandlesAsk(host, deps);
+  host.handlers['contestCreateAll'] = (msg: any) => handleContestCreate(host, deps, msg?.payload);
+  host.handlers['problemTranslate'] = (msg: any) => handleProblemTranslate(host, deps, msg?.payload);
 }
 
 
-async function getContestDetailCached(host: WorkbenchHost, contestId: number): Promise<ContestDetail> {
-  const hit = host.contestDetailCache.get(contestId);
-  if (hit && Date.now() - hit.at < 120000) return hit.detail;
-  const detail = await getContestDetail(host.context, contestId);
-  host.contestDetailCache.set(contestId, { at: Date.now(), detail });
-  return detail;
+async function getContestDetailCached(host: WorkbenchHost, deps: Pick<Services, 'codeforces'>, contestId: number) {
+  return deps.codeforces.getContestDetail(contestId);
 }
 
 
-async function contestFollowHandles(host: WorkbenchHost, ): Promise<string[]> {
-  const cfg = vscode.workspace.getConfiguration('acmWorkflow');
-  let self = (cfg.get<string>('cfHandle', '') || '').trim();
-  if (!self) {
-    try {
-      const session = await getStoredSession(host.context);
-      if (session && session.handle && session.handle !== 'unknown') self = session.handle;
-    } catch { /* 读失败按未登录处理 */ }
-  }
-  const follows = cfg.get<string[]>('followHandles', []) || [];
-  const list = [...follows.map((h) => String(h).trim()).filter(Boolean)];
-  if (self && !list.some((h) => h.toLowerCase() === self.toLowerCase())) list.unshift(self);
-  return list;
-}
-
-
-async function handleFollowHandlesAsk(host: WorkbenchHost, ) {
+async function handleFollowHandlesAsk(host: WorkbenchHost, deps: Pick<Services, 'codeforces'>) {
   const cfg = vscode.workspace.getConfiguration('acmWorkflow');
   const current = (cfg.get<string[]>('followHandles', []) || []).join(', ');
   const input = await vscode.window.showInputBox({
@@ -61,52 +34,52 @@ async function handleFollowHandlesAsk(host: WorkbenchHost, ) {
   if (input === undefined) return; // 用户取消
   const handles = input.split(/[,，\s]+/).map((h) => h.trim()).filter(Boolean);
   await cfg.update('followHandles', handles, vscode.ConfigurationTarget.Global);
-  host.view?.webview.postMessage({ type: 'followHandlesSet', handles });
-  host.view?.webview.postMessage({ type: 'contestStatus', message: `已保存关注：${handles.join(', ') || '(无)'}（重新展开比赛即可查看关注榜单）` });
+  host.post({ type: 'followHandlesSet', handles });
+  host.post({ type: 'contestStatus', message: `已保存关注：${handles.join(', ') || '(无)'}（重新展开比赛即可查看关注榜单）` });
 }
 
 
-async function pushContestList(host: WorkbenchHost, ) {
+async function pushContestList(host: WorkbenchHost, deps: Pick<Services, 'codeforces'>) {
   try {
-    host.contestDetailCache.clear(); // 刷新列表时详情缓存一并失效（赛时榜单/题目会变）
-    const contests = await listCfContests(host.context);
-    host.view?.webview.postMessage({ type: 'contestList', contests: contests.map((c) => ({ ...c })) });
+    deps.codeforces.clearContestDetailCache(); // 刷新列表时详情缓存一并失效（赛时榜单/题目会变）
+    const contests = await deps.codeforces.listContests();
+    host.post({ type: 'contestList', contests: contests.map((c) => ({ ...c })) });
   } catch (e: any) {
-    host.view?.webview.postMessage({ type: 'contestList', error: e?.message || '比赛列表获取失败' });
+    host.post({ type: 'contestList', error: e?.message || '比赛列表获取失败' });
   }
 }
 
 
-async function handleContestSelect(host: WorkbenchHost, payload: any) {
+async function handleContestSelect(host: WorkbenchHost, deps: Pick<Services, 'codeforces'>, payload: any) {
   const contestId = Number(payload?.contestId);
   if (!contestId) return;
   try {
-    if (payload?.refresh) host.contestDetailCache.delete(contestId); // 关注变化后强制刷新
-    const detail = await getContestDetailCached(host, contestId);
-    host.view?.webview.postMessage({ type: 'contestDetail', contestId, detail });
+    if (payload?.refresh) deps.codeforces.invalidateContestDetail(contestId); // 关注变化后强制刷新
+    const detail = await getContestDetailCached(host, deps, contestId);
+    host.post({ type: 'contestDetail', contestId, detail });
   } catch (e: any) {
-    host.view?.webview.postMessage({ type: 'contestDetailError', contestId, message: e?.message || '题目列表获取失败' });
+    host.post({ type: 'contestDetailError', contestId, message: e?.message || '题目列表获取失败' });
   }
 }
 
 
-async function handleContestCreate(host: WorkbenchHost, payload: any) {
+async function handleContestCreate(host: WorkbenchHost, deps: Pick<Services, 'codeforces' | 'workspace' | 'records'>, payload: any) {
   const contestId = Number(payload?.contestId);
   if (!contestId) return;
   try {
-    const detail = await getContestDetailCached(host, contestId);
+    const detail = await getContestDetailCached(host, deps, contestId);
     if (detail.problems.length === 0) {
       throw new Error('该比赛题目尚未公布（比赛开始后可再次点击创建）');
     }
-    host.view?.webview.postMessage({
+    host.post({
       type: 'contestStatus',
       message: `正在创建比赛 ${detail.contest.name} 的 ${detail.problems.length} 道题目…`
     });
-    const files = createContestProblemFiles(contestId, detail.problems);
+    const files = deps.workspace.createContestProblemFiles(contestId, detail.problems);
 
     // 登记刷题记录（生成即登记）
     for (const p of detail.problems) {
-      ensureRecord({
+      deps.records.ensure({
         id: `${contestId}${p.index}`,
         platform: 'codeforces',
         title: p.name,
@@ -126,7 +99,7 @@ async function handleContestCreate(host: WorkbenchHost, payload: any) {
       const filePath = files[i]?.filePath;
       if (!filePath) continue;
       // 复用已有缓存：.cph .prob 已有测试用例则跳过（重复创建不重复抓取）
-      const probPath = findProbFile(filePath);
+      const probPath = deps.workspace.findProbFile(filePath);
       if (probPath) {
         try {
           const existing = JSON.parse(fs.readFileSync(probPath, 'utf8'));
@@ -137,34 +110,34 @@ async function handleContestCreate(host: WorkbenchHost, payload: any) {
           }
         } catch { /* 按无缓存处理 */ }
       }
-      host.view?.webview.postMessage({
+      host.post({
         type: 'contestStatus',
         message: `正在抓取第 ${i + 1}/${n} 题（${p.index}）样例…`
       });
       try {
-        const pd = await getCodeforcesProblemDetail({
+        const pd = await deps.codeforces.getProblemDetail({
           id: `${contestId}${p.index}`,
           platform: 'codeforces',
           title: p.name,
           tags: p.tags,
           url: `https://codeforces.com/contest/${contestId}/problem/${p.index}`
         });
-        const ok = updateContestProblemSamples(filePath, pd.tests);
+        const ok = deps.workspace.updateContestProblemSamples(filePath, pd.tests);
         console.log(`[ACM-Workflow][比赛] ${p.index} 样例抓取完成：${pd.tests.length} 组（${ok ? '已写入 .prob' : '写入失败' }）`);
         if (pd.tests.length > 0) samplesOk++;
         else {
-          markSamplesFetchFailed(filePath);
+          deps.workspace.markSamplesFetchFailed(filePath);
           samplesFail++;
         }
       } catch (e: any) {
         console.warn(`[ACM-Workflow][比赛] ${p.index} 样例抓取失败：${e?.message || e}`);
-        markSamplesFetchFailed(filePath);
+        deps.workspace.markSamplesFetchFailed(filePath);
         samplesFail++;
       }
       if (i < n - 1) await sleep(800); // 请求间隔，降低触发 CF 风控概率
     }
 
-    host.view?.webview.postMessage({
+    host.post({
       type: 'contestCreated',
       contestId,
       count: files.length,
@@ -180,26 +153,26 @@ async function handleContestCreate(host: WorkbenchHost, payload: any) {
       await vscode.window.showTextDocument(doc, { preview: false });
     }
   } catch (e: any) {
-    host.view?.webview.postMessage({ type: 'contestStatus', message: e?.message || '创建失败', isError: true });
+    host.post({ type: 'contestStatus', message: e?.message || '创建失败', isError: true });
   }
 }
 
 
-async function handleProblemTranslate(host: WorkbenchHost, payload: any) {
+async function handleProblemTranslate(host: WorkbenchHost, deps: Pick<Services, 'codeforces' | 'statement'>, payload: any) {
   const url = String(payload?.url || '');
   const label = String(payload?.label || '');
   if (!url) {
-    host.view?.webview.postMessage({ type: 'problemTranslateStatus', message: '缺少题目 URL', busy: false, isError: true });
+    host.post({ type: 'problemTranslateStatus', message: '缺少题目 URL', busy: false, isError: true });
     return;
   }
-  host.view?.webview.postMessage({ type: 'problemTranslateStatus', message: '正在抓取英文题面…', busy: true });
+  host.post({ type: 'problemTranslateStatus', message: '正在抓取英文题面…', busy: true });
   try {
-    const res = await fetchStatement({ platform: 'codeforces', id: label, title: label, tags: [], url });
-    host.view?.webview.postMessage({ type: 'problemTranslateStatus', message: '正在翻译（中英对照）…', busy: true });
-    const zh = await translateStatementHtml(res.html, { context: host.context }).catch(() => null);
-    host.view?.webview.postMessage({ type: 'contestStatement', label, url, html: res.html, zh });
+    const res = await deps.statement.fetchStatement({ platform: 'codeforces', id: label, title: label, tags: [], url });
+    host.post({ type: 'problemTranslateStatus', message: '正在翻译（中英对照）…', busy: true });
+    const zh = await deps.statement.translate(res.html).catch(() => null);
+    host.post({ type: 'contestStatement', label, url, html: res.html, zh });
   } catch (e: any) {
-    host.view?.webview.postMessage({
+    host.post({
       type: 'problemTranslateStatus',
       message: `题面获取/翻译失败：${e?.message || e}`,
       busy: false,

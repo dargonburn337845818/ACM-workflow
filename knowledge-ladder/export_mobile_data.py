@@ -10,9 +10,15 @@ from tiers_data import TIERS
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobile", "www")
 os.makedirs(OUT_DIR, exist_ok=True)
 
+# 移动端不需要 C++ 模板，去掉 cpp 让包更轻
+MOBILE_ALGORITHMS = [
+    {k: v for k, v in a.items() if k != "cpp"}
+    for a in ALGORITHMS
+]
+
 data = {
     "tiers": TIERS,
-    "algorithms": ALGORITHMS,
+    "algorithms": MOBILE_ALGORITHMS,
     "infoOps": INFO_OPS,
     "infoOpColors": INFO_OP_COLORS,
     "topologies": TOPOLOGIES,

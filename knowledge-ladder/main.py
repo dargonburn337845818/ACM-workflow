@@ -10,8 +10,8 @@ import json
 import os
 import sys
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, QStandardPaths
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QPainter, QPixmap
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, QStandardPaths, QUrl
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QMovie, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QListWidget,
     QListWidgetItem,
@@ -51,6 +52,13 @@ from info_framework import (
     TOPOLOGIES,
     get_alg_info,
 )
+try:
+    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+    from PySide6.QtMultimediaWidgets import QVideoWidget
+    HAS_MEDIA = True
+except ImportError:
+    HAS_MEDIA = False
+
 from knowledge_data import ALGORITHMS, ALGORITHM_BY_NAME
 from tiers_data import TIERS
 
@@ -67,6 +75,76 @@ ANIM_OFF = "off"
 ANIM_LIGHT = "light"
 ANIM_SMOOTH = "smooth"
 ANIM_NAMES = {ANIM_OFF: "关闭", ANIM_LIGHT: "轻量", ANIM_SMOOTH: "流畅"}
+
+# 与 ACM Workflow 的壁纸模式一致：
+# 没有壁纸时是默认亚克力；有壁纸时面板只保留一层薄雾，透出下方视频/图片壁纸。
+WALLPAPER_QSS = """
+/* ===== 壁纸模式：轻薄亚克力，让壁纸透出来 ===== */
+QWidget#appBody, QWidget#rightContainer {
+    background: transparent;
+}
+
+QFrame#titleBar {
+    background: rgba(0, 0, 0, 0.18);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+QWidget#sidebar {
+    background: rgba(0, 0, 0, 0.14);
+    border-right: 1px solid rgba(255,255,255,0.05);
+}
+
+QPushButton {
+    background: rgba(0, 0, 0, 0.24);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: rgba(255,255,255,0.92);
+}
+
+QPushButton#dissectNext,
+QPushButton#dissectRestart,
+QPushButton#next {
+    background: rgba(228, 184, 99, 0.12);
+    border: 1px solid rgba(228, 184, 99, 0.35);
+    color: #F3DCA8;
+}
+
+QListWidget#tierList::item {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+QListWidget#tierList::item:selected {
+    background: rgba(228, 184, 99, 0.14);
+    border-color: rgba(228, 184, 99, 0.4);
+    color: #F3DCA8;
+}
+
+QFrame#tagRow,
+QLabel#dissectNode,
+QLabel#dissectThinkCard {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+QFrame#dissectAcrylic {
+    background: rgba(0, 0, 0, 0.16);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+QFrame#diagramNode,
+QPushButton#diagramNodeButton {
+    background: rgba(0, 0, 0, 0.16);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+QWidget#dissectContent {
+    background: transparent;
+}
+
+QDialog {
+    background: rgba(12, 14, 18, 0.92);
+}
+"""
 
 
 def _unique_in_order(values, order=None):
@@ -132,6 +210,7 @@ class ProgressStore:
         self.mastered: dict[str, bool] = {}
         self.style_mode = STYLE_DARK
         self.animation_level = ANIM_LIGHT
+        self.wallpaper = ""
         self.load()
 
     def load(self):
@@ -149,6 +228,7 @@ class ProgressStore:
             self.animation_level = data.get("animation_level", ANIM_LIGHT)
             if self.animation_level not in (ANIM_OFF, ANIM_LIGHT, ANIM_SMOOTH):
                 self.animation_level = ANIM_LIGHT
+            self.wallpaper = data.get("wallpaper", "")
         except (OSError, ValueError):
             self.mastered = {}
             self.style_mode = STYLE_DARK
@@ -159,6 +239,7 @@ class ProgressStore:
             "mastered": self.mastered,
             "style_mode": self.style_mode,
             "animation_level": self.animation_level,
+            "wallpaper": self.wallpaper,
             "updatedAt": "",
         }
         try:
@@ -173,6 +254,10 @@ class ProgressStore:
 
     def set_animation_level(self, level: str):
         self.animation_level = level
+        self.save()
+
+    def set_wallpaper(self, path: str):
+        self.wallpaper = path
         self.save()
 
     def is_mastered(self, tag_id: str) -> bool:
@@ -678,12 +763,12 @@ def tier_item_text(tier, store) -> str:
 
 
 class InfoGuideDialog(QDialog):
-    """信息论导论：四操作、四阶段、解剖四步、量纲速查。"""
+    """信息论导论：四操作、四阶段、拆题四步、数据规模速查。"""
 
     def __init__(self, parent=None, store=None):
         super().__init__(parent)
         self.store = store
-        self.setWindowTitle("信息论导论 / 解剖四步")
+        self.setWindowTitle("信息论导论 / 拆题四步")
         self.resize(860, 680)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -772,13 +857,13 @@ class InfoGuideDialog(QDialog):
 {''.join(phase_rows)}
 </table>
 
-<h3 style="color:#82a0ff;">三、解剖四步</h3>
+<h3 style="color:#82a0ff;">三、拆题四步</h3>
 <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;">
 <tr><th>步骤</th><th>问题</th><th>选项</th><th>产出</th></tr>
 {''.join(anatomy_rows)}
 </table>
 
-<h3 style="color:#82a0ff;">四、量纲速查（约束匕首）</h3>
+<h3 style="color:#82a0ff;">四、数据规模速查</h3>
 <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;width:100%;">
 <tr><th>n</th><th>允许复杂度</th><th>常走的路</th></tr>
 <tr><td>≤20</td><td>指数 / 状压</td><td>直接枚举子集、TSP、位运算</td></tr>
@@ -796,6 +881,492 @@ class InfoGuideDialog(QDialog):
 </body>
 </html>
 """
+
+
+class FlowDiagram(QWidget):
+    """用 QPainter 直接绘制拆题流程图：不依赖 QSS / 富文本引擎，保证一定显示。"""
+
+    def __init__(self, items, parent=None):
+        super().__init__(parent)
+        self.items = items
+        self.setMinimumHeight(260)
+        self.setMinimumWidth(260)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+
+    def sizeHint(self):
+        return QSize(420, max(260, 40 + len(self.items) * 86))
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w = self.width()
+        margin = 16
+        node_h = 58
+        gap = 26
+        y = margin
+
+        for i, (label, value) in enumerate(self.items):
+            node = QRectF(margin, y, w - margin * 2, node_h)
+            p.setPen(QColor(255, 255, 255, 60))
+            p.setBrush(QColor(42, 45, 51))
+            p.drawRoundedRect(node, 10, 10)
+
+            p.setPen(QColor(228, 184, 99))
+            p.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
+            p.drawText(
+                QRectF(node.left() + 14, node.top() + 8, node.width() - 28, 16),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                label,
+            )
+
+            p.setPen(QColor(245, 246, 248))
+            p.setFont(QFont("Georgia", 15, QFont.Weight.Bold))
+            p.drawText(
+                QRectF(node.left() + 14, node.top() + 28, node.width() - 28, 22),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                value,
+            )
+
+            if i < len(self.items) - 1:
+                p.setPen(QColor(255, 255, 255, 130))
+                p.setFont(QFont("Segoe UI", 13))
+                p.drawText(
+                    QRectF(margin, node.bottom() + 2, w - margin * 2, 20),
+                    Qt.AlignmentFlag.AlignCenter,
+                    "↓",
+                )
+            y += node_h + gap
+
+
+class DissectPage(QWidget):
+    """桌面端拆题引导页：四步拆题 + 结果图 + 引导式思考。"""
+
+    STEPS = [
+        {
+            "key": "shape", "title": "数据形状？", "hint": "先看数据长在哪里",
+            "options": [
+                ("linear", "线性", "数组 / 字符串 / 区间"),
+                ("graph", "树 / 图", "树 / 图 / 网络 / 依赖"),
+                ("algebra", "数学对象", "数字 / 集合 / 异或"),
+            ],
+        },
+        {
+            "key": "dynamic", "title": "数据会变吗？", "hint": "运行过程中是否修改",
+            "options": [
+                ("static", "静态", "只读，可预处理"),
+                ("dynamic", "动态", "需要实时维护"),
+            ],
+        },
+        {
+            "key": "metric", "title": "运算规则？", "hint": "信息如何合并",
+            "options": [
+                ("sum", "加法 / 最值", "路径 / 区间和"),
+                ("xor", "异或", "线性基"),
+                ("conv", "卷积 / 计数", "FFT / 组合"),
+                ("bool", "可行性", "连通 / 匹配 / 2-SAT"),
+                ("number", "数论 / 模", "gcd / 同余"),
+                ("geom", "几何", "凸包 / 距离"),
+            ],
+        },
+        {
+            "key": "scale", "title": "n 多大？", "hint": "决定复杂度级别",
+            "options": [
+                ("n20", "≤ 20", "状压 / 枚举"),
+                ("n100", "≤ 100", "O(n³) / 区间DP"),
+                ("n5000", "≤ 5000", "O(n²) / 简单DP"),
+                ("n1e5", "≤ 1e5", "O(n log n)"),
+                ("n1e9", "≤ 1e9", "公式 / 矩阵"),
+            ],
+        },
+    ]
+
+    LABELS = {
+        "shape": "数据形状",
+        "dynamic": "是否变化",
+        "metric": "运算规则",
+        "scale": "数据规模",
+    }
+
+    OP_INFO = {
+        "编码压缩": ("先想能不能把重复信息压掉，把慢查询变成快查询。", "前缀和、哈希、线性基、SAM、可持久化"),
+        "传播松弛": ("信息按依赖关系一层层传，走到哪算到哪。", "BFS / DP、Dijkstra、树形DP、线段树"),
+        "剪枝决策": ("先排除不可能成为答案的候选，别全部试一遍。", "二分、双指针、单调栈、凸包、斜率优化、最小割"),
+        "变换域映射": ("换个角度看题，原本纠缠的东西会变简单。", "FFT、矩阵快速幂、差分、对偶、生成函数"),
+        "基线/暴力": ("暂时看不出破绽，就先按最直接的方式做。", "暴力枚举、模拟、构造"),
+    }
+
+    def __init__(self, on_back=None, parent=None):
+        super().__init__(parent)
+        self.on_back = on_back
+        self.step_index = 0
+        self.ans = {}
+        self.mode = "question"
+        self.setObjectName("dissectPage")
+        self._build()
+
+    def _build(self):
+        self.root = QVBoxLayout(self)
+        self.root.setContentsMargins(24, 24, 24, 24)
+        self.root.setSpacing(12)
+
+        # 亚克力卡片层，和预览一致
+        self.card = QFrame(self)
+        self.card.setObjectName("dissectAcrylic")
+        card_layout = QVBoxLayout(self.card)
+        card_layout.setContentsMargins(28, 22, 28, 26)
+        card_layout.setSpacing(12)
+
+        head = QHBoxLayout()
+        head.setSpacing(12)
+        self.back_btn = QPushButton("‹ 返回")
+        self.back_btn.setObjectName("dissectBack")
+        self.back_btn.clicked.connect(self._go_back)
+        head.addWidget(self.back_btn)
+        self.step_label = QLabel("1 / 4")
+        self.step_label.setObjectName("dissectStep")
+        self.step_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        head.addWidget(self.step_label, 1)
+        card_layout.addLayout(head)
+
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setObjectName("dissectScroll")
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+
+        self.content = QWidget()
+        self.content.setObjectName("dissectContent")
+        self.content_layout = QVBoxLayout(self.content)
+        self.content_layout.setContentsMargins(0, 20, 0, 0)
+        self.content_layout.setSpacing(14)
+        self.scroll_area.setWidget(self.content)
+        card_layout.addWidget(self.scroll_area, 1)
+
+        self.root.addWidget(self.card, 1)
+
+        self._render()
+
+    def _clear_layout(self, layout):
+        """递归清空布局，连嵌套 layout 和里面的控件一起清理，避免残留。"""
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+                continue
+            sub = item.layout()
+            if sub is not None:
+                self._clear_layout(sub)
+                sub.deleteLater()
+
+    def _clear_content(self):
+        self._clear_layout(self.content_layout)
+
+    def _render(self):
+        self._clear_content()
+        if self.mode == "question":
+            self._render_question()
+        elif self.mode == "result":
+            self._render_result()
+        else:
+            self._render_thinking()
+
+    def _render_question(self):
+        self.step_label.setText(f"{self.step_index + 1} / {len(self.STEPS)}")
+        step = self.STEPS[self.step_index]
+        title = QLabel(step["title"])
+        title.setObjectName("dissectTitle")
+        self.content_layout.addWidget(title)
+        hint = QLabel(step["hint"])
+        hint.setObjectName("dissectHint")
+        self.content_layout.addWidget(hint)
+        for value, label, desc in step["options"]:
+            btn = QPushButton(f"{label}    {desc}")
+            btn.setObjectName("dissectOption")
+            btn.clicked.connect(lambda checked=False, v=value: self._choose(v))
+            self.content_layout.addWidget(btn)
+        self.content_layout.addStretch(1)
+
+    def _choose(self, value):
+        step = self.STEPS[self.step_index]
+        self.ans[step["key"]] = value
+        self.step_index += 1
+        if self.step_index >= len(self.STEPS):
+            self.mode = "result"
+        else:
+            self.mode = "question"
+        self._render()
+
+    def _build_flow_html(self) -> str:
+        """移动端 diagram 的 HTML 版，保证流程图一定渲染出来。"""
+        parts = []
+        for i, step in enumerate(self.STEPS):
+            value = self.ans.get(step["key"], "")
+            label = self._option_label(step, value)
+            parts.append(
+                f"""
+                <div style="background-color:#23262B;border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px 14px;margin:6px 0;">
+                  <div style="color:#E4B863;font-size:11px;font-weight:700;letter-spacing:1px;">{self.LABELS[step['key']]}</div>
+                  <div style="color:#F5F6F8;font-size:18px;font-weight:600;">{label}</div>
+                </div>
+                """
+            )
+            if i < len(self.STEPS) - 1:
+                parts.append(
+                    '<div style="text-align:center;color:rgba(255,255,255,0.45);font-size:18px;line-height:1;">↓</div>'
+                )
+        ops = self._recommend()
+        parts.append(
+            f"""
+            <div style="background-color:#23262B;border:1px solid rgba(228,184,99,0.35);border-radius:10px;padding:12px 14px;margin:6px 0;">
+              <div style="color:#E4B863;font-size:11px;font-weight:700;letter-spacing:1px;">建议方向</div>
+              <div style="color:#F3DCA8;font-size:16px;font-weight:600;">{" / ".join(ops)}</div>
+              <div style="color:rgba(255,255,255,0.55);font-size:12px;margin-top:4px;">点下方操作看解释</div>
+            </div>
+            """
+        )
+        return (
+            '<html><body style="font-family:Segoe UI,PingFang SC,sans-serif;font-size:14px;'
+            'color:#F5F6F8;background:#15171C;">' + "".join(parts) + "</body></html>"
+        )
+
+    def _render_result(self):
+        self.step_label.setText("")
+
+        # 流程图（对齐移动端 diagram）：QPainter 直接绘制，保证一定显示
+        ops = self._recommend()
+        items = []
+        for step in self.STEPS:
+            value = self.ans.get(step["key"], "")
+            label = self._option_label(step, value)
+            items.append((self.LABELS[step["key"]], label))
+        items.append(("建议方向", " / ".join(ops)))
+        flow = FlowDiagram(items)
+        self.content_layout.addWidget(flow, 1)
+
+        # 可点操作胶囊：查看解释
+        ops_row = QHBoxLayout()
+        ops_row.setSpacing(6)
+        for op in ops:
+            op_btn = QPushButton(op)
+            op_btn.setObjectName("opPill")
+            op_btn.clicked.connect(lambda checked=False, o=op: self._show_ops([o]))
+            ops_row.addWidget(op_btn)
+        ops_row.addStretch(1)
+        self.content_layout.addLayout(ops_row)
+
+        # 操作解释改成页面内联展示，不再弹警告小窗
+        self.ops_detail_label = QLabel("")
+        self.ops_detail_label.setObjectName("opsDetail")
+        self.ops_detail_label.setWordWrap(True)
+        self.ops_detail_label.hide()
+        self.content_layout.addWidget(self.ops_detail_label)
+
+        # 下一步节点（和移动端下一步卡片一致）
+        next_btn = QPushButton("下一步 → 引导式思考\n点这里继续")
+        next_btn.setObjectName("diagramNodeButton")
+        next_btn.clicked.connect(self._go_thinking)
+        self.content_layout.addWidget(next_btn)
+
+        restart = QPushButton("下一题")
+        restart.setObjectName("dissectRestart")
+        restart.clicked.connect(self._reset)
+        self.content_layout.addWidget(restart)
+        self.content_layout.addStretch(1)
+
+    def _render_thinking(self):
+        self.step_label.setText("")
+        title = QLabel("引导式思考")
+        title.setObjectName("dissectThinkingTitle")
+        self.content_layout.addWidget(title)
+
+        texts = {
+            "shape": "先确认数据形状，决定信息沿着什么结构传播。",
+            "dynamic": "确定静态还是动态，决定能不能预处理。",
+            "metric": "确定运算规则，决定该用哪类数学工具。",
+            "scale": "用数据规模卡住复杂度，排除不可能的做法。",
+        }
+        for step in self.STEPS:
+            value = self.ans.get(step["key"], "")
+            label = self._option_label(step, value)
+            card = QLabel(f"{self.LABELS[step['key']]}：{label}\n{texts[step['key']]}")
+            card.setObjectName("dissectThinkCard")
+            self.content_layout.addWidget(card)
+
+        ops = self._recommend()
+        final = QLabel("建议方向：" + " / ".join(ops))
+        final.setObjectName("dissectFinal")
+        self.content_layout.addWidget(final)
+
+        back = QPushButton("‹ 返回结果")
+        back.setObjectName("dissectBack")
+        back.clicked.connect(self._back_to_result)
+        self.content_layout.addWidget(back)
+        restart = QPushButton("下一题")
+        restart.setObjectName("dissectRestart")
+        restart.clicked.connect(self._reset)
+        self.content_layout.addWidget(restart)
+        self.content_layout.addStretch(1)
+
+    def _option_label(self, step, value):
+        """从 (value, label, desc) 三元组里取答案显示名。"""
+        for v, label, _desc in step["options"]:
+            if v == value:
+                return label
+        return value
+
+    def _recommend(self):
+        ops = set()
+        if self.ans.get("metric") == "conv": ops.add("变换域映射")
+        if self.ans.get("metric") == "xor": ops.update(["编码压缩", "变换域映射"])
+        if self.ans.get("metric") == "number": ops.add("变换域映射")
+        if self.ans.get("scale") == "n20": ops.update(["编码压缩", "基线/暴力"])
+        if self.ans.get("scale") == "n100": ops.add("传播松弛")
+        if self.ans.get("scale") == "n5000": ops.update(["传播松弛", "剪枝决策"])
+        if self.ans.get("scale") == "n1e5": ops.update(["剪枝决策", "编码压缩"])
+        if self.ans.get("scale") == "n1e9": ops.add("变换域映射")
+        if self.ans.get("shape") == "graph": ops.update(["传播松弛", "剪枝决策"])
+        if self.ans.get("shape") == "linear": ops.add("编码压缩")
+        if self.ans.get("dynamic") == "dynamic": ops.add("传播松弛")
+        if self.ans.get("dynamic") == "static": ops.add("编码压缩")
+        if not ops: ops.add("剪枝决策")
+        order = ["编码压缩", "传播松弛", "剪枝决策", "变换域映射", "基线/暴力"]
+        return [op for op in order if op in ops]
+
+    def _show_ops(self, ops):
+        text = "\n\n".join(f"{op}\n{info[0]}\n例：{info[1]}" for op in ops if op in self.OP_INFO for info in [self.OP_INFO[op]])
+        if getattr(self, "ops_detail_label", None) is not None:
+            self.ops_detail_label.setText(text)
+            self.ops_detail_label.show()
+        else:
+            QMessageBox.information(self, "建议方向", text)
+
+    def _go_thinking(self):
+        self.mode = "thinking"
+        self._render()
+
+    def _back_to_result(self):
+        self.mode = "result"
+        self._render()
+
+    def _go_back(self):
+        if self.mode == "thinking":
+            self.mode = "result"
+            self._render()
+        elif self.mode == "result":
+            self._reset()
+        elif self.step_index > 0:
+            self.step_index -= 1
+            step = self.STEPS[self.step_index]
+            self.ans.pop(step["key"], None)
+            self.mode = "question"
+            self._render()
+        elif self.on_back:
+            self.on_back()
+
+    def _reset(self):
+        self.ans = {}
+        self.step_index = 0
+        self.mode = "question"
+        self._render()
+
+
+class InfoMiniDialog(QDialog):
+    """信息论微缩模块：把桌面端精华压缩成四个页签。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("信息论 · 微缩模块")
+        self.resize(680, 560)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(8)
+
+        tabs = QTabWidget(self)
+        tabs.addTab(self._make_ops_tab(), "四种操作")
+        tabs.addTab(self._make_phase_tab(), "四阶段")
+        tabs.addTab(self._make_steps_tab(), "拆题四步")
+        tabs.addTab(self._make_scale_tab(), "数据规模")
+        layout.addWidget(tabs, 1)
+
+        note = QLabel("四种操作是记忆坐标系，不是严格分类；一个算法可以有多个标签。")
+        note.setObjectName("miniNote")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        close_btn = QPushButton("关闭")
+        close_btn.setObjectName("closeBtn")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignRight)
+
+    def _html_wrap(self, body: str) -> str:
+        return f"""
+        <html><body style="font-family:Georgia,serif;font-size:13px;color:#F5F6F8;background:#15171C;">
+        {body}
+        </body></html>
+        """
+
+    def _make_ops_tab(self):
+        b = QTextBrowser()
+        b.setObjectName("guideBrowser")
+        rows = []
+        for op in INFO_OPS:
+            desc = {
+                "编码压缩": "减少冗余：哈希/前缀和/线性基/SAM",
+                "传播松弛": "扩散信息：BFS/DP/Dijkstra/线段树",
+                "剪枝决策": "缩小搜索：二分/双指针/凸包/斜率优化",
+                "变换域映射": "解耦纠缠：FFT/矩阵幂/差分/生成函数",
+                "基线/暴力": "没有明显压缩：暴力/模拟/构造",
+            }.get(op, "")
+            rows.append(f"<tr><td style='color:#E4B863'>{op}</td><td>{desc}</td></tr>")
+        b.setHtml(self._html_wrap(
+            "<table cellpadding='6' cellspacing='0' style='border-collapse:collapse;width:100%;'>"
+            "<tr><th>操作</th><th>代表方向</th></tr>" + "".join(rows) + "</table>"
+        ))
+        return b
+
+    def _make_phase_tab(self):
+        b = QTextBrowser()
+        b.setObjectName("guideBrowser")
+        rows = []
+        for pid in sorted(PHASES):
+            ph = PHASES[pid]
+            rows.append(
+                f"<p style='border-top:1px solid rgba(255,255,255,0.12);padding-top:8px;'>"
+                f"<b>{ph['name']}</b><br><span style='color:#E4B863'>{ph['range']}</span><br>"
+                f"{ph['slogan']}<br>{ph['description']}</p>"
+            )
+        b.setHtml(self._html_wrap("".join(rows)))
+        return b
+
+    def _make_steps_tab(self):
+        b = QTextBrowser()
+        b.setObjectName("guideBrowser")
+        rows = []
+        for s in ANATOMY_STEPS:
+            rows.append(
+                f"<p style='border-top:1px solid rgba(255,255,255,0.12);padding-top:8px;'>"
+                f"<b>{s['step']}</b><br>{s['question']}<br>"
+                f"<span style='color:#E4B863'>{s['choices']}</span><br>{s['output']}</p>"
+            )
+        b.setHtml(self._html_wrap("".join(rows)))
+        return b
+
+    def _make_scale_tab(self):
+        b = QTextBrowser()
+        b.setObjectName("guideBrowser")
+        rows = [
+            "<tr><th>n</th><th>允许复杂度</th><th>常走的路</th></tr>",
+            "<tr><td>≤20</td><td>指数/状压</td><td>子集、TSP、位运算</td></tr>",
+            "<tr><td>≤100</td><td>O(n³)</td><td>Floyd、区间DP</td></tr>",
+            "<tr><td>≤5000</td><td>O(n²)</td><td>简单DP、N²枚举</td></tr>",
+            "<tr><td>≤1e5</td><td>O(n log n)</td><td>排序/二分/堆/线段树</td></tr>",
+            "<tr><td>≤1e9</td><td>对数/公式</td><td>数学公式、矩阵快速幂</td></tr>",
+        ]
+        b.setHtml(self._html_wrap(
+            "<table cellpadding='6' cellspacing='0' style='border-collapse:collapse;width:100%;'>"
+            + "".join(rows) + "</table>"
+        ))
+        return b
 
 
 class ResizeHandle(QFrame):
@@ -962,13 +1533,15 @@ class MainWindow(QMainWindow):
         splitter.setChildrenCollapsible(False)
         body_layout.addWidget(splitter)
 
-        # 左侧档位列表：极简导航，只留颜色 + 数字
+        # 左侧档位列表：极简导航，只留颜色 + 数字；宽度可拖动缩放
         left = QWidget()
         left.setObjectName("sidebar")
-        left.setFixedWidth(88)
+        left.setMinimumWidth(120)
+        left.setMaximumWidth(280)
+        left.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(6, 6, 6, 6)
-        left_layout.setSpacing(4)
+        left_layout.setContentsMargins(8, 8, 8, 8)
+        left_layout.setSpacing(6)
 
         app_title = QLabel("CF 难度阶梯", left)
         app_title.setObjectName("appTitle")
@@ -983,14 +1556,39 @@ class MainWindow(QMainWindow):
         self.tier_list.setUniformItemSizes(True)
         self.tier_list.setIconSize(QSize(18, 18))
         self.tier_list.currentRowChanged.connect(self._on_tier_changed)
-        left_layout.addWidget(self.tier_list, 1)
+
+        # 拆题主入口：桌面端也以“拆题引导”为主
+        self.dissect_btn = QPushButton("拆题", left)
+        self.dissect_btn.setObjectName("dissectBtn")
+        self.dissect_btn.setToolTip("打开拆题引导：四步拆解 + 引导式思考")
+        self.dissect_btn.clicked.connect(self._show_dissect)
+        left_layout.addWidget(self.dissect_btn)
+
+        # 算法模板导航：从拆题主界面进入，查看算法信息/C++模板
+        self.template_btn = QPushButton("算法模板", left)
+        self.template_btn.setObjectName("templateBtn")
+        self.template_btn.setToolTip("查看算法信息与 C++ 模板")
+        self.template_btn.clicked.connect(self._show_templates)
+        left_layout.addWidget(self.template_btn)
+
+        # 壁纸：桌面端玻璃拟态可链接本地 wallpaper 图片
+        self.wallpaper_btn = QPushButton("壁纸", left)
+        self.wallpaper_btn.setObjectName("wallpaperBtn")
+        self.wallpaper_btn.setToolTip("选择壁纸：支持 mp4 / webm / mov / m4v 视频、GIF 与图片；有壁纸时透出背景，清除后恢复默认亚克力")
+        self.wallpaper_btn.clicked.connect(self._choose_wallpaper)
+        left_layout.addWidget(self.wallpaper_btn)
 
         # 信息论导论入口：常驻一个小按钮，不占太多空间
         self.info_btn = QPushButton("导论", left)
         self.info_btn.setObjectName("infoBtn")
-        self.info_btn.setToolTip("打开信息论总纲：四操作 / 四阶段 / 解剖四步")
+        self.info_btn.setToolTip("打开信息论总纲：四操作 / 四阶段 / 拆题四步")
         self.info_btn.clicked.connect(self._show_guide)
         left_layout.addWidget(self.info_btn)
+
+        # 导航按钮放在左上，和预览保持一致；8 档列表保持紧凑，不撑满左侧
+        self.tier_list.setMaximumHeight(320)
+        left_layout.addWidget(self.tier_list)
+        left_layout.addStretch(1)
 
         # 简约模式：隐藏风格/动画/重置等次要控制，避免挤压左侧 8 档列表
         self.style_btn = QPushButton(left)
@@ -1026,7 +1624,9 @@ class MainWindow(QMainWindow):
         self.right_layout.setSpacing(0)
         splitter.addWidget(self.right_container)
 
-        splitter.setSizes([240, 840])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([190, 890])
 
         self._install_resize_handles()
         self._update_window_effect()
@@ -1034,9 +1634,9 @@ class MainWindow(QMainWindow):
         self._populate_tier_list()
         self._update_global_progress()
         self._apply_style(self.store.style_mode)
+        self._apply_wallpaper()
         self._update_maximized_mode()
-        if self.tier_list.count() > 0:
-            self.tier_list.setCurrentRow(0)
+        self._show_dissect()
 
     def _install_resize_handles(self):
         central = self.centralWidget()
@@ -1109,8 +1709,18 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         if hasattr(self, "_resize_handles"):
             self._layout_resize_handles()
+        self._layout_wallpaper_layer()
         if hasattr(self, "root_layout") and hasattr(self, "title_bar"):
             self._update_maximized_mode()
+
+    def _layout_wallpaper_layer(self):
+        if not hasattr(self, "centralWidget"):
+            return
+        rect = self.centralWidget().rect()
+        for attr in ("_video_widget", "_gif_label", "_image_label"):
+            layer = getattr(self, attr, None)
+            if layer is not None:
+                layer.setGeometry(rect)
 
     def _update_window_effect(self):
         # 扁平简约：不使用窗口阴影，避免四边出现多余暗角
@@ -1122,7 +1732,7 @@ class MainWindow(QMainWindow):
             item.setText(tier_item_text(tier, self.store))
             item.setIcon(make_tier_icon(tier["color"]))
             item.setData(Qt.ItemDataRole.UserRole, tier["id"])
-            item.setSizeHint(QSize(76, 44))
+            item.setSizeHint(QSize(120, 42))
             total = len(tier["tags"])
             done = sum(1 for t in tier["tags"] if self.store.is_mastered(t["id"]))
             phase_line = tier.get("phase_name", "")
@@ -1146,6 +1756,19 @@ class MainWindow(QMainWindow):
         self._clear_right()
         page = TierPage(tier, self.store, self._update_global_progress)
         self.right_layout.addWidget(page, 1)
+
+    def _show_dissect(self):
+        self.tier_list.setVisible(False)
+        self._clear_right()
+        page = DissectPage(on_back=self._show_templates, parent=self)
+        self.right_layout.addWidget(page, 1)
+
+    def _show_templates(self):
+        self.tier_list.setVisible(True)
+        if self.tier_list.currentRow() < 0:
+            self.tier_list.setCurrentRow(0)
+        else:
+            self._on_tier_changed(self.tier_list.currentRow())
 
     def _clear_right(self):
         while self.right_layout.count():
@@ -1184,13 +1807,221 @@ class MainWindow(QMainWindow):
             qss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style_mac.qss")
         else:
             qss_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.qss")
-        QApplication.instance().setStyleSheet(load_qss(qss_path))
+        qss = load_qss(qss_path)
+        if self.store.wallpaper:
+            qss += "\n" + WALLPAPER_QSS
+        QApplication.instance().setStyleSheet(qss)
         self.style_btn.setText(f"风格：{STYLE_NAMES[mode]}")
         self.style_btn.setToolTip("点击切换 深色现代 / 浅色现代 风格")
 
     def _show_guide(self):
-        dlg = InfoGuideDialog(self, self.store)
+        dlg = InfoMiniDialog(self)
         dlg.exec()
+
+    def _apply_wallpaper(self):
+        path = (self.store.wallpaper or "").strip()
+        lower = path.lower()
+        self._clear_video_wallpaper()
+        if path and lower.endswith(".gif"):
+            self._setup_gif_wallpaper(path)
+        elif path and HAS_MEDIA and lower.endswith((".mp4", ".webm", ".mov", ".m4v")):
+            self._setup_video_wallpaper(path)
+        elif path:
+            self._setup_image_wallpaper(path)
+        # 重新应用样式：有壁纸时叠加“壁纸模式”亚克力，没壁纸时恢复默认亚克力
+        self._apply_style(self.store.style_mode)
+
+    def _setup_image_wallpaper(self, path: str):
+        self._clear_video_wallpaper()
+        pm = QPixmap(path)
+        if pm.isNull():
+            # 图片加载失败时回退到 QSS 背景，避免无背景
+            style = (
+                '#appShell { background-image: url("'
+                + path.replace("\\", "/")
+                + '"); background-repeat: no-repeat; background-position: center; background-color: transparent; }'
+            )
+            self.centralWidget().setStyleSheet(style)
+            return
+        label = QLabel(self.centralWidget())
+        label.setObjectName("wallpaperImage")
+        label.setScaledContents(True)
+        label.setGeometry(self.centralWidget().rect())
+        label.setPixmap(pm)
+        label.lower()
+        label.show()
+        self._image_label = label
+
+    def _setup_gif_wallpaper(self, path: str):
+        self._clear_video_wallpaper()
+        label = QLabel(self.centralWidget())
+        label.setObjectName("wallpaperGif")
+        label.setScaledContents(True)
+        label.setGeometry(self.centralWidget().rect())
+        movie = QMovie(path)
+        movie.setCacheMode(QMovie.CacheMode.CacheAll)
+        label.setMovie(movie)
+        label.lower()
+        movie.start()
+        self._gif_label = label
+        self._gif_movie = movie
+
+    def _setup_video_wallpaper(self, path: str):
+        self._clear_video_wallpaper()
+        if not HAS_MEDIA:
+            return
+        video = QVideoWidget(self.centralWidget())
+        video.setObjectName("wallpaperVideo")
+        video.setGeometry(self.centralWidget().rect())
+        video.lower()
+        media = QMediaPlayer(self)
+        audio = QAudioOutput(self)
+        audio.setVolume(0)
+        media.setAudioOutput(audio)
+        media.setVideoOutput(video)
+        media.setSource(QUrl.fromLocalFile(path))
+        def replay(status):
+            if status == QMediaPlayer.MediaStatus.EndOfMedia:
+                media.setPosition(0)
+                media.play()
+        media.mediaStatusChanged.connect(replay)
+        media.play()
+        self._video_player = media
+        self._video_widget = video
+
+    def _clear_video_wallpaper(self):
+        for attr in ("_video_player", "_video_widget", "_gif_movie", "_gif_label", "_image_label"):
+            obj = getattr(self, attr, None)
+            if obj is not None:
+                try:
+                    if attr == "_video_player":
+                        obj.stop()
+                    if attr == "_gif_movie":
+                        obj.stop()
+                    obj.deleteLater()
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+        # 清除之前可能残留的内联背景样式，交回默认 QSS 亚克力
+        self.centralWidget().setStyleSheet("")
+
+    def _choose_wallpaper(self):
+        from PySide6.QtWidgets import QFileDialog
+
+        LOCAL_TAG = "__local__"
+        WEDIR_TAG = "__wedir__"
+        CLEAR_TAG = "__clear__"
+        LOCAL_LABEL = "📁 选择本地视频 / 图片 / GIF…"
+        WEDIR_LABEL = "📂 选择 Wallpaper Engine 壁纸目录…"
+        CLEAR_LABEL = "✕ 清除壁纸（恢复默认亚克力）"
+
+        # 自动找 Steam Wallpaper Engine 本地壁纸库
+        def detect_we_roots():
+            candidates = []
+            pf86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+            pf64 = os.environ.get("ProgramFiles", r"C:\Program Files")
+            candidates.append(os.path.join(pf86, "Steam", "steamapps", "workshop", "content", "431960"))
+            candidates.append(os.path.join(pf64, "Steam", "steamapps", "workshop", "content", "431960"))
+            candidates.append(os.path.expandvars(r"%LOCALAPPDATA%\Steam\steamapps\workshop\content\431960"))
+            return [p for p in candidates if os.path.isdir(p)]
+
+        def scan_wallpapers(roots):
+            out = []
+            for root in roots:
+                try:
+                    for name in os.listdir(root):
+                        d = os.path.join(root, name)
+                        if not os.path.isdir(d):
+                            continue
+                        candidate = None
+                        for fn in ("preview.gif", "preview.jpg", "preview.png", "preview.webp"):
+                            p2 = os.path.join(d, fn)
+                            if os.path.isfile(p2):
+                                candidate = p2
+                                break
+                        if not candidate:
+                            for ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"):
+                                try:
+                                    matches = [os.path.join(d, f) for f in os.listdir(d) if f.lower().endswith(ext)]
+                                except OSError:
+                                    matches = []
+                                if matches:
+                                    candidate = matches[0]
+                                    break
+                        if not candidate:
+                            for ext in (".mp4", ".webm", ".mov", ".m4v"):
+                                try:
+                                    matches = [os.path.join(d, f) for f in os.listdir(d) if f.lower().endswith(ext)]
+                                except OSError:
+                                    matches = []
+                                if matches:
+                                    candidate = matches[0]
+                                    break
+                        if candidate:
+                            lower = candidate.lower()
+                            is_video = lower.endswith((".mp4", ".webm", ".mov", ".m4v"))
+                            is_gif = lower.endswith(".gif")
+                            kind = "动态视频" if is_video else ("动态预览GIF" if is_gif else "预览/静态图")
+                            label = f"{name}  ({kind}: {os.path.basename(candidate)})"
+                            out.append((label, candidate))
+                except OSError:
+                    continue
+            return out
+
+        roots = detect_we_roots()
+        while True:
+            items = [(LOCAL_LABEL, LOCAL_TAG)]
+            if self.store.wallpaper:
+                items.insert(0, (CLEAR_LABEL, CLEAR_TAG))
+            items.extend(scan_wallpapers(roots))
+            if not roots:
+                items.append((WEDIR_LABEL, WEDIR_TAG))
+
+            labels = [x[0] for x in items]
+            default_index = 1 if self.store.wallpaper else 0
+            choice, ok = QInputDialog.getItem(self, "选择壁纸", "壁纸（支持 mp4 / webm / mov / m4v / gif / 图片）：", labels, default_index, False)
+            if not ok:
+                return
+
+            if choice == CLEAR_LABEL:
+                self.store.set_wallpaper("")
+                self._apply_wallpaper()
+                return
+
+            if choice == LOCAL_LABEL:
+                path, _ = QFileDialog.getOpenFileName(
+                    self,
+                    "选择壁纸文件",
+                    "",
+                    "壁纸 (*.mp4 *.webm *.mov *.m4v *.gif *.jpg *.jpeg *.png *.webp *.bmp);;"
+                    "视频 (*.mp4 *.webm *.mov *.m4v);;图片 (*.jpg *.jpeg *.png *.webp *.bmp);;GIF (*.gif)",
+                )
+                if path:
+                    self.store.set_wallpaper(path)
+                    self._apply_wallpaper()
+                return
+
+            if choice == WEDIR_LABEL:
+                root = QFileDialog.getExistingDirectory(
+                    self,
+                    "选择 Wallpaper Engine 壁纸目录",
+                    "",
+                )
+                if not root:
+                    continue
+                roots = [root]
+                continue
+
+            for label, path in items:
+                if label == choice:
+                    self.store.set_wallpaper(path)
+                    self._apply_wallpaper()
+                    QMessageBox.information(
+                        self,
+                        "壁纸已设置",
+                        f"已使用壁纸：\n{choice}\n\n动态视频壁纸会在桌面端播放；静态图作为玻璃背景显示。",
+                    )
+                    return
 
     def _toggle_style(self):
         new_mode = STYLE_LIGHT if self.store.style_mode == STYLE_DARK else STYLE_DARK

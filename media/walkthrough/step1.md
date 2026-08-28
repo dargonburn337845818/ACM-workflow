@@ -20,4 +20,4 @@ acmWorkflow.cfHandle: "your_cf_handle"
 ## 可选：登录 CF 会话
 
 工作台顶部状态条点击 **登录**，会打开浏览器进入 Codeforces 登录页（手动输入账号密码）。
-登录态（Cookie）加密保存在系统密钥链（`vscode.SecretStorage`），约 30 天有效，用于带登录态的抓取与提交。
+登录态（Cookie）加密保存在系统密钥链（`vscode.SecretStorage`），约 30 天有效，用于带登录态的抓取。

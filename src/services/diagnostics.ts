@@ -14,6 +14,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { diagnoseEnv } from './runner';
 import { getFetchDispatcher, curlProxyArgs, resolveProxyUrl } from './fetchers/codeforces';
+import { resolveLocalEndpoint } from '../utils/wsl';
 
 export type TraceSource = 'command' | 'service' | 'webview';
 
@@ -360,7 +361,11 @@ export async function diagnoseTranslation(signal?: AbortSignal): Promise<string[
       endpoint = vscode.workspace.getConfiguration('acmWorkflow').get<string>('localEndpoint', endpoint) || endpoint;
     } catch { /* 单测环境用默认 */ }
     lines.push(`  本地端点: ${endpoint}`);
-    const probeUrl = endpoint.replace(/\/+$/, '').replace(/\/translate$/, '') + '/languages';
+    const isOllama = !/\/translate\/?$/.test(endpoint);
+    const effectiveEndpoint = resolveLocalEndpoint(endpoint);
+    const probeUrl = isOllama
+      ? effectiveEndpoint.replace(/\/+$/, '') + '/api/tags'
+      : effectiveEndpoint.replace(/\/+$/, '').replace(/\/translate$/, '') + '/languages';
     const t0 = Date.now();
     try {
       const dispatcher = getFetchDispatcher();
@@ -373,10 +378,14 @@ export async function diagnoseTranslation(signal?: AbortSignal): Promise<string[
       if (res.ok) {
         lines.push(`  本地服务: [OK] HTTP ${res.status}（${ms}ms）`);
         const data: any = await res.json().catch(() => null);
-        if (Array.isArray(data)) {
+        if (isOllama) {
+          const models = data?.models || [];
+          const has = models.some((m: any) => String(m?.name || '') === 'hy-mt2:latest');
+          lines.push(`  本地模型: ${has ? '[OK] Ollama hy-mt2:latest en -> zh 已就绪' : '[WARN] 未找到 Ollama hy-mt2:latest（请运行 tools/setup_local_translate.sh）'}`);
+        } else if (Array.isArray(data)) {
           const en = data.find((l: any) => String(l.code || '').toLowerCase() === 'en');
           const hasZh = en && Array.isArray(en.targets) && en.targets.some((t: any) => String(t).toLowerCase() === 'zh');
-          lines.push(`  本地模型: ${hasZh ? '[OK] en -> zh 已安装' : '[WARN] 未找到 en -> zh 模型（请运行 tools/setup_local_translate.sh）'}`);
+          lines.push(`  本地模型: ${hasZh ? '[OK] Ollama hy-mt2:latest en -> zh 已就绪' : '[WARN] 未找到 Ollama hy-mt2:latest（请运行 tools/setup_local_translate.sh）'}`);
         } else {
           lines.push('  本地模型: [WARN] /languages 返回格式异常');
         }

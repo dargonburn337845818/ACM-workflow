@@ -62,7 +62,8 @@ console.log('== 1. cfUrl 解析 ==');
 
 console.log('== 2. 文件名 → 题目解析 ==');
 {
-  const { problemFromFileName } = require(out('core/workbench.js'));
+  const { ProblemWorkspace } = require(out('services/problemWorkspace.js'));
+  const problemWorkspace = new ProblemWorkspace();
   const cases = [
     ['/x/P1001.cpp', null, null],
     ['/x/979E.cpp', '979E', 'codeforces'],
@@ -72,7 +73,7 @@ console.log('== 2. 文件名 → 题目解析 ==');
     ['/USACO10FEB_Chocolate_Buying_S.cpp', null, null]
   ];
   for (const [file, id, platform] of cases) {
-    const p = problemFromFileName(file);
+    const p = problemWorkspace.problemFromFileName(file);
     if (id === null) assert(p === null, `非题目文件 ${file}`);
     else assert(p && p.id === id && p.platform === platform, `解析 ${file} → ${p.id}`, JSON.stringify(p));
   }
@@ -112,20 +113,55 @@ console.log('== 5. 造数据确定性 ==');
     const perm = await generateInput({ type: 'permutation', nMin: 6, nMax: 6, seed: 7 }, mulberry32(7));
     const nums = perm.trim().split('\n')[1].split(' ').map(Number);
     assert(new Set(nums).size === 6, '排列无重复');
+    const pipe = await generateInput({
+      type: 'pipeline',
+      steps: [
+        { type: 'array', nMin: 2, nMax: 2, vMin: 1, vMax: 9 },
+        { type: 'string', lenMin: 3, lenMax: 3, charset: 'lower' }
+      ]
+    }, mulberry32(1));
+    const pipeLines = pipe.trim().split('\n');
+    assert(pipeLines.length >= 3, '组合流水线拼接多段数据', pipe);
+    const tiny = await generateInput({
+      type: 'pipeline',
+      steps: [
+        { type: 'int', vMin: 3, vMax: 3 },
+        { type: 'text', text: ' ' },
+        { type: 'int', vMin: 4, vMax: 4 },
+        { type: 'newline' }
+      ]
+    }, mulberry32(1));
+    assert(tiny === '3 4\n', '细粒度原语精确拼接', JSON.stringify(tiny));
+    const pairs = await generateInput({ type: 'pairs', nMin: 2, nMax: 2, vMin: 1, vMax: 1, wMin: 2, wMax: 2 }, mulberry32(1));
+    assert(pairs.trim().split('\n').length === 2 && pairs.trim().split('\n')[0] === '1 2', '每行两个数', pairs);
+    const repeated = await generateInput({
+      type: 'pipeline',
+      steps: [
+        { type: 'int', vMin: 3, vMax: 3, varName: 'm' },
+        { type: 'newline' },
+        { type: 'repeat', countRef: 'm', steps: [
+          { type: 'int', vMin: 1, vMax: 1 },
+          { type: 'text', text: ' ' },
+          { type: 'int', vMin: 2, vMax: 2 },
+          { type: 'newline' }
+        ] }
+      ]
+    }, mulberry32(1));
+    assert(repeated === '3\n1 2\n1 2\n1 2\n', 'repeat 变量联动重复块', JSON.stringify(repeated));
+    const foolproof = await generateInput({
+      type: 'pipeline',
+      steps: [
+        { type: 'line', vMin: 3, vMax: 3, varName: 'n' },
+        { type: 'ints', countRef: 'n', vMin: 1, vMax: 1 },
+        { type: 'line', vMin: 2, vMax: 2, varName: 'm' },
+        { type: 'pairs', countRef: 'm', vMin: 7, vMax: 7, wMin: 8, wMax: 8 }
+      ]
+    }, mulberry32(1));
+    assert(foolproof === '3\n1 1 1\n2\n7 8\n7 8\n', '傻瓜式 line+countRef 拼装', JSON.stringify(foolproof));
   })().catch((e) => { assert(false, '造数据', e.message); });
 }
 
-console.log('== 6. 知识图谱结构 ==');
-{
-  const { KNOWLEDGE_CATEGORIES } = require(out('features/manual/knowledgeMap.js'));
-  assert(Array.isArray(KNOWLEDGE_CATEGORIES) && KNOWLEDGE_CATEGORIES.length >= 6, `一级分类 ${KNOWLEDGE_CATEGORIES.length} 个`);
-  const all = KNOWLEDGE_CATEGORIES.flatMap((c) => c.subs || []).flatMap((s) => s.algorithms || []);
-  assert(all.length >= 25, `算法节点 ${all.length} 个`);
-  const bad = all.filter((a) => !a.name || !a.cpp || !a.complexity);
-  assert(bad.length === 0, '每个算法含 name/cpp/complexity', bad.map((b) => b.name).join(','));
-}
-
-console.log('== 7. WSL 路径适配 ==');
+console.log('== 6. WSL 路径适配 ==');
 {
   const { normalizePath } = require(out('utils/paths.js'));
   if (process.platform === 'linux') {
@@ -136,7 +172,7 @@ console.log('== 7. WSL 路径适配 ==');
   }
 }
 
-console.log('== 8. 扩展激活链路（模拟 VS Code） ==');
+console.log('== 7. 扩展激活链路（模拟 VS Code） ==');
 (async () => {
   const vscodeMock = require('./mock-vscode');
   const { activate, deactivate } = require(out('extension.js'));
@@ -165,7 +201,7 @@ console.log('== 8. 扩展激活链路（模拟 VS Code） ==');
   }
 })();
 
-console.log('== 9. 题面 LaTeX 排版（CF $$$ 行内公式） ==');
+console.log('== 8. 题面 LaTeX 排版（CF $$$ 行内公式） ==');
 (async () => {
   try {
     const { parseCfStatementHtml } = require(out('services/statementHtml.js'));
@@ -174,12 +210,25 @@ console.log('== 9. 题面 LaTeX 排版（CF $$$ 行内公式） ==');
     assert(res.html.includes('<span class="acm-math">s</span> and <span class="acm-math">t</span> of length <span class="acm-math">n</span>'),
       'CF $$$ 公式被识别为行内公式');
     assert(!res.html.includes('acm-math-block'), 'CF $$$ 行内公式不会误判为块级公式', res.html);
+
+    const htmlSupSub = `<div class="problem-statement"><div class="header"><div class="title">T</div></div><div class="legend"><p><span class="tex-span">10<sup>5</sup></span> and <span class="tex-span">x<sub>i</sub></span></p></div></div>`;
+    const res2 = await parseCfStatementHtml(htmlSupSub, async () => null);
+    assert(res2.html.includes('<span class="acm-math">10^{5}</span>'), 'tex-span 的 <sup> 转 LaTeX 上标');
+    assert(res2.html.includes('<span class="acm-math">x_{i}</span>'), 'tex-span 的 <sub> 转 LaTeX 下标');
+
+    // 0.20.1：题面页不再重复展示样例（样例只保留在「样例」页的可编辑用例中）
+    const { stripSamplesFromStatementHtml } = require(out('services/statementHtml.js'));
+    const stripped = stripSamplesFromStatementHtml(res.html);
+    assert(!stripped.includes('st-sample'), '题面页 HTML 移除样例内容块', stripped);
+    assert(!/样例/.test(stripped), '题面页 HTML 不出现「样例」标题', stripped);
+    assert(stripped.includes('Naman has two binary strings'), '题面页 HTML 保留题目描述', stripped);
+    assert(stripped.includes('acm-math'), '题面页 HTML 保留公式', stripped);
   } catch (e) {
     assert(false, '题面 LaTeX 排版', e.message);
   }
 })();
 
-console.log('== 10. 诊断服务（轨迹 / 脱敏 / 异常分析 / 报告） ==');
+console.log('== 9. 诊断服务（轨迹 / 脱敏 / 异常分析 / 报告） ==');
 {
   const diag = require(out('services/diagnostics.js'));
   // 轨迹环形缓冲：最多 100 条
@@ -252,6 +301,33 @@ console.log('== 10. 诊断服务（轨迹 / 脱敏 / 异常分析 / 报告） ==
   assert(md.includes('## 网络诊断') && md.includes('## 操作轨迹') && md.includes('## 发现的问题'), 'Markdown 报告含全部章节');
   const json = diag.renderJson(report);
   assert(json.includes('"issues"') && json.includes('"trace"'), 'JSON 报告含轨迹与异常分析');
+}
+
+console.log('== 10. 算法术语表（ADR 0002） ==');
+{
+  const { applyGlossary, glossarySize } = require(out('services/glossary.js'));
+  assert(glossarySize() > 0, '术语表非空');
+  assert(
+    applyGlossary('Use dynamic programming to solve it.', '使用动态编程来解决。') === '使用动态规划来解决。',
+    '动态编程 → 动态规划'
+  );
+  assert(
+    applyGlossary('Find the shortest path.', '找到最短路径。') === '找到最短路。',
+    '最短路径 → 最短路'
+  );
+  assert(
+    applyGlossary('No term here.', '没有术语。') === '没有术语。',
+    '未命中英文术语时不替换'
+  );
+}
+
+console.log('== 11. 测试页签 CSS（样例运行区只出现在样例页） ==');
+{
+  const fs = require('fs');
+  const css = fs.readFileSync(path.join(root, 'media/style.css'), 'utf8');
+  const m = css.match(/\.test-lower\s*\{([^}]*)\}/);
+  assert(!!m, '找到 .test-lower 规则');
+  assert(m && !/display\s*:\s*flex/.test(m[1]), '样例运行区不覆盖 .test-page-panel 的隐藏逻辑', m && m[1]);
 }
 
 setTimeout(() => {

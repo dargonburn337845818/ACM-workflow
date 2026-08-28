@@ -1,113 +1,153 @@
-# Codeforces 难度阶梯（独立本地小程序）
+# 拆题引导 · Knowledge Ladder
 
-> 从 ACM Workflow 插件中拆出的独立版知识导论。
-> 8 档难度阶梯 · 标签勾选进度 · 知识点详情 / C++ 模板 · 第 8 档高阶思维库。
-> 风格为简约扁平风（深色 / 浅色主题）。
-
----
-
-## ✨ 功能
-
-- 📁 8 档难度阶梯（1200 ~ 3500+）
-  - 第 1 档：1200 – 1400（灰→绿）
-  - 第 2 档：1400 – 1600（绿→蓝）
-  - 第 3 档：1600 – 1800（蓝→紫）
-  - 第 4 档：1800 – 2000（紫→橙）
-  - 第 5 档：2000 – 2200（橙→红）
-  - 第 6 档：2200 – 2400（红名冲刺）
-  - 第 7 档：2400 – 2800（红→黑红）
-  - 第 8 档：2800 – 3500+（黑红→传说）
-- 🧭 信息论总纲：左侧「导论」按钮可打开四操作 / 四阶段 / 解剖四步速查表
-- 📱 移动端：`mobile/` 提供 PWA 网页版 + Capacitor APK 打包入口（APK 需本机 Android Studio 或 GitHub Actions 构建）
-- 🏷 每个知识点行显示「编码压缩 / 传播松弛 / 剪枝决策 / 变换域映射」信息论徽章，可跨档位按操作过滤
-- ✅ 每个知识点可勾选「已掌握」，进度自动保存
-- 📊 每档进度条 + 总进度
-- 🧠 第 8 档新增「经典思维模型 / 前沿直觉 / 复杂系统前瞻」分组思维库，可勾选、可展开详细讲解；分组默认折叠，不挤占视野
-- 🧹 极简模式：隐藏搜索框、主题切换、动画/重置设置；左侧仅保留颜色 + 数字导航
-- 📖 点击「模板」查看知识点简介、复杂度、C++ 模板，支持一键复制
-- 🏷 每个算法节点带质量标记：完整 / 骨架 / 待补，详情弹窗可见；当前 120 个节点全部为「完整」
-- 📊 `reports/` 提供每档内容质量报告，方便逐档校对
-- 🎨 `preview/` 提供现代圆润风 HTML/CSS 静态预览，确认后再落地 QSS
-- 💾 进度存储在系统用户数据目录，重启不丢失
-- 🎨 内置深色 / 浅色主题（当前为简约扁平化，设置入口已隐藏）
-- 🖥 无边框极简窗口：扁平铺满屏幕，无圆角、无阴影，保留自定义标题栏
-- 🎬 动画默认轻量，设置入口已隐藏以保持界面干净
+> 不背模板，练拆题。
+> 移动端：打开就拆题，四步引导，不给代码。
+> 桌面端：同一设计，多一个「算法模板」导航。
+> 视觉：Parallax Editorial（暖纸、墨黑、砖红、衬线）。
 
 ---
 
-## 🧭 信息论导论（第二认知轴）
+## 这个项目是什么
 
-这套导论不依赖死记算法名，而是把 120 个算法映射到 4 种信息操作：
+刷题时真正缺的不是模板，而是**别走弯路**。  
+这个工具把题目拆解变成一条固定思考链：
 
-| 操作 | 代表算法 |
-| :--- | :--- |
-| 编码压缩 | 前缀和、哈希、线性基、SAM、可持久化 |
-| 传播松弛 | BFS/DP、Dijkstra、线段树、树形 DP |
-| 剪枝决策 | 二分、双指针、单调栈、凸包、斜率优化、最小割 |
-| 变换域映射 | FFT/NTT、矩阵幂、差分、对偶、生成函数、LCT |
+```text
+数据形状 → 数据是否变化 → 运算规则 → 数据规模
+                         ↓
+                    建议方向
+                         ↓
+               引导式思考 / 下一步
+```
 
-同时保留 **8 档难度轴** 作为训练进度：难度决定“什么时候练”，信息论轴决定“它们为什么是同一类”。
+- 移动端：只做拆题，快速、简洁、无模板
+- 桌面端：同样的拆题主界面，额外提供算法信息与 C++ 模板
+- 使用场景：不能写代码时练拆解；写代码前先确认方向
 
 ---
 
-## 🚀 Windows 直接运行（源码方式）
+## 风格
 
-1. 安装 Python 3.10+（勾选 `Add Python to PATH`）
-2. 打开终端进入本目录：
+**Parallax Editorial（视差杂志风）**
 
-```bat
-cd knowledge-ladder
+- 暖纸底色 `#F5F0E6`
+- 墨黑正文 `#1A1712`
+- 唯一砖红强调 `#B3401F`
+- 衬线标题、宽松行高、无圆角、无阴影、无冷色
+
+完整设计规范见：
+
+```text
+docs/style-parallax-editorial.md
+```
+
+---
+
+## 功能
+
+### 移动端（PWA / APK）
+
+- 打开直接进入四步拆题
+- 一步一屏，点选自动前进
+- 建议方向标签可点击查看解释
+- 下一步进入「引导式思考」界面，可返回
+- 不包含 C++ 模板
+
+### 桌面端（Python / PySide6）
+
+- 启动即拆题，与移动端一致
+- 左侧「算法模板」进入算法信息与 C++ 模板
+- 保留 8 档难度、掌握进度、信息论微缩模块
+- 同一套玻璃拟态视觉
+- 支持连接 Steam Wallpaper Engine：壁纸按钮自动扫描本地壁纸库，可选壁纸作为背景
+
+---
+
+## 快速开始
+
+### 移动端网页预览
+
+```bash
+cd mobile
+./serve.sh
+```
+
+浏览器打开：
+
+```text
+http://localhost:8000
+```
+
+### Android APK
+
+方式一：GitHub Actions
+
+- 推送到 `main` 自动构建 APK，下载 artifact
+- 打 tag（如 `v1.0.0`）自动创建 GitHub Release
+
+方式二：本地构建
+
+```bash
+cd mobile
+npm install
+npx cap add android
+npx cap sync android
+cd android && ./gradlew assembleDebug
+```
+
+### 桌面端
+
+```bash
 python -m pip install -r requirements.txt
 python main.py
 ```
 
----
-
-## 📦 打包 Windows 便携版 exe
-
-在 Windows 上双击 `build_windows.bat`，或在终端运行：
+Windows 便携版：
 
 ```bat
-cd knowledge-ladder
 build_windows.bat
 ```
 
-打包完成后生成：
-
-```
-dist\CodeforcesDifficultyLadder.exe
-```
-
-这是一个单文件便携版，可复制到任意 Windows 电脑双击运行，无需安装 Python。
-
 ---
 
-## 🗂 项目结构
+## 项目结构
 
-```
-knowledge-ladder/
-├── main.py               # 程序入口（PySide6 GUI）
-├── mobile/               # 移动端 PWA + Capacitor 打包工程
-├── export_mobile_data.py # 导出移动端 data.js
-├── info_framework.py     # 信息论标签：四操作 / 拓扑 / 动静 / 阶段 / 解剖四步
-├── knowledge_data.py     # 自动生成：120 个算法节点（简介/复杂度/C++ 模板）
-├── tier8_thoughts.py     # 第 8 档高阶思维模式库（可展开详情）
-├── tiers_data.py         # 8 档难度阶梯数据
-├── style.qss             # 深色现代圆润风样式
-├── style_mac.qss         # 浅色现代圆润风样式
-├── requirements.txt      # Python 依赖
-├── preview/              # 现代圆润风 HTML/CSS 静态预览
-├── generate_report.py    # 生成每档 HTML 内容质量报告
-├── reports/              # 已生成的内容质量报告
-├── build_windows.bat     # Windows 一键打包脚本
-└── README.md
+```text
+.
+├── main.py                    # 桌面端（PySide6）
+├── mobile/                    # 移动端 PWA + Capacitor
+│   └── www/                   # 移动端前端
+├── docs/
+│   └── style-parallax-editorial.md
+├── info_framework.py          # 信息论标签数据
+├── knowledge_data.py          # 120 个算法数据
+├── tiers_data.py              # 8 档难度数据
+├── export_mobile_data.py      # 导出移动端 data.js
+├── .github/workflows/
+│   ├── build-apk.yml          # 自动构建 APK
+│   └── release.yml            # 打 tag 发 Release
+└── style.qss                  # 桌面端 Parallax Editorial 主题
 ```
 
 ---
 
-## 🛠 性能说明
+## Release
 
-- 左侧仅 8 个档位，右侧按需构建当前档位页面
-- 模板详情使用对话框按需打开，不常驻内存
-- 进度写入使用轻量 JSON 文件，秒级保存
-- 数据全部内嵌在程序中，不依赖网络
+- 打 tag 自动构建 **Android APK**
+- 打 tag 自动构建 **Windows 桌面 EXE**（KnowledgeLadder.exe）
+- Windows EXE 可直接下载使用，无需源码构建
+
+在 `main` 分支打 tag：
+
+```bash
+git tag v1.0.0
+git push origin main --tags
+```
+
+GitHub Actions 会自动构建 APK 并创建 Release。
+
+---
+
+## License
+
+MIT

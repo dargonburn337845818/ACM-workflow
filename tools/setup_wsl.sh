@@ -5,7 +5,7 @@
 # 功能：
 #   1. 安装 g++ / curl / python3 / python3-venv / python3-pip
 #   2. 安装 Chromium（如果系统没有 Chrome/Edge/Chromium）
-#   3. 可选安装本地离线翻译环境（Argos）
+#   3. 可选安装本地离线翻译环境（Ollama hy-mt2:latest）
 #   4. 输出 VS Code 设置建议
 #
 # 用法：
@@ -64,11 +64,11 @@ else
 fi
 
 if [ "$WITH_TRANSLATE" -eq 1 ]; then
-  echo "==> 3/3 安装本地离线翻译环境"
+  echo "==> 3/3 检查本地 Ollama 翻译环境"
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   bash "$SCRIPT_DIR/setup_local_translate.sh"
 else
-  echo "==> 3/3 跳过本地离线翻译（需要时运行 bash tools/setup_wsl.sh --with-translate）"
+  echo "==> 3/3 跳过本地 Ollama 翻译（需要时运行 bash tools/setup_wsl.sh --with-translate）"
 fi
 
 echo

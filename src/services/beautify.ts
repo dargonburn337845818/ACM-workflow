@@ -13,7 +13,7 @@ const BACKUP_KEY = 'acmWorkflow.beautifyBackup';
 const APP_MARK_KEY = 'acmWorkflow.beautifyApplied';
 
 /** 视窗布局设置（应用前备份原值） */
-const LAYOUT_SETTINGS: Record<string, any> = {
+export const LAYOUT_SETTINGS: Record<string, any> = {
   'workbench.activityBar.location': 'bottom',      // 活动栏沉底，主区域更沉浸
   'workbench.statusBar.visible': false,            // 隐藏状态栏
   'workbench.sideBar.location': 'left',            // 侧边栏居左（用户习惯）
@@ -25,7 +25,7 @@ const LAYOUT_SETTINGS: Record<string, any> = {
 };
 
 /** 硬边墨色配色（V0.8：全部实色，无半透明，无 backdrop-filter） */
-const IMMERSIVE_COLORS: Record<string, string> = {
+export const IMMERSIVE_COLORS: Record<string, string> = {
   // 基础
   'editor.background': '#1A1A1A',
   'editor.foreground': '#E8E0D5',

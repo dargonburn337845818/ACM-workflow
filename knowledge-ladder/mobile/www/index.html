@@ -3,70 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#141519">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>知识阶梯 · 信息论版</title>
-  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#F5F0E6">
+  <title>拆题引导</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-dot"></span>
-        <span>知识阶梯</span>
-      </div>
-      <button id="guideBtn" class="plain-btn">导论</button>
+    <header class="top" data-parallax="0.15">
+      <button id="themeToggle" class="theme-toggle">风格</button>
+      <div class="step-count" id="stepCount">1 / 4</div>
     </header>
 
-    <nav class="tabs">
-      <button class="tab-btn active" data-view="home">首页</button>
-      <button class="tab-btn" data-view="tiers">阶梯</button>
-    </nav>
+    <main id="stage" class="stage"></main>
 
-    <main id="home-view" class="view active">
-      <div class="hero-card">
-        <div class="hero-title">信息论视角的学习路线</div>
-        <div class="hero-sub">不背 120 个标签，用 4 种操作看穿它们</div>
-        <div id="homeProgress" class="progress-line"></div>
+    <div id="explainModal" class="explain-modal hidden">
+      <div class="explain-mask" id="explainMask"></div>
+      <div class="explain-sheet">
+        <div class="explain-head">
+          <div id="explainTitle" class="explain-title"></div>
+          <button id="explainClose" class="close-btn">×</button>
+        </div>
+        <div id="explainBody" class="explain-body"></div>
       </div>
-
-      <div class="section-title">四种信息操作</div>
-      <div id="opOverview" class="op-grid"></div>
-
-      <div class="section-title">四阶段地图</div>
-      <div id="phaseList" class="phase-list"></div>
-
-      <div class="section-title">解剖四步</div>
-      <div id="anatomyList" class="anatomy-list"></div>
-
-      <div class="note-card">
-        提示：当前是移动端网页版，进度保存在本机；后续可用 Capacitor 打包成 APK。
-      </div>
-    </main>
-
-    <main id="tiers-view" class="view">
-      <div class="search-wrap">
-        <input id="searchInput" type="search" placeholder="搜索算法 / 标签 / 操作…" autocomplete="off">
-      </div>
-      <div id="opFilter" class="op-filter"></div>
-      <div id="tierList" class="tier-list"></div>
-    </main>
-  </div>
-
-  <div id="modal" class="modal hidden">
-    <div class="modal-mask" id="modalMask"></div>
-    <div class="modal-panel">
-      <div class="modal-head">
-        <div id="modalTitle" class="modal-title">详情</div>
-        <button id="modalClose" class="close-btn">×</button>
-      </div>
-      <div id="modalBody" class="modal-body"></div>
     </div>
   </div>
 
-  <script src="data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

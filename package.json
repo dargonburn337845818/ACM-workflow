@@ -1,8 +1,8 @@
 {
   "name": "acm-workflow",
   "displayName": "ACM Workflow",
-  "description": "VSCode 中强大的 Codeforces 刷题助手：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录，全部在编辑器内完成",
-  "version": "0.20.7",
+  "description": "ACM Workflow 是 VSCode 中的 Codeforces 刷题工作台：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录一站式完成；支持玻璃拟态工作台，可联动 VSCode Background 背景插件（https://github.com/caoge5524/vscode-background）将所选壁纸一键设为全局背景。",
+  "version": "0.21.0",
   "publisher": "deepseekharness",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -21,7 +21,10 @@
     "vscode-extension",
     "algorithm",
     "刷题",
-    "cp"
+    "cp",
+    "vscode-background",
+    "wallpaper",
+    "背景"
   ],
   "activationEvents": [
     "onStartupFinished"

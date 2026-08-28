@@ -1,100 +1,143 @@
 #!/usr/bin/env bash
 #
-# ACM Workflow 本地离线翻译环境安装脚本
+# ACM Workflow 本地翻译环境安装/检查脚本（Ollama hy-mt2:latest）
 #
 # 功能：
-#   1. 创建/复用 Python 虚拟环境并安装 argos-translate-lt
-#   2. 下载并安装 Argos en -> zh 模型（默认 argos-net.com，可用 ARGOS_MODEL_URL 覆盖）
-#   3. 下载 MiniSBD en.onnx（默认 GitHub Release，可用 MINISBD_EN_URL 覆盖）
-#   4. 提示启动本地翻译服务
+#   1. 检查 Ollama 服务是否可用，不可用时尝试拉起
+#   2. 检查 hy-mt2:latest 模型是否存在，不存在时提示/尝试拉取
+#   3. 输出 VS Code 设置建议
 #
 # 用法：
 #   bash tools/setup_local_translate.sh
 #
-# 可选环境变量：
-#   PIP_INDEX_URL       pip 镜像，例如 https://pypi.tuna.tsinghua.edu.cn/simple
-#   ARGOS_MODEL_URL     Argos en->zh 模型下载地址
-#   MINISBD_EN_URL      MiniSBD en.onnx 下载地址
-#   VENV_DIR            虚拟环境目录（默认 ~/.local/share/acm-workflow-translate/venv）
-#
-# 适用于 Linux / WSL / macOS。Windows 用户建议在 WSL 中运行。
+# 环境变量：
+#   OLLAMA_URL       Ollama API 地址（默认 http://127.0.0.1:11434）
+#   OLLAMA_MODEL     翻译模型名（默认 hy-mt2:latest）
+#   OLLAMA_EXE       Windows 侧 ollama.exe 路径（WSL 自动探测时可用）
 
 set -euo pipefail
 
-# 如果用户已有 LibreTranslate 的 venv，默认复用它；否则新建独立 venv
-if [ -z "${VENV_DIR:-}" ] && [ -x "$HOME/LibreTranslate/venv/bin/python" ]; then
-  VENV_DIR="$HOME/LibreTranslate/venv"
-  echo "==> 检测到 LibreTranslate venv，将复用: $VENV_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-hy-mt2:latest}"
+
+# 优先使用 PATH 中的 ollama；否则在 WSL 里尝试 Windows 侧 ollama.exe
+OLLAMA_CLI=""
+if command -v ollama >/dev/null 2>&1; then
+  OLLAMA_CLI="$(command -v ollama)"
+elif [ -n "${OLLAMA_EXE:-}" ] && [ -x "$OLLAMA_EXE" ]; then
+  OLLAMA_CLI="$OLLAMA_EXE"
+elif [ -x "/mnt/c/Users/ru/AppData/Local/Programs/Ollama/ollama.exe" ]; then
+  OLLAMA_CLI="/mnt/c/Users/ru/AppData/Local/Programs/Ollama/ollama.exe"
 fi
-VENV_DIR="${VENV_DIR:-$HOME/.local/share/acm-workflow-translate/venv}"
-ARGOS_DATA_DIR="${ARGOS_DATA_DIR:-$HOME/.local/share/argos-translate}"
-ARGOS_MODEL_URL="${ARGOS_MODEL_URL:-https://argos-net.com/v1/translate-en_zh-1_9.argosmodel}"
-MINISBD_EN_URL="${MINISBD_EN_URL:-https://github.com/LibreTranslate/MiniSBD/releases/download/v0.0.1/en.onnx}"
 
-MODEL_FILE="$ARGOS_DATA_DIR/translate-en_zh-1_9.argosmodel"
-MINISBD_DIR="$ARGOS_DATA_DIR/minisbd"
-MINISBD_FILE="$MINISBD_DIR/en.onnx"
+say() { printf '\n[setup] %s\n' "$*"; }
 
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-
-echo "==> 1/4 准备 Python 虚拟环境: $VENV_DIR"
-if [ ! -x "$VENV_DIR/bin/python" ]; then
-  "$PYTHON_BIN" -m venv "$VENV_DIR"
-fi
-PY="$VENV_DIR/bin/python"
-PIP="$VENV_DIR/bin/pip"
-
-echo "==> 2/4 安装 argos-translate-lt"
-"$PIP" install --upgrade argos-translate-lt
-
-echo "==> 3/4 准备 Argos en -> zh 模型"
-mkdir -p "$ARGOS_DATA_DIR"
-
-# 已安装则跳过下载
-if "$PY" - <<'PY' >/dev/null 2>&1
-from argostranslate import package
-if any(getattr(p, "from_code", None) == "en" and getattr(p, "to_code", None) == "zh" for p in package.get_installed_packages()):
-    raise SystemExit(0)
-raise SystemExit(1)
-PY
-then
-  echo "    已检测到 en -> zh 模型，跳过下载。"
-else
-  if [ -f "$MODEL_FILE" ]; then
-    echo "    使用已有模型文件：$MODEL_FILE"
-  else
-    echo "    下载模型（约 68MB，可断点续传）..."
-    mkdir -p "$ARGOS_DATA_DIR"
-    curl -k -L -C - --retry 5 --retry-delay 2 -o "$MODEL_FILE" "$ARGOS_MODEL_URL"
+# WSL2 下自动发现 Windows 宿主机 IP，用于访问 Windows 侧 Ollama
+wsl_host_ip() {
+  local ip=""
+  ip="$(ip route show default 2>/dev/null | awk '{print $3}' | head -1)"
+  if [ -z "$ip" ]; then
+    ip="$(grep nameserver /etc/resolv.conf 2>/dev/null | awk '{print $2}' | head -1)"
   fi
-  echo "    安装模型..."
-  "$PY" - "$MODEL_FILE" <<'PY'
-import sys
-from pathlib import Path
-from argostranslate import package
+  printf '%s' "$ip"
+}
 
-model_path = Path(sys.argv[1])
-package.install_from_path(model_path)
-print("    模型安装完成。")
-PY
-fi
+resolve_ollama_url() {
+  if [ -d /mnt/c ] && [ -x /mnt/c/Windows/System32/cmd.exe ]; then
+    if ! curl -fsS --max-time 2 "$OLLAMA_URL/api/tags" >/dev/null 2>&1; then
+      local host_ip
+      host_ip="$(wsl_host_ip)"
+      if [ -n "$host_ip" ]; then
+        local candidate="http://$host_ip:11434"
+        if curl -fsS --max-time 2 "$candidate/api/tags" >/dev/null 2>&1; then
+          say "Windows 宿主机 Ollama 可达，使用 $candidate"
+          OLLAMA_URL="$candidate"
+        fi
+      fi
+    fi
+  fi
+}
 
-echo "==> 4/4 准备 MiniSBD en.onnx（句切分模型）"
-mkdir -p "$MINISBD_DIR"
-if [ -f "$MINISBD_FILE" ]; then
-  echo "    已存在 $MINISBD_FILE，跳过下载。"
+ollama_ready() {
+  curl -fsS --max-time 3 "$OLLAMA_URL/api/tags" >/dev/null 2>&1
+}
+
+start_ollama_windows() {
+  # WSL 里启动 Windows 侧 Ollama。
+  # 不要用 `cmd.exe /c start ...`（WSL 互操作下会挂起）。
+  # 改用 PowerShell Start-Process 启动独立的 Windows 进程。
+  local exe="${OLLAMA_EXE:-}"
+  if [ -z "$exe" ] && [ -x "/mnt/c/Users/ru/AppData/Local/Programs/Ollama/ollama.exe" ]; then
+    exe="/mnt/c/Users/ru/AppData/Local/Programs/Ollama/ollama.exe"
+  fi
+  if [ -n "$exe" ] && [ -x "$exe" ]; then
+    local win_exe
+    win_exe="$(wslpath -w "$exe" 2>/dev/null || echo "$exe")"
+    say "尝试启动 Windows Ollama 服务: $win_exe serve"
+    powershell.exe -NoProfile -Command "\$env:OLLAMA_HOST='${OLLAMA_HOST:-0.0.0.0:11434}'; Start-Process -FilePath '$win_exe' -ArgumentList 'serve' -WindowStyle Hidden" >/dev/null 2>&1 || true
+  fi
+}
+
+start_ollama_linux() {
+  if command -v ollama >/dev/null 2>&1; then
+    say "尝试启动本机 Ollama: ollama serve"
+    nohup ollama serve >/dev/null 2>&1 &
+  fi
+}
+
+echo "==> 1/3 检查 Ollama 服务"
+resolve_ollama_url
+if ollama_ready; then
+  say "Ollama API 可用：$OLLAMA_URL"
 else
-  echo "    下载 $MINISBD_FILE ..."
-  curl -k -L --retry 5 --retry-delay 2 -o "$MINISBD_FILE" "$MINISBD_EN_URL"
+  say "Ollama 未响应，尝试拉起..."
+  if [ -d /mnt/c ] && [ -x /mnt/c/Windows/System32/cmd.exe ]; then
+    start_ollama_windows
+  else
+    start_ollama_linux
+  fi
+  # 启动后循环重新探测：Windows Ollama 监听 0.0.0.0 后，WSL2 可从宿主机 IP 访问
+  for _ in $(seq 1 30); do
+    resolve_ollama_url
+    if ollama_ready; then
+      break
+    fi
+    sleep 1
+  done
+  resolve_ollama_url
+  if ! ollama_ready; then
+    echo "错误：Ollama 服务仍不可用（$OLLAMA_URL）。" >&2
+    echo "请先在 Windows 启动 Ollama 托盘，或安装 Ollama：https://ollama.com" >&2
+    exit 1
+  fi
 fi
 
+echo "==> 2/3 检查翻译模型 $OLLAMA_MODEL"
+if curl -fsS --max-time 3 "$OLLAMA_URL/api/tags" 2>/dev/null | grep -q "$OLLAMA_MODEL"; then
+  say "模型已存在：$OLLAMA_MODEL"
+else
+  say "未找到 $OLLAMA_MODEL，尝试拉取..."
+  if [ -n "$OLLAMA_CLI" ]; then
+    "$OLLAMA_CLI" pull "$OLLAMA_MODEL"
+  else
+    echo "错误：未找到 ollama 命令，无法自动拉取模型。" >&2
+    echo "请先在 Windows Ollama 中拉取：ollama pull $OLLAMA_MODEL" >&2
+    exit 1
+  fi
+fi
+
+echo "==> 3/3 输出配置建议"
 echo
 echo "==========================================================="
-echo " 本地离线翻译环境已就绪。启动服务："
+echo " 本地翻译环境已就绪。启动服务："
 echo
-echo "   $VENV_DIR/bin/python tools/local_translate_server.py --port 5000"
+echo "   bash tools/start_local_translate.sh --port 5000"
 echo
 echo " 然后在 VS Code 设置中填写："
 echo '   "acmWorkflow.translateProvider": "local"'
 echo '   "acmWorkflow.localEndpoint": "http://127.0.0.1:5000/translate"'
+echo '   "acmWorkflow.localAutoStart": true'
+echo
+echo " 扩展会在首次翻译时自动拉起该服务，并在 VS Code 关闭时自动停止。"
 echo "==========================================================="

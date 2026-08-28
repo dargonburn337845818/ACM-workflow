@@ -17,8 +17,8 @@ export interface StatementFiles {
   zh: (string | null)[] | null;
 }
 
-/** 排版 HTML 缓存版本标记：旧版（V0.20 逐碎片分块/MATH 占位符泄漏/V0.24 $$$ 公式误判）缓存直接失效重抓 */
-export const HTML_CACHE_MARK = '<!-- acm-workflow-html-v4 -->';
+/** 排版 HTML 缓存版本标记：旧版（V0.20 逐碎片分块/MATH 占位符泄漏/V0.24 $$$ 公式误判/V0.25 tex-span sup/sub 未转 LaTeX）缓存直接失效重抓 */
+export const HTML_CACHE_MARK = '<!-- acm-workflow-html-v5 -->';
 
 /** 题目文件夹内题面文件的路径（与 cpp 同级） */
 export function statementFilePaths(filePath: string): { html: string; md: string; zh: string } {

@@ -1,6 +1,53 @@
 # 更新日志（Changelog）
 
-版本号遵循语义化版本。本文件记录全部迭代历史（含内部开发记录提炼）。
+版本号遵循语义化版本。本文件记录正式版本迭代历史。
+
+## 0.21.0 — 可组装对拍器 / 造数据流水线 / 联动 VSCode Background（2026-08-28）
+
+- 对拍器升级为可组装：比对方式支持精确 / Token / 浮点误差 / Special Judge（外部 checker）
+- 造数据改为「只流水线拼装」：细粒度原语、变量绑定、重复块、种子复现，多步参数独立保留
+- 新增与 [VSCode Background](https://github.com/caoge5524/vscode-background) 的联动：工作台壁纸可一键设为全局 VSCode 背景
+- 玻璃拟态工作台持续优化，支持主题与背景图
+
+## 0.20.5 — 样例页适应性窗口优化（2026-08-21）
+
+- 测试模块「样例」页：切换为适应性窗口，占满可用宽度；题面页保持 720px 居中阅读宽度
+- 样例页输入 / 期望输出列改为 `auto-fit` 自适应网格，窄窗自动单列、宽窗双列
+- 用例框拉长：默认高度从 60px 提升到 120px，最大到 480px / 60vh，查看更舒适；窗口缩放时重新计算高度
+
+## 0.20.4 — 插件瘦身：移除知识导论模块（2026-08-20）
+
+- 插件：移除工作台内「知识导论」视图、`src/features/manual/` 目录及相关 JS/CSS/测试
+- 独立软件：知识导论拆分为 `knowledge-ladder/`（PySide6 + PyInstaller），支持 8 档难度阶梯、勾选进度、C++ 模板详情、Windows 便携 exe
+- 保留：选题、URL 导入、比赛、测试、对拍、造数据、记录、CF 登录态、诊断等核心功能
+
+## 0.20.3 — 知识导论扩充 / 选题标签扩充（2026-08-20）
+
+- 知识导论：从 8 大分类 47 节点扩充到 10 大分类 99 节点，新增排序、前缀和/差分、双指针、构造、位运算、树、矩阵、图匹配、2-SAT、SAM、EXCRT、线性基、旋转卡壳、反悔贪心等缺失知识点
+- 选题标签：新增 CF 官方标签 `string suffix structures`（后缀结构）、`graph matchings`（图匹配）、`chinese remainder theorem`（中国剩余定理），均以中文显示并沿用多选 OR 过滤
+- 文档：同步更新 README 与 features 中的知识导论分类/节点数量
+
+## 0.20.2 — 本地翻译模型适配与样例页显示修复（2026-08-20）
+
+- 本地翻译：默认模型改为 Ollama `hy-mt2:latest`（ID `ad76b286cab2`，1.5 GB，100% GPU，上下文 4096），诊断 / 配置引导 / 启动脚本同步识别该模型
+- 测试模块：修复「题面」页下方仍显示样例运行区的问题，样例（编辑 / 运行）只出现在「样例」页
+- 测试：新增 CSS 回归测试，防止样例运行区再次出现在题面页
+
+## 0.20.1 — 测试模块题面 / 样例分页（2026-08-20）
+
+- 测试模块：把「题面」与「样例」拆分为同一模块下的两个页面，通过页签切换
+- 测试模块：修复「题面」页仍重复展示样例的问题，官方样例统一在「样例」页以可编辑用例展示
+- 测试模块：移除原「题面 / 测试用例」可拖动分隔条及对应的布局比例持久化逻辑
+- 文档：同步更新 README、features、getting-started 与 walkthrough 说明
+
+## 0.20.0 — LaTeX 修复 / 排版优化 / 标签选题 / 深模块优化 / Ollama 本地翻译（2026-08-19）
+
+- 题面：修复 LaTeX，解析 `tex-span` 时把 `<sup>` / `<sub>` / 斜体等 HTML 转成 LaTeX（如 `10^5`、`x_i`）
+- 题面：排版优化，正文约 14–15px、行高 1.8、去掉段落间虚线、增加段落间距
+- 选题：新增算法标签多选（常用 chips + 搜索框），与难度区间共同过滤，命中任一标签即可
+- 架构：服务门面化（深模块），`src/services/*` 收敛为 6 个 facade class，`createServices(context)` 组合根统一装配
+- 本地翻译：`local` 后端默认直接使用 Ollama `hy-mt2:q4`（1.5 GB，100% GPU，上下文 4096，端点 `http://127.0.0.1:11434`），替代 Argos；扩展按需自动拉起 Ollama 与模型
+- 移除 0.20.0 中冗余的新功能：文件切换器 / 学习路线 / 美化预设 / AtCoder / 牛客；本版本只保留 LaTeX 修复、排版优化、算法标签选题、深模块优化与 Ollama 本地翻译
 
 ## 0.19.6 — 比赛自动加载 / 环境配置引导 / 移除一键提交（2026-08-19）
 
@@ -15,9 +62,9 @@
 - 翻译：题面区新增“正在翻译中…（已 Ns）”实时提示，翻译在后台进行时用户能知道进度
 - 题面：`.st-en img` 和比赛题面图片加白色背景，深色主题下文字型小图不再黑字看不清
 
-## 0.19.4 — 本地翻译 Windows/WSL 适配（2026-08-19）
+## 0.19.4 — 本地翻译 Windows 适配（2026-08-19）
 
-- 本地翻译服务自动启动：Windows 下优先尝试 Git Bash，失败或超时后自动改用 `wsl.exe` 启动 WSL 内的 Argos/LibreTranslate 服务，适配“模型装在 WSL、VS Code 跑在 Windows”的常见情况
+- 本地翻译服务自动启动增强：Windows 下优先尝试 Git Bash
 - `tools/start_local_translate.sh` 增加 Windows venv 检测（`Scripts/python.exe`），后续在 Windows 侧安装模型也能直接启动
 
 ## 0.19.3 — 比赛按钮修正 / 重新获取题面（2026-08-19）
@@ -97,20 +144,15 @@
 - 抓取/批量补样例失败时提示「运行工作流诊断」
 - 冒烟测试新增诊断服务断言；README / troubleshooting / changelog 同步更新
 
-## 0.18.2 — WSL 适配与题面公式修复（2026-08-18）
+## 0.18.2 — 题面公式修复与本地翻译工具（2026-08-18）
 
-- 新增 `tools/setup_wsl.sh`：一键安装 g++ / curl / python3 / Chromium，可选本地离线翻译
-- `src/utils/paths.ts` 新增 `normalizePath`：WSL 下自动把 `C:\...` / `D:\...` 转成 `/mnt/c/...` / `/mnt/d/...`，`baseDir` / `templatePath` / `dbPath` / `browserPath` 全部生效
 - `src/services/dataGen.ts`：`.py` 造数据脚本在非 Windows 平台优先使用 `python3`，找不到再回退 `python`
 - `src/services/runner.ts`：环境诊断增加 `/bin/curl` 与 python3 探测
-- `src/services/cfSession.ts` / `submitter.ts`：WSL 浏览器启动加 `--no-sandbox`，错误提示更可操作
-- `src/services/template.ts`：CPH `.prob` 同时生成 WSL `/mnt/...` 与 Windows `C:\...` 路径变体，WSL/Windows 两端都能命中
 - `src/services/statementFiles.ts`：生成题目文件夹时同时写出 `题面.md`（由 HTML 转换），方便外部查看/分享
 - `src/services/translate.ts`：公式占位符从 `MATH0` 改为 `☃0☃`，避免 Argos 等本地翻译把 `MATH` 音译成“马特”导致译文泄漏
 - `src/services/statementHtml.ts`：修复 CF 题面 `$$$...$$$` 行内公式被误判为 `$$...$$` 块级公式，导致 “s and t of length n” 被拆成公式碎片、KaTeX 渲染乱版的问题；`statementFiles.ts` 同步提升题面 HTML 缓存版本，旧乱版缓存自动失效重抓
 - `src/core/workbench.ts`：打开题目时自动从 CF 题集补全难度，URL 导入/本地打开也能显示 rating
 - `src/features/records/index.ts` / `src/features/contest/index.ts`：记录导入与比赛“我的关注”直接使用 CF 登录态 handle，移除记录页手动“绑定 / 更换”按钮
-- 文档：README / getting-started / configuration / troubleshooting / tools 增加 WSL 章节
 
 ## 0.18.0 — 开源首版（2026-08-18）
 

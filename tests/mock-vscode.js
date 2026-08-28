@@ -22,7 +22,9 @@ module.exports = {
     showInformationMessage: () => {},
     showWarningMessage: () => {},
     showErrorMessage: () => {},
+    showInputBox: async () => undefined,
     createOutputChannel: () => ({ appendLine() {}, show() {}, clear() {} }),
+    onDidChangeActiveTextEditor: () => ({ dispose() {} }),
     registerWebviewViewProvider: (viewType, provider) => {
       registeredViews.push({ viewType, provider });
       return { dispose() {} };

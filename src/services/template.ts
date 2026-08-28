@@ -183,19 +183,22 @@ export function listProblemCpps(): string[] {
 
 /**
  * 按题目 ID 查找本地是否已生成（V0.23 URL 导入查重用）。
- * 目录命名与 createProblemFile 一致：code/Codeforces/{sanitizedId}/ 下的第一个 .cpp。
+ * 目录命名与 createProblemFile 一致：code/{平台}/{sanitizedId}/ 下的第一个 .cpp。
  * 返回 cpp 绝对路径；不存在返回 null。
  */
 export function findProblemCppById(problemId: string): string | null {
   const folderName = problemId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const dir = path.join(baseDir(), 'code', 'Codeforces', folderName);
-  if (!fs.existsSync(dir)) return null;
-  try {
-    const cpp = fs.readdirSync(dir).find((f) => f.endsWith('.cpp'));
-    return cpp ? path.join(dir, cpp) : null;
-  } catch {
-    return null;
+  for (const platformDir of Object.values(PLATFORM_DIRS)) {
+    const dir = path.join(baseDir(), 'code', platformDir, folderName);
+    if (!fs.existsSync(dir)) continue;
+    try {
+      const cpp = fs.readdirSync(dir).find((f) => f.endsWith('.cpp'));
+      if (cpp) return path.join(dir, cpp);
+    } catch {
+      /* 忽略单个平台读取错误 */
+    }
   }
+  return null;
 }
 
 /**

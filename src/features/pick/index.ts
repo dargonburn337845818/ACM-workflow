@@ -2,58 +2,59 @@
  * pick 功能模块（V0.18 结构重组：从 panel.ts 拆出）
  */
 import * as vscode from 'vscode';
-import { getCodeforcesProblemDetail, getCodeforcesProblems, pickCodeforcesProblem } from '../../services/fetchers/codeforces';
-import { ensureRecord, listRecords } from '../../services/records';
-import { createProblemFile, updateProblemTests } from '../../services/template';
-import type { WorkbenchHost, PickState } from '../../core/workbench';
-import { STATE_KEY } from '../../core/workbench';
+import { Services } from '../../services';
+import type { WorkbenchHost } from '../../core/workbench';
 import type { Problem } from '../../types';
 
 
-export function installPick(host: WorkbenchHost): void {
-  host.handlers['fetchProblem'] = (msg: any) => handleFetchProblem(host, msg?.payload);
-  host.handlers['createFile'] = (msg: any) => handleCreateFile(host, msg?.payload);
-  host.handlers['fetchWeakProblem'] = (msg: any) => handleFetchWeakProblem(host);
+export function installPick(host: WorkbenchHost, deps: Pick<Services, 'codeforces' | 'records' | 'workspace'>): void {
+  host.handlers['fetchProblem'] = (msg: any) => handleFetchProblem(host, deps, msg?.payload);
+  host.handlers['createFile'] = (msg: any) => handleCreateFile(host, deps, msg?.payload);
+  host.handlers['fetchWeakProblem'] = (msg: any) => handleFetchWeakProblem(host, deps);
 }
 
 
-async function handleFetchProblem(host: WorkbenchHost, payload: any) {
+async function handleFetchProblem(host: WorkbenchHost, deps: Pick<Services, 'codeforces'>, payload: any) {
   try {
     const minRating = Number(payload?.minRating ?? 800);
     const maxRating = Number(payload?.maxRating ?? 2400);
+    // 第 5 条：按算法标签多选过滤（命中任一标签即可，OR）
+    const tags = Array.isArray(payload?.tags)
+      ? payload.tags.filter((t: any) => typeof t === 'string' && t.trim() !== '')
+      : [];
     // Bug2：前端已尝试过的题目 ID（避免重复推荐同一道题 / 空条件死循环）
     const exclude: Set<string> | undefined = Array.isArray(payload?.exclude)
       ? new Set(payload.exclude.map((x: any) => String(x)))
       : undefined;
-    const problem = await pickCodeforcesProblem({ minRating, maxRating, tags: [], exclude });
-    if (problem.difficulty) host.difficultyById.set(problem.id, problem.difficulty); // Bug6：记录难度
+    const problem = await deps.codeforces.pickProblem({ minRating, maxRating, tags, exclude });
+    if (problem.difficulty) deps.codeforces.difficultyById.set(problem.id, problem.difficulty); // Bug6：记录难度
 
-    const current = host.context.globalState.get<PickState>(STATE_KEY) || {};
+    const current = await host.getPickState();
     const recent = current.recent || [];
     const nextRecent = [problem, ...recent.filter(p => p.id !== problem.id)].slice(0, 10);
-    await host.saveState({ platform: 'codeforces', minRating, maxRating, problem, recent: nextRecent });
+    await host.saveState({ platform: 'codeforces', minRating, maxRating, tags, problem, recent: nextRecent });
 
-    host.view?.webview.postMessage({ type: 'problemResult', problem });
-    host.view?.webview.postMessage({ type: 'recentList', recent: nextRecent });
+    host.post({ type: 'problemResult', problem });
+    host.post({ type: 'recentList', recent: nextRecent });
   } catch (e: any) {
-    host.view?.webview.postMessage({ type: 'error', message: e?.message || '选题失败' });
+    host.post({ type: 'error', message: e?.message || '选题失败' });
   }
 }
 
 
-async function handleCreateFile(host: WorkbenchHost, payload: any) {
+async function handleCreateFile(host: WorkbenchHost, deps: Pick<Services, 'codeforces' | 'workspace' | 'records'>, payload: any) {
   try {
     const problem = payload?.problem as Problem;
     if (!problem) {
       throw new Error('没有可生成的题目');
     }
 
-    host.view?.webview.postMessage({ type: 'status', message: '正在获取题目详情...' });
+    host.post({ type: 'status', message: '正在获取题目详情...' });
 
     let tests: { input: string; output: string }[] = [];
     let detailWarning: string | undefined;
     try {
-      const detail = await getCodeforcesProblemDetail(problem);
+      const detail = await deps.codeforces.getProblemDetail(problem);
       tests = detail.tests;
       if (tests.length === 0) {
         detailWarning = '未能从题目页面解析出测试数据（可能被反爬拦截）';
@@ -63,8 +64,8 @@ async function handleCreateFile(host: WorkbenchHost, payload: any) {
       detailWarning = e?.message || '获取题目详情失败';
     }
 
-    const filePath = createProblemFile(problem, tests);
-    host.view?.webview.postMessage({
+    const filePath = deps.workspace.createProblemFile(problem, tests);
+    host.post({
       type: 'fileCreated',
       path: filePath,
       message: tests.length > 0
@@ -73,30 +74,30 @@ async function handleCreateFile(host: WorkbenchHost, payload: any) {
     });
 
     // 生成即登记刷题记录（不等打开文件）
-    ensureRecord(problem).catch(() => { /* 记录失败不影响生成 */ });
+    deps.records.ensure(problem).catch(() => { /* 记录失败不影响生成 */ });
 
     // 抓取失败：后台自动重试，成功后把样例写回 .prob
     if (tests.length === 0) {
-      retryBackfill(host, problem, filePath);
+      retryBackfill(host, deps, problem, filePath);
     }
 
     const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
     await vscode.window.showTextDocument(doc, { preview: false });
   } catch (e: any) {
-    host.view?.webview.postMessage({ type: 'error', message: e?.message || '生成文件失败' });
+    host.post({ type: 'error', message: e?.message || '生成文件失败' });
   }
 }
 
 
-async function retryBackfill(host: WorkbenchHost, problem: Problem, filePath: string) {
+async function retryBackfill(host: WorkbenchHost, deps: Pick<Services, 'codeforces' | 'workspace'>, problem: Problem, filePath: string) {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= 3; attempt++) {
     await new Promise(r => setTimeout(r, 2500 * attempt));
     try {
-      const detail = await getCodeforcesProblemDetail(problem);
+      const detail = await deps.codeforces.getProblemDetail(problem);
       if (detail.tests.length > 0) {
-        const updated = updateProblemTests(filePath, detail.tests);
-        host.view?.webview.postMessage({
+        const updated = deps.workspace.updateProblemTests(filePath, detail.tests);
+        host.post({
           type: 'status',
           message: updated
             ? `已自动补充 ${detail.tests.length} 组测试数据。切换一下标签页，内置测试器即会显示样例。`
@@ -108,17 +109,17 @@ async function retryBackfill(host: WorkbenchHost, problem: Problem, filePath: st
       lastErr = e;
     }
   }
-  host.view?.webview.postMessage({
+  host.post({
     type: 'status',
     message: `自动重试 3 次仍未获取到测试数据${lastErr ? '：' + ((lastErr as any)?.message || lastErr) : ''}。可稍后用命令 “ACM Workflow: 重新获取测试数据” 补样例。`
   });
 }
 
 
-async function handleFetchWeakProblem(host: WorkbenchHost, ) {
+async function handleFetchWeakProblem(host: WorkbenchHost, deps: Pick<Services, 'codeforces' | 'records'>) {
   try {
-    const records = await listRecords();
-    const all = await getCodeforcesProblems();
+    const records = await deps.records.list();
+    const all = await deps.codeforces.getProblems();
     const byId = new Map(all.map((p) => [p.id, p]));
     const tagMap = new Map<string, { sub: Set<string>; ac: Set<string> }>();
     for (const r of records) {
@@ -148,17 +149,17 @@ async function handleFetchWeakProblem(host: WorkbenchHost, ) {
     if (pool.length > 0) {
       tag = pool[Math.floor(Math.random() * pool.length)];
       try {
-        problem = await pickCodeforcesProblem({ minRating: 800, maxRating: 2400, tags: [tag], exclude: solved });
+        problem = await deps.codeforces.pickProblem({ minRating: 800, maxRating: 2400, tags: [tag], exclude: solved });
       } catch {
         problem = null;
       }
     }
     if (!problem) {
-      problem = await pickCodeforcesProblem({ minRating: 800, maxRating: 2400, tags: [], exclude: solved });
+      problem = await deps.codeforces.pickProblem({ minRating: 800, maxRating: 2400, tags: [], exclude: solved });
       tag = '随机';
     }
-    host.view?.webview.postMessage({ type: 'weakProblem', problem, tag });
+    host.post({ type: 'weakProblem', problem, tag });
   } catch (e: any) {
-    host.view?.webview.postMessage({ type: 'weakProblem', problem: null, error: e?.message || '薄弱点推荐失败' });
+    host.post({ type: 'weakProblem', problem: null, error: e?.message || '薄弱点推荐失败' });
   }
 }

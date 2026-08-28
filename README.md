@@ -1,6 +1,6 @@
 # ACM Workflow
 
-> **VSCode 中强大的 Codeforces 刷题助手** — 选题 → 题面翻译 → 生成 → 测试 → 对拍 → 记录，全流程在编辑器内闭环。
+> **VSCode 中强大的 Codeforces 刷题工作台** — 选题 → 题面翻译 → 生成 → 测试 → 对拍 → 造数据 → 比赛 → 记录，全流程在编辑器内闭环；同时支持玻璃拟态工作台，可联动 [VSCode Background](https://github.com/caoge5524/vscode-background) 背景插件将壁纸一键设为全局背景。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-blue)](https://code.visualstudio.com/)
@@ -128,6 +128,12 @@ https://codeforces.com/gym/104053/problem/A
 ```
 
 填入 wallpaper 图库直链（建议 https）后，工作台玻璃面板会透出背景；留空则使用内置深夜景光源，正常显示。
+
+工作台壁纸栏中的 **「设为全局背景」** 会把当前壁纸一键写入联动插件 [VSCode Background](https://github.com/caoge5524/vscode-background) 的配置，让整个 VSCode（编辑器、侧边栏、状态栏等）都使用同一张壁纸。
+
+> 联动插件 GitHub：<https://github.com/caoge5524/vscode-background>
+>
+> 安装该插件后，在 ACM Workflow 工作台选择壁纸 → 点击「设为全局背景」→ 按提示重启 VSCode 即可。
 
 ---
 

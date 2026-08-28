@@ -1,6 +1,6 @@
 {
   "name": "knowledge-ladder-mobile",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "知识阶梯移动端 PWA / Capacitor 工程",
   "scripts": {

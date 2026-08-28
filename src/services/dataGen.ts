@@ -43,18 +43,23 @@ function shuffle<T>(rng: Rng, arr: T[]): T[] {
 
 // ===== 生成规格 =====
 
-export type DataGenType = 'array' | 'tree' | 'graph' | 'string' | 'permutation' | 'script';
+export type DataGenType = 'array' | 'tree' | 'graph' | 'string' | 'permutation' | 'script' | 'pipeline' | 'int' | 'line' | 'ints' | 'text' | 'newline' | 'pairs' | 'repeat';
+
+/** 流水线中的单个生成步骤；repeat 可通过 steps 嵌套一个子流水线 */
+export type DataGenStepSpec = Omit<DataGenSpec, 'type'> & { type: Exclude<DataGenType, 'pipeline'> };
 
 export interface DataGenSpec {
   type: DataGenType;
-  // array / permutation
+  /** 组合流水线/重复块：按顺序生成并拼接多段数据 */
+  steps?: DataGenStepSpec[];
+  // array / permutation / ints / pairs / repeat
   nMin?: number;
   nMax?: number;
-  // array
+  // array / int / ints / pairs
   vMin?: number;
   vMax?: number;
   sorted?: 'none' | 'asc' | 'desc';
-  // tree
+  // tree / pairs
   weighted?: boolean;
   wMin?: number;
   wMax?: number;
@@ -68,6 +73,17 @@ export interface DataGenSpec {
   charset?: string; // 'lower' | 'upper' | 'digit' | 'lowerdigit' | 自定义字符集
   // script
   scriptPath?: string;
+  // ints / text / repeat
+  sep?: string;
+  text?: string;
+  newline?: boolean;
+  // 变量绑定（int 步骤可命名，供后续 repeat 引用）
+  varName?: string;
+  // repeat：固定次数 / 引用变量 / 随机范围
+  count?: number;
+  countRef?: string;
+  countMin?: number;
+  countMax?: number;
 }
 
 // ===== 内置生成器 =====
@@ -195,6 +211,82 @@ function genPermutation(spec: DataGenSpec, rng: Rng): string {
   return `${n}\n${p.join(' ')}\n`;
 }
 
+/** 原语：单行单数，始终独占一行（傻瓜式，不用管换行） */
+function genLine(spec: DataGenSpec, rng: Rng): string {
+  const vMin = clampInt(spec.vMin, 1, -1e9, 1e9);
+  const vMax = clampInt(spec.vMax, 1e9, -1e9, 1e9);
+  const lo = Math.min(vMin, vMax);
+  const hi = Math.max(vMin, vMax);
+  return `${randInt(rng, lo, hi)}\n`;
+}
+
+/** 细粒度原语：单个数，默认不加换行；勾选 newline 才换行（进阶用） */
+function genInt(spec: DataGenSpec, rng: Rng): string {
+  const vMin = clampInt(spec.vMin, 1, -1e9, 1e9);
+  const vMax = clampInt(spec.vMax, 1e9, -1e9, 1e9);
+  const lo = Math.min(vMin, vMax);
+  const hi = Math.max(vMin, vMax);
+  let out = String(randInt(rng, lo, hi));
+  if (spec.newline) out += '\n';
+  return out;
+}
+
+/** 数量解析：优先 countRef（引用前面单数行的变量），其次固定 count，最后随机范围 */
+function resolveCount(spec: DataGenSpec, ctx: Record<string, any>, rng: Rng): number {
+  if (spec.countRef) {
+    const v = Number(ctx[spec.countRef]);
+    if (!Number.isFinite(v)) {
+      throw new Error(`数量引用了不存在的变量：${spec.countRef}`);
+    }
+    return Math.max(0, Math.round(v));
+  }
+  if (Number.isFinite(spec.count)) {
+    return Math.max(0, Math.round(spec.count || 0));
+  }
+  return randInt(rng, clampInt(spec.nMin, 5, 1, 1000000), clampInt(spec.nMax, 5, 1, 1000000));
+}
+
+/** 细粒度原语：一行多个数，可自定义分隔符，默认末尾换行 */
+function genInts(spec: DataGenSpec, rng: Rng, ctx: Record<string, any> = {}): string {
+  const n = resolveCount(spec, ctx, rng);
+  const vMin = clampInt(spec.vMin, 1, -1e9, 1e9);
+  const vMax = clampInt(spec.vMax, 1e9, -1e9, 1e9);
+  const lo = Math.min(vMin, vMax);
+  const hi = Math.max(vMin, vMax);
+  const arr = Array.from({ length: n }, () => randInt(rng, lo, hi));
+  let out = arr.join(spec.sep ?? ' ');
+  if (spec.newline !== false) out += '\n';
+  return out;
+}
+
+/** 细粒度原语：N 行，每行两个整数（如龙/边等成对数据） */
+function genPairs(spec: DataGenSpec, rng: Rng, ctx: Record<string, any> = {}): string {
+  const n = resolveCount(spec, ctx, rng);
+  const xMin = clampInt(spec.vMin, 1, -1e18, 1e18);
+  const xMax = clampInt(spec.vMax, 1e12, -1e18, 1e18);
+  const yMin = clampInt(spec.wMin, 1, -1e18, 1e18);
+  const yMax = clampInt(spec.wMax, 1e18, -1e18, 1e18);
+  const xlo = Math.min(xMin, xMax);
+  const xhi = Math.max(xMin, xMax);
+  const ylo = Math.min(yMin, yMax);
+  const yhi = Math.max(yMin, yMax);
+  const lines: string[] = [];
+  for (let i = 0; i < n; i++) {
+    lines.push(`${randInt(rng, xlo, xhi)} ${randInt(rng, ylo, yhi)}`);
+  }
+  return lines.join('\n') + '\n';
+}
+
+/** 细粒度原语：固定文本，原样输出（可含换行） */
+function genText(spec: DataGenSpec): string {
+  return spec.text ?? '';
+}
+
+/** 细粒度原语：一个换行 */
+function genNewline(): string {
+  return '\n';
+}
+
 // ===== 脚本生成器 =====
 
 const SCRIPT_RUN_TIMEOUT_MS = 15000;
@@ -284,14 +376,69 @@ async function runScript(scriptPath: string): Promise<string> {
 // ===== 统一入口 =====
 
 /** 按规格生成一组随机数据（作为程序 stdin 的文本） */
-export async function generateInput(spec: DataGenSpec, rng?: Rng): Promise<string> {
+export async function generateInput(
+  spec: DataGenSpec,
+  rng?: Rng,
+  ctx: Record<string, any> = {}
+): Promise<string> {
   const r = rng || newRng();
+
+  // 组合流水线：按顺序精确拼接（是否换行由每个步骤自己控制）
+  if (spec.type === 'pipeline') {
+    const steps = Array.isArray(spec.steps) ? spec.steps : [];
+    if (steps.length === 0) {
+      throw new Error('组合流水线至少需要一个生成步骤');
+    }
+    const parts: string[] = [];
+    for (const step of steps) {
+      const out = await generateInput(step, r, ctx);
+      if (step.varName) {
+        // 单行单数/单个数存数字，其他存原始输出，供 countRef 使用
+        ctx[step.varName] = (step.type === 'int' || step.type === 'line') ? Number(out.trim()) : out;
+      }
+      parts.push(out);
+    }
+    return parts.join('');
+  }
+
+  // 重复块：按固定次数 / 变量引用 / 随机范围，重复执行子流水线
+  if (spec.type === 'repeat') {
+    let count: number;
+    if (spec.countRef) {
+      const v = Number(ctx[spec.countRef]);
+      if (!Number.isFinite(v)) {
+        throw new Error(`重复次数引用了不存在的变量：${spec.countRef}`);
+      }
+      count = Math.max(0, Math.round(v));
+    } else if (Number.isFinite(spec.count)) {
+      count = Math.max(0, Math.round(spec.count || 0));
+    } else {
+      count = randInt(r, clampInt(spec.countMin, 1, 0, 1000000), clampInt(spec.countMax, 1, 0, 1000000));
+    }
+    const bodySteps = Array.isArray(spec.steps) ? spec.steps : [];
+    if (bodySteps.length === 0) {
+      throw new Error('重复块至少需要一个子步骤');
+    }
+    const body: DataGenSpec = { type: 'pipeline', steps: bodySteps };
+    let out = '';
+    for (let i = 0; i < count; i++) {
+      out += await generateInput(body, r, ctx);
+    }
+    return out;
+  }
+
   switch (spec.type) {
     case 'array': return genArray(spec, r);
     case 'tree': return genTree(spec, r);
     case 'graph': return genGraph(spec, r);
     case 'string': return genString(spec, r);
     case 'permutation': return genPermutation(spec, r);
+    case 'int': return genInt(spec, r);
+    case 'line': return genLine(spec, r);
+    case 'ints': return genInts(spec, r, ctx);
+    case 'pairs': return genPairs(spec, r, ctx);
+    case 'text': return genText(spec);
+    case 'newline': return genNewline();
     case 'script': return runScript(spec.scriptPath || '');
     default: throw new Error(`未知数据类型：${(spec as any).type}`);
   }

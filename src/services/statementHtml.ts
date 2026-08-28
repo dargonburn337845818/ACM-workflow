@@ -144,6 +144,38 @@ function renderInlineChildren($: cheerio.CheerioAPI, el: AnyNode, ctx: BuildCtx)
   return joinInlineChunks(chunks);
 }
 
+/**
+ * 把 CF tex-span 内的 HTML 子节点转成 LaTeX 源码。
+ * 修复：`10<sup>5</sup>` → `10^{5}`、`x<sub>i</sub>` → `x_{i}`，
+ * 斜体/加粗等行内标签按数学模式语义扁平化或转成 LaTeX 命令。
+ */
+function renderTexSpanSource($: cheerio.CheerioAPI, $el: cheerio.Cheerio<AnyNode>): string {
+  let out = '';
+  $el.contents().each((_i, node) => {
+    if (node.type === 'text') {
+      out += (node.data || '').replace(THIN_SPACES, ' ').replace(/\s+/g, ' ').trim();
+      return;
+    }
+    if (node.type !== 'tag') return;
+    const name = node.name;
+    if (name === 'sup') {
+      out += '^{' + renderTexSpanSource($, $(node)) + '}';
+    } else if (name === 'sub') {
+      out += '_{' + renderTexSpanSource($, $(node)) + '}';
+    } else if (name === 'i' || name === 'em') {
+      // 数学模式下变量默认斜体，去掉 <i>/<em> 即可，避免出现多余 HTML 标签
+      out += renderTexSpanSource($, $(node));
+    } else if (name === 'br') {
+      out += ' ';
+    } else if (name === 'b' || name === 'strong') {
+      out += '\\mathbf{' + renderTexSpanSource($, $(node)) + '}';
+    } else {
+      out += renderTexSpanSource($, $(node));
+    }
+  });
+  return out;
+}
+
 function renderInlineNode($: cheerio.CheerioAPI, node: AnyNode, ctx: BuildCtx): InlineChunk {
   if (node.type === 'text') {
     const collapsed = (node.data || '').replace(THIN_SPACES, ' ').replace(/\s+/g, ' ');
@@ -168,8 +200,8 @@ function renderInlineNode($: cheerio.CheerioAPI, node: AnyNode, ctx: BuildCtx): 
   if (name === 'span') {
     const cls = String($el.attr('class') || '');
     if (cls.includes('tex-span')) {
-      // CF 行内公式：取 span 内文本作为 LaTeX 源码（不拆分、不折叠内部），去掉外层定界符
-      const src = stripMathDelimiters($el.text().replace(THIN_SPACES, ' ').replace(/\s+/g, ' ').trim());
+      // CF 行内公式：把 span 内 HTML 转成 LaTeX 源码（不拆分、不折叠内部），去掉外层定界符
+      const src = stripMathDelimiters(renderTexSpanSource($, $el));
       if (!src) return { html: '', text: '' };
       return { html: `<span class="acm-math">${escapeHtml(src)}</span>`, text: src };
     }
@@ -304,6 +336,28 @@ function renderSampleTests($: cheerio.CheerioAPI, $root: cheerio.Cheerio<AnyNode
     if (output.trim()) out += `<div class="st-sample"><div class="st-sample-title">样例输出 ${idx}</div><pre>${escapeHtml(output)}</pre></div>`;
   });
   return out;
+}
+
+/**
+ * 从排版后的题面 HTML 中移除「样例」区块。
+ *
+ * 测试模块的「题面」页只展示题目描述/输入输出/提示；
+ * 官方样例统一放在「样例」页的可编辑用例中，不在题面页重复展示。
+ * 仅影响 Webview 渲染用的 HTML，不改变落盘/缓存中的完整题面。
+ */
+export function stripSamplesFromStatementHtml(html: string): string {
+  const $ = cheerio.load(html);
+  // 移除样例内容块（若前面紧跟「样例」标题，标题也一并移除）
+  $('.st-sample').each((_i, el) => {
+    const $prev = $(el).prev();
+    if ($prev.length && $prev.is('h2.st-h') && $prev.text().trim() === '样例') {
+      $prev.remove();
+    }
+    $(el).remove();
+  });
+  // 兜底：即使没有样例内容块，也不保留空的「样例」标题
+  $('h2.st-h').filter((_i, h) => $(h).text().trim() === '样例').remove();
+  return $('body').html() || '';
 }
 
 /* ---------------- 限制提取 ---------------- */

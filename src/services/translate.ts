@@ -17,7 +17,8 @@ const MYMEMORY = 'https://api.mymemory.translated.net/get';
 const GOOGLE = 'https://translate.googleapis.com/translate_a/single';
 const DEEPSEEK_API = 'https://api.deepseek.com/chat/completions';
 const DEFAULT_LIBRE = 'https://libretranslate.com/translate';
-const DEFAULT_LOCAL = 'http://127.0.0.1:5000/translate';
+const DEFAULT_LOCAL = 'http://127.0.0.1:11434';
+const DEFAULT_LOCAL_MODEL = 'hy-mt2:latest';
 const CONCURRENCY = 4;
 const MAX_PARAS = 30;          // 最多翻译段落数（防长题面超时/耗配额）
 const MAX_PARA_LEN = 480;      // MyMemory 免费版单请求长度限制（保守值）
@@ -27,11 +28,15 @@ const RETRY_DELAY_MS = 1000;      // 重试间隔（Bug1）
 
 const cache = new Map<string, string>();
 
-/** 翻译后端（V0.22）：auto=MyMemory+Google 兜底 / libre=LibreTranslate（端点可配）/ deepseek=DeepSeek API（密钥存 SecretStorage）/ local=本地离线 Argos（端点可配） */
+/** 翻译后端（V0.22）：auto=MyMemory+Google 兜底 / libre=LibreTranslate（端点可配）/ deepseek=DeepSeek API（密钥存 SecretStorage）/ local=本地 Ollama hy-mt2:latest（端点可配） */
 import * as vscode from 'vscode';
 import * as cheerio from 'cheerio';
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
-import { spawn } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
+import { applyGlossary } from './glossary';
+import { resolveLocalEndpoint } from '../utils/wsl';
 
 export type TranslateProvider = 'auto' | 'libre' | 'deepseek' | 'local';
 
@@ -134,8 +139,9 @@ async function translateOne(text: string, provider: TranslateProvider = 'auto', 
       if (ok) {
         const joined = parts.join(' ').trim();
         if (joined) {
-          cache.set(key, joined);
-          return joined;
+          const withGlossary = applyGlossary(text, joined);
+          cache.set(key, withGlossary);
+          return withGlossary;
         }
       }
     } catch (e) {
@@ -193,7 +199,7 @@ async function libreTranslate(text: string): Promise<string | null> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: text, source: 'en', target: 'zh', format: 'text' }),
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(60000)
     });
     if (!res.ok) return null;
     const data: any = await res.json();
@@ -204,9 +210,30 @@ async function libreTranslate(text: string): Promise<string | null> {
   }
 }
 
-/** 本地离线翻译（V0.23，端点可配置 acmWorkflow.localEndpoint，默认本机 Argos/LibreTranslate 服务） */
+/** 本地离线翻译（V0.23，端点可配置 acmWorkflow.localEndpoint，默认本机 Ollama hy-mt2:latest） */
 
 let localServerStarting: Promise<boolean> | null = null;
+let localServerProcess: ChildProcess | null = null;
+let localServerStopRequested = false;
+
+function isOllamaEndpoint(endpoint: string): boolean {
+  return !/\/translate\/?$/.test(endpoint);
+}
+
+async function ollamaModelAvailable(endpoint: string): Promise<boolean> {
+  try {
+    const target = resolveLocalEndpoint(endpoint);
+    const res = await fetch(target.replace(/\/+$/, '') + '/api/tags', {
+      signal: AbortSignal.timeout(2000)
+    });
+    if (!res.ok) return false;
+    const data: any = await res.json();
+    const models = data?.models || [];
+    return models.some((m: any) => String(m?.name || '') === DEFAULT_LOCAL_MODEL);
+  } catch {
+    return false;
+  }
+}
 
 function getLocalProbeUrl(endpoint: string): string {
   return endpoint.replace(/\/+$/, '').replace(/\/translate$/, '') + '/languages';
@@ -225,7 +252,11 @@ function getLocalServerScript(): string {
   return path.resolve(__dirname, '..', '..', 'tools', 'start_local_translate.sh');
 }
 
-async function probeLocalServer(probeUrl: string): Promise<boolean> {
+async function probeLocalServer(endpoint: string): Promise<boolean> {
+  if (isOllamaEndpoint(endpoint)) {
+    return ollamaModelAvailable(endpoint);
+  }
+  const probeUrl = getLocalProbeUrl(endpoint);
   try {
     const res = await fetch(probeUrl, { signal: AbortSignal.timeout(1200) });
     return res.ok;
@@ -234,16 +265,22 @@ async function probeLocalServer(probeUrl: string): Promise<boolean> {
   }
 }
 
-/** Windows 路径转 WSL 挂载路径（如 C:\a\b -> /mnt/c/a/b）；非 Windows 路径返回 null */
+/** Windows 路径转 WSL 路径：支持 C:\a\b -> /mnt/c/a/b，以及 \\wsl.localhost\Distro\... -> /... */
 function toWslPath(p: string): string | null {
-  const m = /^([A-Za-z]):\\(.*)$/.exec(p);
-  if (!m) return null;
-  return '/mnt/' + m[1].toLowerCase() + '/' + m[2].replace(/\\/g, '/');
+  const drive = /^([A-Za-z]):\\(.*)$/.exec(p);
+  if (drive) {
+    return '/mnt/' + drive[1].toLowerCase() + '/' + drive[2].replace(/\\/g, '/');
+  }
+  const unc = /^\\\\wsl(?:\.localhost|\$)\\+[^\\]+\\(.*)$/i.exec(p);
+  if (unc) {
+    return '/' + unc[1].replace(/\\/g, '/');
+  }
+  return null;
 }
 
 async function ensureLocalServer(endpoint: string): Promise<boolean> {
-  const probeUrl = getLocalProbeUrl(endpoint);
-  if (await probeLocalServer(probeUrl)) return true;
+  if (await probeLocalServer(endpoint)) return true;
+  localServerStopRequested = false;
   if (localServerStarting) return localServerStarting;
 
   let autoStart = true;
@@ -256,18 +293,36 @@ async function ensureLocalServer(endpoint: string): Promise<boolean> {
     const script = getLocalServerScript();
     const port = getLocalPort(endpoint);
     const root = path.resolve(__dirname, '..', '..');
+    const baseArgs = isOllamaEndpoint(endpoint)
+      ? [script, '--ollama-only']
+      : [script, '--port', String(port)];
     const attempts: { cmd: string; args: string[] }[] = [];
     if (process.platform === 'win32') {
-      attempts.push({ cmd: 'bash.exe', args: [script, '--port', String(port)] });
+      // 原生 Windows：优先直接拉起 ollama.exe serve。
+      // 之前通过 wsl.exe 调 bash 脚本，而脚本里的 cmd.exe start 在 WSL 互操作下会挂起，
+      // 导致自动启动超时。这里直接用 Windows 进程启动，最稳。
+      if (isOllamaEndpoint(endpoint)) {
+        const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+        const ollamaExe = process.env.OLLAMA_EXE || path.join(localAppData, 'Programs', 'Ollama', 'ollama.exe');
+        attempts.push(
+          fs.existsSync(ollamaExe)
+            ? { cmd: ollamaExe, args: ['serve'] }
+            : { cmd: 'ollama.exe', args: ['serve'] }
+        );
+      }
       const wslScript = toWslPath(script);
+      // WSL UNC 路径时只走 wsl.exe，避免 Windows 直接执行 UNC 路径报“找不到 \ 文件”
       if (wslScript) {
-        attempts.push({ cmd: 'wsl.exe', args: ['bash', '-lc', `"${wslScript}" --port ${port}`] });
+        attempts.push({ cmd: 'wsl.exe', args: ['bash', '-lc', `"${wslScript}" ${baseArgs.slice(1).map(a => `'${a}'`).join(' ')}`] });
+      } else {
+        attempts.push({ cmd: 'bash.exe', args: baseArgs });
       }
     } else {
-      attempts.push({ cmd: 'bash', args: [script, '--port', String(port)] });
+      attempts.push({ cmd: 'bash', args: baseArgs });
     }
 
     for (const attempt of attempts) {
+      if (localServerStopRequested) return false;
       console.log(`[ACM-Workflow][翻译] 本地翻译服务未启动，尝试自动拉起: ${attempt.cmd} ${attempt.args.join(' ')}`);
       let spawnFailed = false;
       const child = spawn(attempt.cmd, attempt.args, {
@@ -275,16 +330,22 @@ async function ensureLocalServer(endpoint: string): Promise<boolean> {
         stdio: 'ignore',
         detached: false,
       });
+      localServerProcess = child;
       child.on('error', (err) => {
         spawnFailed = true;
+        if (localServerProcess === child) localServerProcess = null;
         console.warn(`[ACM-Workflow][翻译] 自动启动本地翻译服务失败（${attempt.cmd}）：`, err);
       });
-      for (let i = 0; i < 16; i++) {
-        if (spawnFailed) break;
+      child.on('exit', () => {
+        if (localServerProcess === child) localServerProcess = null;
+      });
+      for (let i = 0; i < 80; i++) {
+        if (spawnFailed || localServerStopRequested) break;
         await new Promise((r) => setTimeout(r, 500));
-        if (await probeLocalServer(probeUrl)) return true;
+        if (await probeLocalServer(endpoint)) return true;
       }
-      if (await probeLocalServer(probeUrl)) return true;
+      if (localServerStopRequested) return false;
+      if (await probeLocalServer(endpoint)) return true;
     }
 
     console.warn('[ACM-Workflow][翻译] 本地翻译服务自动启动超时，请手动运行 tools/start_local_translate.sh');
@@ -294,6 +355,63 @@ async function ensureLocalServer(endpoint: string): Promise<boolean> {
   return localServerStarting;
 }
 
+/** 停止由扩展拉起的本地翻译服务（VS Code 关闭时调用）。 */
+export function stopLocalServer(): void {
+  localServerStopRequested = true;
+  if (localServerProcess && !localServerProcess.killed) {
+    console.log('[ACM-Workflow][翻译] 停止本地翻译服务');
+    localServerProcess.kill();
+  }
+  localServerProcess = null;
+  localServerStarting = null;
+}
+
+/** 直接调用本机 Ollama hy-mt2:latest 翻译（默认 local 后端）。 */
+async function ollamaChatTranslate(text: string, endpoint: string, model: string): Promise<string | null> {
+  try {
+    const system = (
+      'You are a professional competitive-programming translator. ' +
+      'Translate the given English text into Simplified Chinese. ' +
+      'Keep math expressions (like $x$, $a_i$), code identifiers, numbers, ' +
+      'LaTeX and placeholder tokens (like MATH0, MATH1) unchanged. ' +
+      'Output only the translation, no explanations.'
+    );
+    const payload = {
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: text }
+      ],
+      stream: false,
+      keep_alive: '3m',
+      options: {
+        temperature: 0.3,
+        num_ctx: 2048,
+        num_predict: 512,
+        repeat_penalty: 1.1
+      }
+    };
+    const target = resolveLocalEndpoint(endpoint);
+    const res = await fetch(target.replace(/\/+$/, '') + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000)
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.warn(`[ACM-Workflow][翻译] Ollama 翻译请求失败 HTTP ${res.status}: ${body.slice(0, 200)}`);
+      return null;
+    }
+    const data: any = await res.json();
+    const t = String(data?.message?.content || '').trim();
+    return t && t !== text ? t : null;
+  } catch (e: any) {
+    console.warn('[ACM-Workflow][翻译] Ollama 翻译请求异常：', e?.message || e);
+    return null;
+  }
+}
+
 async function localTranslate(text: string): Promise<string | null> {
   try {
     let endpoint = DEFAULT_LOCAL;
@@ -301,11 +419,14 @@ async function localTranslate(text: string): Promise<string | null> {
       endpoint = vscode.workspace.getConfiguration('acmWorkflow').get<string>('localEndpoint', DEFAULT_LOCAL) || DEFAULT_LOCAL;
     } catch { /* 单测环境用默认 */ }
     if (!(await ensureLocalServer(endpoint))) return null;
+    if (isOllamaEndpoint(endpoint)) {
+      return await ollamaChatTranslate(text, endpoint, DEFAULT_LOCAL_MODEL);
+    }
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: text, source: 'en', target: 'zh', format: 'text' }),
-      signal: AbortSignal.timeout(15000)
+      signal: AbortSignal.timeout(60000)
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
@@ -431,7 +552,7 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
     if (!results[k]) { out[j.index] = null; return; }
     let zh = results[k];
     const used = new Set<number>();
-    // V0.26：用 MATH{n} 占位符（Argos 实测可原样保留）；同时兼容旧 ☃、{n}}、XQn☃ 等被本地模型改写的形式
+    // V0.26：用 MATH{n} 占位符（Ollama hy-mt2:latest 实测可原样保留）；同时兼容旧 ☃、{n}}、XQn☃ 等被本地模型改写的形式
     const restoreMath = (_m: string, n: string) => {
       const mi = Number(n);
       used.add(mi);

@@ -22,7 +22,7 @@ function problemFromCompanion(raw: any): { problem: Problem; tests: { input: str
     output: String(t?.output ?? '')
   }));
 
-  const platform: 'codeforces' = 'codeforces';
+  const platform = 'codeforces' as const;
   let id = '';
   if (url.includes('codeforces.com')) {
     const m = /problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/.exec(url)

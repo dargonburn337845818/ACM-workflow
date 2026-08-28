@@ -1,0 +1,41 @@
+name: Build Wallpaper Export EXE
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build EXE
+        run: |
+          python -m PyInstaller --noconfirm --onefile --windowed --name WallpaperExport --collect-all tkinter tools/export_we_wallpaper.py
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: WallpaperExport-Windows
+          path: dist/WallpaperExport.exe
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/WallpaperExport.exe
+          generate_release_notes: true

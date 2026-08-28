@@ -33,25 +33,9 @@
 | Windows | [MinGW-w64](https://www.mingw-w64.org/)（解压后把 `bin` 加入 PATH）或 MSYS2（`pacman -S mingw-w64-x86_64-gcc`） |
 | macOS | 终端运行 `xcode-select --install` |
 | Linux | `sudo apt install g++` / `sudo dnf install gcc-c++` |
-| WSL | `bash tools/setup_wsl.sh` |
 
 扩展自动探测：PATH → `C:\mingw64\bin\g++.exe` → `C:\msys64\mingw64\bin\g++.exe` →
 mingw-w64 安装器默认路径 → `/usr/bin/g++`。安装后重启 VS Code 再试。
-
-## 2.5 WSL 环境 / 浏览器问题
-
-- **WSL 里打不开浏览器（登录 / 提交）**：
-  1. 运行 `bash tools/setup_wsl.sh` 安装 Chromium；
-  2. 或在设置里配置 `acmWorkflow.browserPath` 指向 Windows 侧浏览器：
-     ```jsonc
-     {
-       "acmWorkflow.browserPath": "/mnt/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-     }
-     ```
-- **路径设置从 Windows 带过来不生效**：`baseDir` / `templatePath` / `dbPath` / `browserPath`
-  支持自动把 `C:\...` 转成 `/mnt/c/...`，一般无需手动改；如果发现没生效，请确认 VS Code
-  的 Remote 窗口确实连接到了 WSL（左下角显示 `WSL: Ubuntu`）。
-- **工作流诊断**：`ACM Workflow: 工作流诊断` 会显示 python3 探测结果，并包含 Codeforces 主页/API 连通性、最近操作轨迹与发现的问题（轨迹异常）。
 
 ## 3. CF 访问慢 / 超时
 
@@ -61,36 +45,29 @@ mingw-w64 安装器默认路径 → `/usr/bin/g++`。安装后重启 VS Code 再
   仍慢可用 hosts 加速（把 `codeforces.com` 解析到的 IPv4 写入 hosts）
 - **频繁 403 / 限流**：登录一次 CF 会话（工作台顶部「登录」），登录态会自动用于所有抓取
 
-## 4. 提交（Submit）问题
-
-- **浏览器没弹出来**：提交依赖系统 Chrome/Edge/Chromium（puppeteer-core 不内置浏览器）。Windows 一般自带 Edge；WSL 可运行 `bash tools/setup_wsl.sh` 或配置 `acmWorkflow.browserPath`
-- **提交后判定超时**：轮询上限约 90s，超时会提示去 CF 页面手动查看
-- **凭证**：Handle/密码存系统密钥链，忘记或想换 → 再次提交时输入新凭证会覆盖
-- **登录态失效**：CF 会话约 30 天过期，API 403 会自动清除并提示重新登录
-
-## 5. 记录库问题
+## 4. 记录库问题
 
 - **统计全零 / 按钮无响应**：多为数据库目录不可写。`dbPath` 的父目录必须存在且可写
   （扩展会自动创建 `{baseDir}` 与 `dbPath` 父目录，但请确认没有权限限制）
 - **想重置**：删除 `{baseDir}/records.db`（或配置里换 `dbPath`）即全新开始，不影响已生成题目
 - **数据库格式**：标准 SQLite（sql.js WASM 实现），可用任何 SQLite 工具打开
 
-## 6. 美化（Beautify）问题
+## 5. 美化（Beautify）问题
 
 - **应用后界面怪怪的**：运行 `ACM Workflow: 还原美化` 一键恢复
 - **浅色主题**：应用前会提示先切深色主题（硬边墨色配色基于深色设计）
 
-## 7. 其他
+## 6. 其他
 
 | 问题 | 处理 |
 |---|---|
 | 端口 27121 被占用 | 配置 `acmWorkflow.companionPort` 换端口，浏览器插件同步修改 |
 | 批量补样例失败 | 命令「批量补充测试数据」会逐题抓取，网络慢时可能耗时较长 |
-| 翻译为空 | 免费后端有日限额（MyMemory ~5000 字符/天），换 `libre`/`deepseek` 或次日再试 |
+| 翻译为空 | 免费后端有日限额（MyMemory ~5000 字符/天），换 `libre`/`deepseek` 或次日再试；`local` 模式请确认 Ollama `hy-mt2:latest` 已就绪并运行 `tools/start_local_translate.sh --ollama-only` |
 | 扩展更新后行为异常 | 重启 VS Code；仍异常可查看输出面板 `ACM Workflow` 频道日志 |
 | 想反馈 Bug / 提需求 | GitHub Issues（附「工作流诊断」输出/报告与复现步骤） |
 
-## 8. 日志位置
+## 7. 日志位置
 
 - **扩展日志**：输出面板 → 下拉选 `ACM Workflow`（前缀 `[ACM-Workflow]`）
 - **设置恢复**：美化/沉浸功能会备份原设置，还原命令一键恢复，不会动你的其他配置

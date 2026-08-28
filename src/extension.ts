@@ -95,27 +95,28 @@ export function activate(context: vscode.ExtensionContext) {
     await services.support.restoreBeautify();
   });
 
-  // 全局壁纸：把当前选中的壁纸写入 shalldie/vscode-background 插件配置
+  // 全局壁纸：把当前选中的壁纸写入 caoge5524/vscode-background 插件配置并触发应用
   registerTracedCommand(context, services, 'acmWorkflow.applyGlobalWallpaper', async () => {
     const wallpaperPath = vscode.workspace.getConfiguration('acmWorkflow').get<string>('glassBackground', '');
     if (!wallpaperPath) {
       vscode.window.showWarningMessage('请先在工作台「壁纸」中选择一张壁纸，再设为全局壁纸。');
       return;
     }
-    const bgCfg = vscode.workspace.getConfiguration('background');
+    const bgCfg = vscode.workspace.getConfiguration('vscodeBackground');
     await bgCfg.update('enabled', true, vscode.ConfigurationTarget.Global);
-    await bgCfg.update('customImages', [wallpaperPath], vscode.ConfigurationTarget.Global);
-    await bgCfg.update('imagePath', wallpaperPath, vscode.ConfigurationTarget.Global);
-    await bgCfg.update('style', ['cover', 'center', 'no-repeat', 'fixed'], vscode.ConfigurationTarget.Global);
-    await bgCfg.update('applyPatch', true, vscode.ConfigurationTarget.Global);
-    // 尝试触发常见背景插件的启用命令（不同 fork 命令名可能不同，失败不报错）
-    for (const cmd of ['background.applyPatch', 'background.enable', 'background.apply']) {
-      try {
-        await vscode.commands.executeCommand(cmd);
-      } catch { /* ignore */ }
-    }
+    await bgCfg.update('videos', [wallpaperPath], vscode.ConfigurationTarget.Global);
+    await bgCfg.update('transitions', ['zoom'], vscode.ConfigurationTarget.Global);
+    await bgCfg.update('opacity', 0.8, vscode.ConfigurationTarget.Global);
+    await bgCfg.update('switchInterval', 0, vscode.ConfigurationTarget.Global);
+    await bgCfg.update('theme', 'glass', vscode.ConfigurationTarget.Global);
+    // 触发 caoge5524/vscode-background 的安装命令，让配置立即生效
+    try {
+      await vscode.commands.executeCommand('vscode-background.install');
+    } catch { /* 插件未安装时忽略，稍后提示安装 */ }
     vscode.window.showInformationMessage(
-      '已写入全局背景配置。\n\n请执行该背景插件的启用命令（如 "Background: Enable"），然后 Reload Window。'
+      '已写入 VSCode Background 插件配置。\n\n' +
+      '请安装联动插件：https://github.com/caoge5524/vscode-background\n' +
+      '安装后按插件提示重启 VSCode 即可显示全局背景。'
     );
   });
 

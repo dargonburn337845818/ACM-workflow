@@ -1,8 +1,10 @@
 # 知识阶梯 · 移动端（PWA / Capacitor）
 
-这是从 `knowledge-ladder` 桌面版抽出的移动端版本。
+这是从 `knowledge-ladder` 桌面版抽出的移动端版本，按“不能写代码、只能练拆题”的场景做了精简：
 
-- 手机浏览器直接打开 `www/index.html` 即可体验（建议用本地 http 服务，方便 Service Worker）。
+- **两个功能：拆题 + 进度**，没有模板，保持轻量。
+- 拆题页：四种信息操作 + 四步选择题，选完马上给方向。
+- 进度页：按档位勾选已掌握，可点「信息」看算法的简洁说明（无 C++ 模板）。
 - 进度保存在 `localStorage`，离线可用。
 - 要生成 Android APK 时，用 Capacitor 把它包装成原生 WebView 应用。
 
