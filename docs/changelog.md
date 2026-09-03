@@ -2,11 +2,14 @@
 
 版本号遵循语义化版本。本文件记录正式版本迭代历史。
 
-## Unreleased — 本地翻译切换到 llama.cpp
+## 0.21.3 — Spark 本地模型 / 下拉框修复 / CI（2026-09-03）
 
-- 本地翻译后端从 Ollama 切换到 Windows 侧 llama.cpp：自动拉起 `D:\llama\llama-server.exe`，直接调用 OpenAI 兼容接口 `/v1/chat/completions`
-- 启动参数按模型卡/低消耗调优：`--ctx-size 4096`、`--batch-size 512`、`--threads 4`、`--parallel 1`、`--no-webui`、`--jinja`
-- 新增 `acmWorkflow.llamaDir` / `acmWorkflow.llamaModel` / `acmWorkflow.llamaThreads` 配置，诊断与配置引导同步识别 llama-server
+- 造数据页新增「AI 生成脚本」：读取当前题面调用本地 Spark 生成 Python 造数据脚本，自动验证、覆盖 `gen.py` 并插入流水线
+- Spark 生命周期：自动拉起、空闲 3 分钟自动停止释放显存、GPU 全量低上下文调优；不抢占本地翻译服务
+- 新增 `acmWorkflow.spark*` 全套配置
+- 修复下拉框完全白色、鼠标扫过才显示内容的问题（`select`/`option` 深色配色）
+- 修复 Spark 启动失败：`--ngl` 改为当前 llama.cpp 构建支持的 `-ngl`
+- 新增 GitHub Actions CI：lint / test / compile
 
 ## 0.21.0 — 可组装对拍器 / 造数据流水线 / 联动 VSCode Background（2026-08-28）
 
