@@ -1,9 +1,12 @@
 # Changelog
 
-最新版本：**0.21.0**（可组装对拍器 / 造数据流水线 / 联动 VSCode Background）。
+最新版本：**0.21.3**（修复 Spark 启动参数 `--ngl` → `-ngl`）。
+上一版本：**0.21.2**（Spark 本地模型生成造数据脚本 / 下拉框深色修复）。
 
 完整迭代历史见 [docs/changelog.md](docs/changelog.md)：
 
+- **0.21.3** 修复 Spark 本地模型启动失败：当前 `D:\llama-spark\build\bin\llama-server.exe` 只接受短参数 `-ngl`，不接受 `--ngl`；已同步修正 `src/services/spark.ts` 与 `tools/start_spark.sh`。
+- **0.21.2** 集成本地 Spark 模型（`D:\llama\Spark-X2.5-4B-Q8_0` + `D:\llama-spark\build\bin\llama-server.exe`）：造数据页新增「AI 生成脚本」按钮，自动取当前题目题面让 Spark 生成 Python 造数据脚本；生成后自动运行验证、覆盖 `gen.py` 并插入/更新造数据流水线中的自定义脚本步骤；新增 `acmWorkflow.spark*` 全套配置；Spark 空闲 3 分钟自动停止释放显存、下次点击自动拉起；与本地翻译服务可共存且不抢占翻译；修复下拉框完全白色、鼠标拖动才显示内容的问题（`select`/`option` 深色配色）。
 - **0.21.0** 对拍器升级为可组装：造数据改为「只流水线拼装」，去掉顶层预设类型；新增细粒度原语（单行单数 / 单个数 / 一行多个数 / 每行两个数 / 固定文本 / 换行 / 重复块），支持单行单数绑定变量、一行多个数/每行两个数直接引用变量当数量，傻瓜式拼装无需手动空格换行；多步精确拼接且每个步骤参数独立保留（换类型不再重置其他步骤数据）；比对方式支持 精确 / Token / 浮点误差 / Special Judge（外部 checker，`.cpp` / `.py` / `.js` / `.exe`）。新增与 [VSCode Background](https://github.com/caoge5524/vscode-background) 的联动：工作台「设为全局背景」可将当前壁纸一键应用到整个 VSCode。
 - **0.20.5** 测试模块「样例」页改为适应性窗口：占满可用宽度，输入/期望输出随窗口自动单列或双列；用例框拉长（默认 120px，最大 480px / 60vh），查看更舒适。
 - **0.20.4** 插件瘦身：移除工作台内「知识导论」模块，知识导论已拆分为独立本地小程序 `knowledge-ladder/`（PySide6 + Windows 便携 exe）；插件保持简洁，选题、测试、对拍、比赛、记录等核心功能不变。

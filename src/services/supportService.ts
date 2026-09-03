@@ -13,6 +13,7 @@ import {
 } from './diagnostics';
 import { runSetupGuide } from './setupGuide';
 import { stopLocalServer } from './translate';
+import { stopSparkServer } from './spark';
 
 /**
  * SupportService facade：封装诊断、环境配置引导、美化、浏览器探测与
@@ -53,8 +54,9 @@ export class SupportService {
     return getBrowserPath();
   }
 
-  /** 释放扩展拉起的本地翻译服务（VS Code 关闭时调用）。 */
+  /** 释放扩展拉起的本地翻译与 Spark 服务（VS Code 关闭时调用）。 */
   dispose(): void {
     stopLocalServer();
+    stopSparkServer();
   }
 }

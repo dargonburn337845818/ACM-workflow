@@ -23,6 +23,8 @@ records.db
 .pw-fonts-data/
 .npm-cache/
 tools/shots/
+tools/.llama-server.pid
+tools/.spark-server.pid
 .cph-cookies.txt
 
 # 系统与编辑器

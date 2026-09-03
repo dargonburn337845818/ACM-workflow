@@ -2,6 +2,12 @@
 
 版本号遵循语义化版本。本文件记录正式版本迭代历史。
 
+## Unreleased — 本地翻译切换到 llama.cpp
+
+- 本地翻译后端从 Ollama 切换到 Windows 侧 llama.cpp：自动拉起 `D:\llama\llama-server.exe`，直接调用 OpenAI 兼容接口 `/v1/chat/completions`
+- 启动参数按模型卡/低消耗调优：`--ctx-size 4096`、`--batch-size 512`、`--threads 4`、`--parallel 1`、`--no-webui`、`--jinja`
+- 新增 `acmWorkflow.llamaDir` / `acmWorkflow.llamaModel` / `acmWorkflow.llamaThreads` 配置，诊断与配置引导同步识别 llama-server
+
 ## 0.21.0 — 可组装对拍器 / 造数据流水线 / 联动 VSCode Background（2026-08-28）
 
 - 对拍器升级为可组装：比对方式支持精确 / Token / 浮点误差 / Special Judge（外部 checker）

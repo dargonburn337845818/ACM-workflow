@@ -4,7 +4,7 @@
  * 职责：
  *  - 检查本地翻译服务/模型是否可用；
  *  - 如果 local 后端缺少模型或服务未启动，询问用户是否安装；
- *  - 提供 Ollama/hy-mt2:latest 的检查与安装帮助，失败时把具体原因展示出来，方便用户直接问 AI。
+ *  - 提供 llama.cpp/hy-mt2:latest 的检查与启动帮助，失败时把具体原因展示出来，方便用户直接问 AI。
  */
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -19,9 +19,9 @@ export interface LocalTranslationStatus {
 }
 
 const MIRROR_LINES = [
-  'Ollama 官网: https://ollama.com',
-  '拉取翻译模型: ollama pull hy-mt2:latest',
-  '启动 Ollama: 在 Windows 托盘打开 Ollama，或运行 ollama serve'
+  '模型文件: D:\\llama\\Hy-MT2-1.8B-Q6_K.gguf',
+  '启动服务: D:\\llama\\llama-server.exe -m D:\\llama\\Hy-MT2-1.8B-Q6_K.gguf --host 0.0.0.0 --port 11434 --ctx-size 4096 --no-webui --jinja --alias hy-mt2:latest',
+  '自动检查: bash tools/setup_local_translate.sh'
 ];
 
 /** 检查当前 local 翻译后端是否真的可用（服务 + en->zh 模型）。 */
@@ -40,11 +40,12 @@ export async function checkLocalTranslationStatus(): Promise<LocalTranslationSta
     return { ok: true, reason: `当前后端为 ${provider}，不需要本地翻译模型`, provider, endpoint };
   }
 
-  const isOllama = !/\/translate\/?$/.test(endpoint);
+  const isDirectApi = !/\/translate\/?$/.test(endpoint);
   const effectiveEndpoint = resolveLocalEndpoint(endpoint);
-  const probeUrl = isOllama
-    ? effectiveEndpoint.replace(/\/+$/, '') + '/api/tags'
-    : effectiveEndpoint.replace(/\/+$/, '').replace(/\/translate$/, '') + '/languages';
+  const base = effectiveEndpoint.replace(/\/+$/, '');
+  const probeUrl = isDirectApi
+    ? (base.endsWith('/v1') ? base : base + '/v1') + '/models'
+    : base.replace(/\/translate$/, '') + '/languages';
   try {
     const dispatcher = getFetchDispatcher();
     const res = await fetch(probeUrl, {
@@ -56,13 +57,13 @@ export async function checkLocalTranslationStatus(): Promise<LocalTranslationSta
       return { ok: false, reason: `本地服务返回 HTTP ${res.status}，端点：${endpoint}`, provider, endpoint };
     }
     const data: any = await res.json().catch(() => null);
-    if (isOllama) {
-      const models = data?.models || [];
-      const has = models.some((m: any) => String(m?.name || '') === 'hy-mt2:latest');
+    if (isDirectApi) {
+      const models = data?.data || [];
+      const has = models.some((m: any) => String(m?.id || '') === 'hy-mt2:latest');
       if (!has) {
-        return { ok: false, reason: 'Ollama 已连接，但未找到 hy-mt2:latest 模型', provider, endpoint };
+        return { ok: false, reason: 'llama-server 已连接，但未找到 hy-mt2:latest 模型别名', provider, endpoint };
       }
-      return { ok: true, reason: '本地 Ollama hy-mt2:latest 翻译服务正常', provider, endpoint };
+      return { ok: true, reason: '本地 llama.cpp hy-mt2:latest 翻译服务正常', provider, endpoint };
     }
     if (!Array.isArray(data)) {
       return { ok: false, reason: `本地 /languages 返回格式异常，端点：${endpoint}`, provider, endpoint };
@@ -70,9 +71,9 @@ export async function checkLocalTranslationStatus(): Promise<LocalTranslationSta
     const en = data.find((l: any) => String(l.code || '').toLowerCase() === 'en');
     const hasZh = en && Array.isArray(en.targets) && en.targets.some((t: any) => String(t).toLowerCase() === 'zh');
     if (!hasZh) {
-      return { ok: false, reason: '本地服务已启动，但未找到 Ollama hy-mt2:latest 模型', provider, endpoint };
+      return { ok: false, reason: '本地服务已启动，但未找到 llama.cpp hy-mt2:latest 模型', provider, endpoint };
     }
-    return { ok: true, reason: '本地 Ollama hy-mt2:latest 翻译服务正常', provider, endpoint };
+    return { ok: true, reason: '本地 llama.cpp hy-mt2:latest 翻译服务正常', provider, endpoint };
   } catch (e: any) {
     return { ok: false, reason: `连接本地服务失败：${e?.message || e}`, provider, endpoint };
   }
@@ -95,7 +96,7 @@ function toWslPath(p: string): string | null {
 export function openSetupTerminal(context: vscode.ExtensionContext): void {
   const script = path.join(context.extensionPath, 'tools', 'setup_local_translate.sh');
   const env = [
-    'OLLAMA_MODEL=hy-mt2:latest'
+    'LLAMA_MODEL_ALIAS=hy-mt2:latest'
   ].join(' ');
 
   let cmd: string;
@@ -110,7 +111,7 @@ export function openSetupTerminal(context: vscode.ExtensionContext): void {
 
   const terminal = vscode.window.createTerminal({
     name: 'ACM Workflow 本地翻译安装',
-    message: '正在准备检查/安装本地 Ollama 翻译模型…'
+    message: '正在准备检查/启动本地 llama.cpp 翻译模型…'
   });
   terminal.show();
   terminal.sendText(cmd);

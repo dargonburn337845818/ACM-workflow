@@ -43,7 +43,7 @@ https://codeforces.com/gym/104053/problem/A
 ### 📖 题面与翻译
 
 - 抓取即排版：标题、限制、公式、图片、输入输出格式、样例、提示
-- 自动翻译为中文，支持 **MyMemory / LibreTranslate / DeepSeek / 本地 Ollama hy-mt2:latest** 多后端
+- 自动翻译为中文，支持 **MyMemory / LibreTranslate / DeepSeek / 本地 llama.cpp hy-mt2:latest** 多后端
 - 中英对照渲染，可切换 双语 / 仅译文 / 仅原文
 - 三级缓存保障：题目文件夹落盘 → 30 天全局缓存 → 简易渲染兜底，断网也能读
 
@@ -70,6 +70,7 @@ https://codeforces.com/gym/104053/problem/A
 - 傻瓜式拼装：单行单数绑定变量，一行多个数/每行两个数直接引用变量当数量，不需要手动拼空格和换行
 - 变量联动：单行单数可绑定变量名，供后续数量/重复块引用
 - 支持自定义脚本：`.js` / `.py` / `.cpp`，生成结果只在造数据页预览，不自动覆盖测试样例
+- **AI 生成脚本**：`AI 生成脚本` 按钮调用本地 Spark 模型，根据当前题目题面自动生成 Python 造数据脚本，验证通过后覆盖 `gen.py` 并自动插入造数据流水线
 - 生成后可预览、保存为 `data_*.txt`
 
 ### 📊 刷题记录
@@ -191,8 +192,21 @@ npm run compile
 | `acmWorkflow.companionPort` | `27121` | competitive-companion 接收端口 |
 | `acmWorkflow.translateProvider` | `auto` | 翻译后端：`auto` / `libre` / `local` / `deepseek`（DeepSeek 密钥存系统密钥链） |
 | `acmWorkflow.libreEndpoint` | LibreTranslate 官方 | 自建 LibreTranslate 实例端点 |
-| `acmWorkflow.localEndpoint` | `http://127.0.0.1:11434` | 本地翻译端点（默认直接使用 Ollama `hy-mt2:latest`） |
-| `acmWorkflow.localAutoStart` | `true` | `local` 后端未启动时，扩展自动拉起 Ollama `hy-mt2:latest` |
+| `acmWorkflow.localEndpoint` | `http://127.0.0.1:11434` | 本地翻译端点（默认直接使用 llama.cpp `hy-mt2:latest`） |
+| `acmWorkflow.localAutoStart` | `true` | `local` 后端未启动时，扩展自动拉起 Windows 侧 `D:\llama\llama-server.exe` |
+| `acmWorkflow.llamaDir` | `D:\llama` | llama.cpp 目录（含 llama-server.exe 与 GGUF） |
+| `acmWorkflow.llamaModel` | `Hy-MT2-1.8B-Q6_K.gguf` | 本地翻译 GGUF 模型文件名 |
+| `acmWorkflow.llamaThreads` | `4` | llama-server CPU 线程数（默认低消耗） |
+| `acmWorkflow.sparkEndpoint` | `http://127.0.0.1:8080` | Spark 本地模型端点（llama.cpp OpenAI 兼容接口） |
+| `acmWorkflow.sparkServerPath` | `D:\llama-spark\build\bin\llama-server.exe` | Spark 使用的 llama-server.exe（CUDA DLL 同目录） |
+| `acmWorkflow.sparkModelPath` | `D:\llama\Spark-X2.5-4B-Q8_0\Spark-X2.5-4B-Q8_0.gguf` | Spark GGUF 模型文件 |
+| `acmWorkflow.sparkModelName` | `spark:latest` | Spark 在 llama-server 中的模型别名 |
+| `acmWorkflow.sparkAutoStart` | `true` | 使用 Spark 时未启动则自动拉起 |
+| `acmWorkflow.sparkIdleTimeoutMs` | `180000` | Spark 空闲自动停止毫秒数（3 分钟，0=不自动停止） |
+| `acmWorkflow.sparkCtxSize` | `16384` | Spark 上下文长度（低占用调优） |
+| `acmWorkflow.sparkThreads` | `8` | Spark CPU 线程数 |
+| `acmWorkflow.sparkGpuLayers` | `99` | Spark GPU 层数（全量加速） |
+| `acmWorkflow.sparkScriptPath` | `D:\vscode_code\code\shell\gen.py` | AI 生成的 Python 造数据脚本固定保存路径 |
 | `acmWorkflow.browserPath` | `""`（自动探测） | Puppeteer 浏览器路径；留空自动探测 Edge/Chrome/Chromium |
 | `acmWorkflow.followHandles` | `[]` | 比赛「我的关注」额外 Handle（自己的自动包含） |
 | `acmWorkflow.proxy` | `""` | CF 网络代理（扩展请求不跟随系统代理，需代理时填写） |
@@ -248,7 +262,7 @@ src/
 ├── types/                    # 统一类型定义
 └── utils/
     └── paths.ts              # 路径解析（配置化，跨平台默认）
-tools/                        # 本地翻译：Ollama hy-mt2:latest 安装/启动脚本 + HTTP 服务
+tools/                        # 本地翻译：llama.cpp hy-mt2:latest 启动/检查脚本 + HTTP 服务
 media/                        # 工作台前端（main.js / style.css / icon / walkthrough）
 tests/smoke.js                # 冒烟测试（无 VS Code 环境可跑）
 docs/                         # 完整文档

@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, QStandardPaths, QUrl
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, QSizeF, Qt, QStandardPaths, QUrl
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QMovie, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFrame,
+    QGraphicsScene,
+    QGraphicsView,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -53,8 +55,8 @@ from info_framework import (
     get_alg_info,
 )
 try:
-    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
-    from PySide6.QtMultimediaWidgets import QVideoWidget
+    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoSink
+    from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
     HAS_MEDIA = True
 except ImportError:
     HAS_MEDIA = False
@@ -85,56 +87,56 @@ QWidget#appBody, QWidget#rightContainer {
 }
 
 QFrame#titleBar {
-    background: rgba(0, 0, 0, 0.18);
+    background: rgba(0, 0, 0, 0.30);
     border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
 QWidget#sidebar {
-    background: rgba(0, 0, 0, 0.14);
+    background: rgba(0, 0, 0, 0.28);
     border-right: 1px solid rgba(255,255,255,0.05);
 }
 
 QPushButton {
-    background: rgba(0, 0, 0, 0.24);
+    background: rgba(0, 0, 0, 0.34);
     border: 1px solid rgba(255,255,255,0.10);
-    color: rgba(255,255,255,0.92);
+    color: rgba(255,255,255,0.94);
 }
 
 QPushButton#dissectNext,
 QPushButton#dissectRestart,
 QPushButton#next {
-    background: rgba(228, 184, 99, 0.12);
-    border: 1px solid rgba(228, 184, 99, 0.35);
+    background: rgba(228, 184, 99, 0.16);
+    border: 1px solid rgba(228, 184, 99, 0.38);
     color: #F3DCA8;
 }
 
 QListWidget#tierList::item {
-    background: rgba(0, 0, 0, 0.18);
+    background: rgba(0, 0, 0, 0.30);
     border: 1px solid rgba(255,255,255,0.06);
 }
 
 QListWidget#tierList::item:selected {
-    background: rgba(228, 184, 99, 0.14);
-    border-color: rgba(228, 184, 99, 0.4);
+    background: rgba(228, 184, 99, 0.18);
+    border-color: rgba(228, 184, 99, 0.45);
     color: #F3DCA8;
 }
 
 QFrame#tagRow,
 QLabel#dissectNode,
 QLabel#dissectThinkCard {
-    background: rgba(0, 0, 0, 0.18);
+    background: rgba(0, 0, 0, 0.30);
     border: 1px solid rgba(255,255,255,0.06);
 }
 
 QFrame#dissectAcrylic {
-    background: rgba(0, 0, 0, 0.16);
-    border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(0, 0, 0, 0.30);
+    border: 1px solid rgba(255,255,255,0.06);
 }
 
 QFrame#diagramNode,
 QPushButton#diagramNodeButton {
-    background: rgba(0, 0, 0, 0.16);
-    border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(0, 0, 0, 0.30);
+    border: 1px solid rgba(255,255,255,0.06);
 }
 
 QWidget#dissectContent {
@@ -1524,6 +1526,7 @@ class MainWindow(QMainWindow):
 
         body = QWidget()
         body.setObjectName("appBody")
+        self.body = body
         body_layout = QHBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
         body_layout.setSpacing(0)
@@ -1717,10 +1720,23 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "centralWidget"):
             return
         rect = self.centralWidget().rect()
-        for attr in ("_video_widget", "_gif_label", "_image_label"):
+        for attr in ("_video_widget", "_video_view", "_video_label", "_gif_label", "_image_label"):
             layer = getattr(self, attr, None)
             if layer is not None:
                 layer.setGeometry(rect)
+        item = getattr(self, "_video_item", None)
+        if item is not None:
+            item.setSize(QSizeF(rect.width(), rect.height()))
+            scene = getattr(self, "_video_scene", None)
+            if scene is not None:
+                scene.setSceneRect(0, 0, rect.width(), rect.height())
+
+    def _raise_ui_above_wallpaper(self):
+        """确保主界面控件永远在壁纸层上方。"""
+        if hasattr(self, "body"):
+            self.body.raise_()
+        if hasattr(self, "title_bar"):
+            self.title_bar.raise_()
 
     def _update_window_effect(self):
         # 扁平简约：不使用窗口阴影，避免四边出现多余暗角
@@ -1851,6 +1867,7 @@ class MainWindow(QMainWindow):
         label.lower()
         label.show()
         self._image_label = label
+        self._raise_ui_above_wallpaper()
 
     def _setup_gif_wallpaper(self, path: str):
         self._clear_video_wallpaper()
@@ -1865,20 +1882,44 @@ class MainWindow(QMainWindow):
         movie.start()
         self._gif_label = label
         self._gif_movie = movie
+        self._raise_ui_above_wallpaper()
 
     def _setup_video_wallpaper(self, path: str):
         self._clear_video_wallpaper()
         if not HAS_MEDIA:
             return
-        video = QVideoWidget(self.centralWidget())
-        video.setObjectName("wallpaperVideo")
-        video.setGeometry(self.centralWidget().rect())
-        video.lower()
+        # 使用 QGraphicsVideoItem + QGraphicsView：
+        # 1) 是普通 Qt 控件，可稳定放在主界面下层；
+        # 2) 由 QtMultimedia 内部渲染视频，不在 Python 里逐帧转 QImage，
+        #    性能远好于 QVideoSink+QLabel。
+        scene = QGraphicsScene(self)
+        item = QGraphicsVideoItem()
+        try:
+            item.setAspectRatioMode(Qt.AspectRatioMode.KeepAspectRatioByExpanding)
+        except Exception:
+            pass
+        scene.addItem(item)
+
+        view = QGraphicsView(scene, self.centralWidget())
+        view.setObjectName("wallpaperVideoView")
+        view.setFrameShape(QFrame.Shape.NoFrame)
+        view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        view.setStyleSheet("QGraphicsView { background: transparent; border: none; }")
+        view.setGeometry(self.centralWidget().rect())
+        view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        view.lower()
+        view.show()
+        if view.width() > 0 and view.height() > 0:
+            item.setSize(QSizeF(view.width(), view.height()))
+            scene.setSceneRect(0, 0, view.width(), view.height())
+        self._raise_ui_above_wallpaper()
+
         media = QMediaPlayer(self)
         audio = QAudioOutput(self)
         audio.setVolume(0)
         media.setAudioOutput(audio)
-        media.setVideoOutput(video)
+        media.setVideoOutput(item)
         media.setSource(QUrl.fromLocalFile(path))
         def replay(status):
             if status == QMediaPlayer.MediaStatus.EndOfMedia:
@@ -1887,10 +1928,12 @@ class MainWindow(QMainWindow):
         media.mediaStatusChanged.connect(replay)
         media.play()
         self._video_player = media
-        self._video_widget = video
+        self._video_item = item
+        self._video_scene = scene
+        self._video_view = view
 
     def _clear_video_wallpaper(self):
-        for attr in ("_video_player", "_video_widget", "_gif_movie", "_gif_label", "_image_label"):
+        for attr in ("_video_player", "_video_widget", "_video_sink", "_video_label", "_video_item", "_video_scene", "_video_view", "_gif_movie", "_gif_label", "_image_label"):
             obj = getattr(self, attr, None)
             if obj is not None:
                 try:

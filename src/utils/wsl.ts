@@ -1,6 +1,6 @@
 /**
  * WSL 网络辅助：当扩展运行在 WSL（Remote-WSL）时，
- * Windows 侧 Ollama 通常不再监听 WSL 可访问的 127.0.0.1，
+ * Windows 侧 llama.cpp / Ollama 通常不再监听 WSL 可访问的 127.0.0.1，
  * 需要把 localhost 端点解析成 Windows 宿主机 IP。
  */
 import * as fs from 'fs';
@@ -30,7 +30,7 @@ export function windowsHostIp(): string | null {
 }
 
 /**
- * 在 WSL 里，把“访问 Windows 侧 Ollama”的 127.0.0.1/localhost 端点
+ * 在 WSL 里，把“访问 Windows 侧 llama.cpp / Ollama”的 127.0.0.1/localhost 端点
  * 替换成 Windows 宿主机 IP。
  * LibreTranslate 代理（/translate）跑在 WSL 内部，保持 127.0.0.1 不变。
  */
@@ -39,8 +39,8 @@ export function resolveLocalEndpoint(endpoint: string): string {
   try {
     const u = new URL(endpoint);
     const isLocal = u.hostname === '127.0.0.1' || u.hostname === 'localhost';
-    const isOllama = !/\/translate\/?$/.test(endpoint);
-    if (isLocal && isOllama) {
+    const isDirectApi = !/\/translate\/?$/.test(endpoint);
+    if (isLocal && isDirectApi) {
       const host = windowsHostIp();
       if (host) {
         return `http://${host}:${u.port || '11434'}${u.pathname}${u.search || ''}`;

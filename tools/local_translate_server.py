@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-ACM Workflow 本地翻译服务（Ollama hy-mt2:latest）
+ACM Workflow 本地翻译服务（llama.cpp Hy-MT2）
 
 一个轻量的本地 HTTP 翻译服务，把 ACM Workflow 扩展的 LibreTranslate 兼容请求
-转发给本机 Ollama 的 hy-mt2:latest 翻译模型。
+转发给 Windows 侧 llama-server 的 OpenAI 兼容接口（/v1/chat/completions）。
 
 端点：
   GET  /languages
@@ -18,8 +18,7 @@ ACM Workflow 本地翻译服务（Ollama hy-mt2:latest）
 
 依赖：
   - Python 3（仅标准库）
-  - 本机 Ollama 服务（http://127.0.0.1:11434）
-  - Ollama 已安装 hy-mt2:latest 模型
+  - Windows 侧 llama-server.exe（D:\\llama）已启动并加载 Hy-MT2 GGUF
 """
 
 from __future__ import annotations
@@ -32,39 +31,43 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
+DEFAULT_LLAMA_URL = "http://127.0.0.1:11434"
 DEFAULT_MODEL = "hy-mt2:latest"
 
-# 翻译用参数：按 Codeforces 题面段落翻译的实际需要设置，尽量降低显存/内存占用。
-#   num_ctx   2048 足够覆盖单段题面；Ollama 模型自身 context 为 4096，这里调低减少占用。
-#   num_predict 512 足够输出一段中文译文。
-#   temperature 0.3 保持术语/公式稳定，减少机翻幻觉。
-OLLAMA_OPTIONS = {
-    "temperature": 0.3,
-    "num_ctx": 2048,
-    "num_predict": 512,
-    "repeat_penalty": 1.1,
+# 翻译用参数：按 Hy-MT2 模型卡推荐参数设置（1.8B / 7B）。
+LLAMA_CHAT_OPTIONS = {
+    "temperature": 0.7,
+    "top_p": 0.6,
+    "top_k": 20,
+    "repetition_penalty": 1.05,
+    "max_tokens": 4096,
+    "stream": False,
 }
 
 
-def ollama_url(base: str) -> str:
+def llama_url(base: str) -> str:
     return base.rstrip("/")
 
 
-def ollama_available(base: str, model: str = DEFAULT_MODEL) -> bool:
-    """检查 Ollama 是否在线且包含翻译模型。"""
+def llama_api_base(base: str) -> str:
+    b = llama_url(base)
+    return b if b.endswith("/v1") else b + "/v1"
+
+
+def llama_available(base: str, model: str = DEFAULT_MODEL) -> bool:
+    """检查 llama-server 是否在线且包含翻译模型别名。"""
     try:
-        req = urllib.request.Request(ollama_url(base) + "/api/tags", method="GET")
+        req = urllib.request.Request(llama_api_base(base) + "/models", method="GET")
         with urllib.request.urlopen(req, timeout=3) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        models = data.get("models") or []
-        return any(m.get("name") == model for m in models)
+        models = data.get("data") or []
+        return any(m.get("id") == model for m in models)
     except Exception:
         return False
 
 
-def ollama_translate(text: str, source: str, target: str, base: str, model: str) -> str:
-    """调用 Ollama chat API 完成 en -> zh 翻译。"""
+def llama_translate(text: str, source: str, target: str, base: str, model: str) -> str:
+    """调用 llama-server OpenAI 兼容 chat API 完成 en -> zh 翻译。"""
     system = (
         "You are a professional competitive-programming translator. "
         f"Translate the given {source} text into {target}. "
@@ -78,12 +81,10 @@ def ollama_translate(text: str, source: str, target: str, base: str, model: str)
             {"role": "system", "content": system},
             {"role": "user", "content": text},
         ],
-        "stream": False,
-        "keep_alive": "3m",
-        "options": OLLAMA_OPTIONS,
+        **LLAMA_CHAT_OPTIONS,
     }
     req = urllib.request.Request(
-        ollama_url(base) + "/api/chat",
+        llama_api_base(base) + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -93,23 +94,24 @@ def ollama_translate(text: str, source: str, target: str, base: str, model: str)
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Ollama HTTP {exc.code}: {body[:300]}") from exc
+        raise RuntimeError(f"llama-server HTTP {exc.code}: {body[:300]}") from exc
     except Exception as exc:
-        raise RuntimeError(f"Ollama 请求失败: {exc}") from exc
+        raise RuntimeError(f"llama-server 请求失败: {exc}") from exc
 
-    content = ((data.get("message") or {}).get("content") or "").strip()
+    content = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+    content = content.strip()
     if not content:
-        raise RuntimeError("Ollama 返回空翻译")
+        raise RuntimeError("llama-server 返回空翻译")
     return content
 
 
 def translate_text(text: str, source: str, target: str, base: str, model: str) -> str:
     # 目前只服务 en -> zh；其他方向也交给模型尝试，但保持接口兼容。
-    return ollama_translate(text, source, target, base, model)
+    return llama_translate(text, source, target, base, model)
 
 
 class TranslateHandler(BaseHTTPRequestHandler):
-    base = DEFAULT_OLLAMA_URL
+    base = DEFAULT_LLAMA_URL
     model = DEFAULT_MODEL
 
     def log_message(self, fmt: str, *args: Any) -> None:
@@ -136,8 +138,8 @@ class TranslateHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path.split("?")[0].rstrip("/") == "/languages":
-            if not ollama_available(self.base, self.model):
-                self._send_json(503, {"error": "Ollama 不可用或未安装 hy-mt2:latest"})
+            if not llama_available(self.base, self.model):
+                self._send_json(503, {"error": "llama-server 不可用或未加载 Hy-MT2 模型"})
                 return
             self._send_json(200, [{"code": "en", "name": "English", "targets": ["zh"]}])
             return
@@ -155,8 +157,8 @@ class TranslateHandler(BaseHTTPRequestHandler):
         source = str(data.get("source") or "en")
         target = str(data.get("target") or "zh")
         try:
-            if not ollama_available(self.base, self.model):
-                self._send_json(503, {"error": "Ollama 不可用或未安装 hy-mt2:latest"})
+            if not llama_available(self.base, self.model):
+                self._send_json(503, {"error": "llama-server 不可用或未加载 Hy-MT2 模型"})
                 return
             if isinstance(q, list):
                 result = [
@@ -175,17 +177,17 @@ def main() -> int:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--model", default=DEFAULT_MODEL)
-    parser.add_argument("--ollama-url", default=DEFAULT_OLLAMA_URL)
+    parser.add_argument("--llama-url", "--ollama-url", dest="llama_url", default=DEFAULT_LLAMA_URL)
     args = parser.parse_args()
 
-    TranslateHandler.base = args.ollama_url
+    TranslateHandler.base = args.llama_url
     TranslateHandler.model = args.model
 
-    if not ollama_available(args.ollama_url, args.model):
+    if not llama_available(args.llama_url, args.model):
         print(
-            f"错误：无法连接 Ollama 或未找到模型 {args.model}。\n"
-            f"请先启动 Ollama（{args.ollama_url}），并确认已安装模型：\n"
-            f"  ollama pull {args.model}\n"
+            f"错误：无法连接 llama-server 或未找到模型别名 {args.model}。\n"
+            f"请先启动 Windows 侧 D:\\llama\\llama-server.exe，并确认模型已加载：\n"
+            f"  llama-server.exe -m D:\\llama\\Hy-MT2-1.8B-Q6_K.gguf --alias {args.model}\n"
             f"或运行 tools/setup_local_translate.sh 自动检查。",
             file=sys.stderr,
         )
@@ -194,7 +196,7 @@ def main() -> int:
     server = ThreadingHTTPServer((args.host, args.port), TranslateHandler)
     print(
         f"ACM Workflow 本地翻译服务已启动：http://{args.host}:{args.port}\n"
-        f"后端：Ollama {args.model}（{args.ollama_url}）\n"
+        f"后端：llama-server {args.model}（{args.llama_url}）\n"
         f"方向：en -> zh\n"
         f"按 Ctrl+C 停止。"
     )

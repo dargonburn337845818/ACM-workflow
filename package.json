@@ -2,7 +2,7 @@
   "name": "acm-workflow",
   "displayName": "ACM Workflow",
   "description": "ACM Workflow 是 VSCode 中的 Codeforces 刷题工作台：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录一站式完成；支持玻璃拟态工作台，可联动 VSCode Background 背景插件（https://github.com/caoge5524/vscode-background）将所选壁纸一键设为全局背景。",
-  "version": "0.21.0",
+  "version": "0.21.3",
   "publisher": "deepseekharness",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -150,7 +150,7 @@
             "local"
           ],
           "default": "auto",
-          "description": "题面翻译后端：auto（MyMemory + Google 兜底，无需配置）/ libre（LibreTranslate，端点见 libreEndpoint）/ deepseek（DeepSeek API，密钥存系统密钥链 acmWorkflow.deepseekKey）/ local（本地 Ollama hy-mt2:latest，端点见 localEndpoint）。"
+          "description": "题面翻译后端：auto（MyMemory + Google 兜底，无需配置）/ libre（LibreTranslate，端点见 libreEndpoint）/ deepseek（DeepSeek API，密钥存系统密钥链 acmWorkflow.deepseekKey）/ local（本地 llama.cpp hy-mt2:latest，端点见 localEndpoint）。"
         },
         "acmWorkflow.libreEndpoint": {
           "type": "string",
@@ -160,12 +160,92 @@
         "acmWorkflow.localEndpoint": {
           "type": "string",
           "default": "http://127.0.0.1:11434",
-          "description": "本地翻译端点。默认直接使用 Ollama（hy-mt2:latest）；也可填兼容 LibreTranslate 的自建服务地址（如 http://127.0.0.1:5000/translate）。"
+          "description": "本地翻译端点。默认直接使用 Windows 侧 llama.cpp llama-server（hy-mt2:latest）；也可填兼容 LibreTranslate 的自建服务地址（如 http://127.0.0.1:5000/translate）。"
         },
         "acmWorkflow.localAutoStart": {
           "type": "boolean",
           "default": true,
-          "description": "使用 local 翻译后端时，如果 Ollama 或本地翻译服务未启动，扩展自动拉起（默认拉起 Ollama hy-mt2:latest）。"
+          "description": "使用 local 翻译后端时，如果 llama-server 或本地翻译服务未启动，扩展自动拉起（默认拉起 D:\\llama\\llama-server.exe + Hy-MT2）。"
+        },
+        "acmWorkflow.llamaDir": {
+          "type": "string",
+          "default": "D:\\llama",
+          "description": "本地 llama.cpp 目录（含 llama-server.exe 与 GGUF 模型；WSL 下也可写 /mnt/d/llama）。"
+        },
+        "acmWorkflow.llamaModel": {
+          "type": "string",
+          "default": "Hy-MT2-1.8B-Q6_K.gguf",
+          "description": "本地翻译 GGUF 模型文件名（位于 acmWorkflow.llamaDir 下）。"
+        },
+        "acmWorkflow.llamaThreads": {
+          "type": "number",
+          "default": 4,
+          "description": "llama-server CPU 线程数；默认 4 兼顾响应与低消耗。"
+        },
+        "acmWorkflow.sparkEndpoint": {
+          "type": "string",
+          "default": "http://127.0.0.1:8080",
+          "description": "Spark 本地模型端点（llama.cpp OpenAI 兼容接口）。"
+        },
+        "acmWorkflow.sparkServerPath": {
+          "type": "string",
+          "default": "D:\\llama-spark\\build\\bin\\llama-server.exe",
+          "description": "Spark 使用的 llama-server.exe 路径（优先使用 D:\\llama-spark 的构建，含 CUDA DLL）。"
+        },
+        "acmWorkflow.sparkModelPath": {
+          "type": "string",
+          "default": "D:\\llama\\Spark-X2.5-4B-Q8_0\\Spark-X2.5-4B-Q8_0.gguf",
+          "description": "Spark GGUF 模型文件路径。"
+        },
+        "acmWorkflow.sparkModelName": {
+          "type": "string",
+          "default": "spark:latest",
+          "description": "Spark 在 llama-server 中的模型别名（--alias）。"
+        },
+        "acmWorkflow.sparkAutoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "使用 Spark 生成脚本时，如果本地服务未启动，扩展自动拉起。"
+        },
+        "acmWorkflow.sparkIdleTimeoutMs": {
+          "type": "number",
+          "default": 180000,
+          "description": "Spark 空闲多少毫秒后自动停止并释放显存；默认 3 分钟。设 0 表示不自动停止。"
+        },
+        "acmWorkflow.sparkCtxSize": {
+          "type": "number",
+          "default": 16384,
+          "description": "Spark 上下文长度（低占用调优，兼顾长题面与代码生成）。"
+        },
+        "acmWorkflow.sparkBatchSize": {
+          "type": "number",
+          "default": 512,
+          "description": "Spark llama-server 批大小。"
+        },
+        "acmWorkflow.sparkThreads": {
+          "type": "number",
+          "default": 8,
+          "description": "Spark llama-server CPU 线程数。"
+        },
+        "acmWorkflow.sparkGpuLayers": {
+          "type": "number",
+          "default": 99,
+          "description": "Spark 加载到 GPU 的层数；99 表示全量 GPU 加速。"
+        },
+        "acmWorkflow.sparkMaxTokens": {
+          "type": "number",
+          "default": 8192,
+          "description": "Spark 单次生成的最大 token 数。"
+        },
+        "acmWorkflow.sparkRequestTimeoutMs": {
+          "type": "number",
+          "default": 120000,
+          "description": "Spark 生成请求超时（毫秒）。"
+        },
+        "acmWorkflow.sparkScriptPath": {
+          "type": "string",
+          "default": "D:\\vscode_code\\code\\shell\\gen.py",
+          "description": "AI 生成的造数据 Python 脚本固定保存路径；生成后自动在该路径覆盖并插入造数据流水线。"
         },
         "acmWorkflow.browserPath": {
           "type": "string",

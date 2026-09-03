@@ -361,11 +361,12 @@ export async function diagnoseTranslation(signal?: AbortSignal): Promise<string[
       endpoint = vscode.workspace.getConfiguration('acmWorkflow').get<string>('localEndpoint', endpoint) || endpoint;
     } catch { /* 单测环境用默认 */ }
     lines.push(`  本地端点: ${endpoint}`);
-    const isOllama = !/\/translate\/?$/.test(endpoint);
+    const isDirectApi = !/\/translate\/?$/.test(endpoint);
     const effectiveEndpoint = resolveLocalEndpoint(endpoint);
-    const probeUrl = isOllama
-      ? effectiveEndpoint.replace(/\/+$/, '') + '/api/tags'
-      : effectiveEndpoint.replace(/\/+$/, '').replace(/\/translate$/, '') + '/languages';
+    const base = effectiveEndpoint.replace(/\/+$/, '');
+    const probeUrl = isDirectApi
+      ? (base.endsWith('/v1') ? base : base + '/v1') + '/models'
+      : base.replace(/\/translate$/, '') + '/languages';
     const t0 = Date.now();
     try {
       const dispatcher = getFetchDispatcher();
@@ -378,14 +379,14 @@ export async function diagnoseTranslation(signal?: AbortSignal): Promise<string[
       if (res.ok) {
         lines.push(`  本地服务: [OK] HTTP ${res.status}（${ms}ms）`);
         const data: any = await res.json().catch(() => null);
-        if (isOllama) {
-          const models = data?.models || [];
-          const has = models.some((m: any) => String(m?.name || '') === 'hy-mt2:latest');
-          lines.push(`  本地模型: ${has ? '[OK] Ollama hy-mt2:latest en -> zh 已就绪' : '[WARN] 未找到 Ollama hy-mt2:latest（请运行 tools/setup_local_translate.sh）'}`);
+        if (isDirectApi) {
+          const models = data?.data || [];
+          const has = models.some((m: any) => String(m?.id || '') === 'hy-mt2:latest');
+          lines.push(`  本地模型: ${has ? '[OK] llama.cpp hy-mt2:latest en -> zh 已就绪' : '[WARN] 未找到 llama.cpp hy-mt2:latest（请运行 tools/setup_local_translate.sh）'}`);
         } else if (Array.isArray(data)) {
           const en = data.find((l: any) => String(l.code || '').toLowerCase() === 'en');
           const hasZh = en && Array.isArray(en.targets) && en.targets.some((t: any) => String(t).toLowerCase() === 'zh');
-          lines.push(`  本地模型: ${hasZh ? '[OK] Ollama hy-mt2:latest en -> zh 已就绪' : '[WARN] 未找到 Ollama hy-mt2:latest（请运行 tools/setup_local_translate.sh）'}`);
+          lines.push(`  本地模型: ${hasZh ? '[OK] llama.cpp hy-mt2:latest en -> zh 已就绪' : '[WARN] 未找到 llama.cpp hy-mt2:latest（请运行 tools/setup_local_translate.sh）'}`);
         } else {
           lines.push('  本地模型: [WARN] /languages 返回格式异常');
         }

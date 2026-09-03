@@ -40,6 +40,29 @@ def get_screen_size():
         return 1920, 1080
 
 
+def force_window_top(window_name):
+    """强制 Windows 窗口置顶并置前，避免录制时被其他窗口遮挡。"""
+    try:
+        import ctypes
+        user32 = ctypes.windll.user32
+        hwnd = user32.FindWindowW(None, window_name)
+        if not hwnd:
+            print(f"未找到窗口：{window_name}")
+            return None
+        SW_RESTORE = 9
+        HWND_TOPMOST = -1
+        SWP_NOMOVE = 0x0001
+        SWP_NOSIZE = 0x0002
+        user32.ShowWindow(hwnd, SW_RESTORE)
+        user32.SetForegroundWindow(hwnd)
+        user32.BringWindowToTop(hwnd)
+        user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+        print(f"已将窗口置顶：{window_name}")
+        return hwnd
+    except Exception:
+        return None
+
+
 def run_we(we_exe, args, check=True):
     cmd = [we_exe, "-control"] + args
     print(">>", " ".join(f'"{x}"' if " " in x else x for x in cmd))
@@ -80,24 +103,29 @@ def export_wallpaper(wallpaper, width=1920, height=1080, seconds=15,
     print("等待 Wallpaper Engine 渲染 3 秒…")
     time.sleep(3)
 
-    filter_str = f"crop={width}:{height}:0:0"
+    # 强制 WE 渲染窗口置顶，避免被其他窗口挡住
+    force_window_top(window_name)
+
+    # 只截取 WE 窗口本身，不再录制整个桌面后裁剪
+    filter_parts = []
     if upscale:
         uw, uh = upscale.lower().split("x")
-        filter_str += f",scale={uw}:{uh}:flags=lanczos"
+        filter_parts.append(f"scale={uw}:{uh}:flags=lanczos")
     ffmpeg_cmd = [
         "ffmpeg", "-y",
         "-f", "gdigrab",
         "-framerate", str(framerate),
-        "-i", "desktop",
-        "-vf", filter_str,
+        "-i", "title=" + window_name,
         "-draw_mouse", "0",
         "-c:v", "h264_nvenc",
         "-preset", "p5",
         "-t", str(seconds),
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
-        output,
     ]
+    if filter_parts:
+        ffmpeg_cmd += ["-vf", ",".join(filter_parts)]
+    ffmpeg_cmd.append(output)
     print(">>", " ".join(ffmpeg_cmd))
     try:
         subprocess.run(ffmpeg_cmd, check=True)

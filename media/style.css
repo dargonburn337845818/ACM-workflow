@@ -240,6 +240,23 @@ select, textarea {
   font-family: inherit;
 }
 
+/* 下拉框必须使用深色方案，否则 Windows/Chromium 原生弹出列表是白底白字，
+   只能靠鼠标扫过才看到内容（Bug：下拉框完全白色）。 */
+select {
+  color-scheme: dark;
+  background-color: #1B1D22;
+}
+
+select option {
+  background: #1B1D22;
+  color: #F5F6F8;
+}
+
+select option:hover {
+  background: rgba(255,255,255,0.10);
+  color: #F5F6F8;
+}
+
 input:focus, select:focus, textarea:focus {
   border-color: var(--gold);
   outline: none;

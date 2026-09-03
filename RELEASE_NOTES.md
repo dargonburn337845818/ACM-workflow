@@ -1,26 +1,19 @@
-# ACM Workflow 0.21.0
+# ACM Workflow 0.21.3
 
-> 一款在 VSCode 中完成 Codeforces 刷题全流程的工作台：选题、题面翻译、生成、测试、对拍、造数据、比赛管理与刷题记录，全部在编辑器内闭环。
+VSCode 内 Codeforces 刷题全流程工作台：选题 → 题面翻译 → 测试 → 对拍 → 造数据 → 比赛 → 记录。
 
-## 本次更新亮点
+## 本次更新
 
-- **可组装对拍器**：正解与暴力可自由组合比对方式（精确 / Token / 浮点误差 / Special Judge），支持外部 checker，差异实时展示。
-- **造数据流水线**：去掉顶层预设，改为一步一步拼装数据生成流程；支持变量绑定、重复块、树/图/数组等细粒度原语，种子可复现。
-- **玻璃拟态工作台**：工作台可配置背景图，支持玻璃/夜航等视觉主题。
-- **联动 VSCode Background**：在工作台选择壁纸后，可一键写入 [VSCode Background](https://github.com/caoge5524/vscode-background) 插件配置，将同一张壁纸应用到整个 VSCode。
-- **刷题记录与统计**：SQLite 本地记录、AC 率、连续刷题天数、标签难度分布图。
-- **稳定工具链**：本地翻译多后端、CF 登录态、比赛自动加载、工作流诊断、环境配置引导。
-
-## 联动插件
-
-- [VSCode Background](https://github.com/caoge5524/vscode-background) — 为 VSCode 设置视频/图片背景，支持玻璃拟态、透明主题等效果。
+- **本地 Spark 集成**：造数据页一键生成 Python 造数据脚本，自动验证并写入 `gen.py`、插入流水线。
+- **空闲释放显存**：Spark 使用完 3 分钟自动停止，下次点击自动拉起。
+- **全套 Spark 配置**：`acmWorkflow.spark*`，含端点/模型路径/上下文/空闲时间/脚本路径。
+- **修复下拉框全白**：所有 `select` 改用深色配色，不再需要鼠标扫过才显示内容。
+- **修复 Spark 启动失败**：`--ngl` 改为当前构建支持的 `-ngl`。
 
 ## 安装
 
-1. 从本 Release 下载 `acm-workflow-0.21.0.vsix`
-2. VS Code → 扩展面板 → `...` → 从 VSIX 安装
-3. 按 `Ctrl+Alt+A` 打开 ACM Workflow 工作台
+下载 `acm-workflow-0.21.3.vsix`，在 VS Code 扩展面板选择「从 VSIX 安装」。
 
-## 开源协议
+## License
 
-MIT License
+MIT

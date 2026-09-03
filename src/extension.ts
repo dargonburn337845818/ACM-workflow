@@ -48,7 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ADR 0003：组合根统一构建服务门面，Workbench 只接收组装好的 Services。
   const services = createServices(context);
-  // 确保 VS Code 关闭时停止由扩展拉起的本地 Ollama 翻译服务。
+  // 确保 VS Code 关闭时停止由扩展拉起的本地 llama.cpp 翻译服务。
   context.subscriptions.push({ dispose: () => services.support.dispose() });
 
   // 注册侧边栏视图（活动栏 ACM 图标 → 侧边栏工作台）

@@ -1565,6 +1565,8 @@
   const dgSaveBtn = document.getElementById('dg-save-btn');
   const dgStatusEl = document.getElementById('dg-status');
   const dgOutputEl = document.getElementById('dg-output');
+  const dgAiBtn = document.getElementById('dg-ai-btn');
+  const dgOpenScriptBtn = document.getElementById('dg-open-script-btn');
   let lastGenerated = '';
   // 组合流水线：只记录每步类型；表单值从 DOM 采集
   let dgPipelineSteps = [];
@@ -1898,6 +1900,17 @@
     });
   }
 
+  /** AI 生成后：更新已有 script 步骤，或向末尾追加一个 script 步骤。 */
+  function ensureScriptStep(scriptPath) {
+    const idx = dgPipelineSteps.findIndex((s) => s.type === 'script');
+    if (idx >= 0) {
+      dgPipelineSteps[idx].scriptPath = scriptPath;
+    } else {
+      dgPipelineSteps.push({ type: 'script', scriptPath: scriptPath });
+    }
+    renderDgPipeline(dgPipelineSteps);
+  }
+
   function collectDgSpec() {
     // 直接使用实时维护的 JS 状态，不再依赖 DOM 树解析，避免嵌套参数丢失
     return { type: 'pipeline', steps: cloneSteps(dgPipelineSteps) };
@@ -1919,6 +1932,23 @@
           return;
         }
         vscode.postMessage({ type: 'dataGenSave', payload: { input: lastGenerated } });
+      });
+    }
+    if (dgAiBtn) {
+      dgAiBtn.addEventListener('click', () => {
+        dgAiBtn.disabled = true;
+        if (dgOpenScriptBtn) dgOpenScriptBtn.style.display = 'none';
+        if (dgStatusEl) {
+          dgStatusEl.textContent = '正在调用本地 Spark 生成脚本…';
+          dgStatusEl.className = 'dg-status busy';
+        }
+        vscode.postMessage({ type: 'sparkGenerateScript' });
+      });
+    }
+    if (dgOpenScriptBtn) {
+      dgOpenScriptBtn.addEventListener('click', () => {
+        const p = dgOpenScriptBtn.getAttribute('data-path');
+        if (p) vscode.postMessage({ type: 'openSparkScript', payload: { path: p } });
       });
     }
   }
@@ -2477,6 +2507,32 @@
           dgStatusEl.className = 'dg-status' + (msg.isError ? ' error' : msg.busy ? ' busy' : ' ok');
         }
         if (dgGenBtn) dgGenBtn.disabled = false;
+        break;
+      }
+      // ===== Spark 本地模型生成造数据脚本（V0.22）=====
+      case 'sparkStatus': {
+        if (dgStatusEl) {
+          dgStatusEl.textContent = msg.message || '';
+          dgStatusEl.className = 'dg-status' + (msg.isError ? ' error' : msg.busy ? ' busy' : ' ok');
+        }
+        if (dgAiBtn) {
+          dgAiBtn.disabled = !!msg.busy;
+        }
+        break;
+      }
+      case 'sparkGenerated': {
+        if (dgStatusEl) {
+          dgStatusEl.textContent = 'AI 已生成并保存：' + (msg.payload && msg.payload.path || '');
+          dgStatusEl.className = 'dg-status ok';
+        }
+        if (dgAiBtn) dgAiBtn.disabled = false;
+        if (msg.payload && msg.payload.path) {
+          ensureScriptStep(msg.payload.path);
+          if (dgOpenScriptBtn) {
+            dgOpenScriptBtn.style.display = '';
+            dgOpenScriptBtn.setAttribute('data-path', msg.payload.path);
+          }
+        }
         break;
       }
       // ===== 对拍器（V0.22）=====

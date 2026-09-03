@@ -63,7 +63,7 @@ mingw-w64 安装器默认路径 → `/usr/bin/g++`。安装后重启 VS Code 再
 |---|---|
 | 端口 27121 被占用 | 配置 `acmWorkflow.companionPort` 换端口，浏览器插件同步修改 |
 | 批量补样例失败 | 命令「批量补充测试数据」会逐题抓取，网络慢时可能耗时较长 |
-| 翻译为空 | 免费后端有日限额（MyMemory ~5000 字符/天），换 `libre`/`deepseek` 或次日再试；`local` 模式请确认 Ollama `hy-mt2:latest` 已就绪并运行 `tools/start_local_translate.sh --ollama-only` |
+| 翻译为空 | 免费后端有日限额（MyMemory ~5000 字符/天），换 `libre`/`deepseek` 或次日再试；`local` 模式请确认 llama.cpp `hy-mt2:latest` 已就绪并运行 `tools/start_local_translate.sh --llama-only` |
 | 扩展更新后行为异常 | 重启 VS Code；仍异常可查看输出面板 `ACM Workflow` 频道日志 |
 | 想反馈 Bug / 提需求 | GitHub Issues（附「工作流诊断」输出/报告与复现步骤） |
 
