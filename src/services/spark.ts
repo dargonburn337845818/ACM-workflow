@@ -32,6 +32,8 @@ const DEFAULT_CACHE_TYPE = 'q4_0';
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_REQUEST_TIMEOUT_MS = 300000;
 const DEFAULT_IDLE_TIMEOUT_MS = 180000;
+const MAX_REPAIR_ATTEMPTS = 3;
+const REPAIR_DELAY_MS = 500;
 
 let sparkProcess: ChildProcess | null = null;
 let sparkStarting: Promise<boolean> | null = null;
@@ -294,7 +296,9 @@ function tryCallGeneratorFunctions(code: string): string | null {
   return null;
 }
 
-/** 从模型输出中提取 Python 代码（兼容 markdown 代码块和纯文本）。 */
+/** 从模型输出中提取 Python 代码（兼容 markdown 代码块和纯文本）。
+ *  小模型常不写 ```python 标记，因此做“暴力降级”：找到第一行像 Python 代码的行，
+ *  丢弃前面可能出现的解释性文字。 */
 export function extractPythonCode(raw: string): string {
   const text = String(raw || '');
   const fence = /```(?:python|py)?\s*([\s\S]*?)```/i.exec(text);
@@ -303,9 +307,11 @@ export function extractPythonCode(raw: string): string {
     if (code) return code;
   }
   const lines = text.split('\n');
-  const start = lines.findIndex((l) => /^\s*(import|from|def|class|#|if __name__)/.test(l));
+  const codeStart = /^\s*(?:import\s|from\s|def\s|class\s|@|#|if\s+__name__|print\s*\(|for\s|while\s|try\s*:|sys\.|data\s*=|random\.|[A-Za-z_]\w*\s*=)/;
+  const start = lines.findIndex((l) => codeStart.test(l));
   if (start >= 0) return lines.slice(start).join('\n').trim();
-  return text.trim();
+  // 没有识别到任何 Python 代码行时返回空串，让上层有机会改从 reasoning 提取代码块。
+  return '';
 }
 
 /** 只从 reasoning_content 中提取明确包裹的代码块，避免把解题分析当成脚本保存。 */
@@ -363,10 +369,37 @@ function runPythonCode(code: string, timeoutMs = 15000): Promise<{ ok: boolean; 
   });
 }
 
-export function buildDataGenPrompt(problem: { title: string; id?: string; url?: string; statement?: string }): string {
+export interface SparkProblemContext {
+  title: string;
+  id?: string;
+  url?: string;
+  statement?: string;
+  samples?: { input: string; output?: string }[];
+}
+
+export function buildDataGenPrompt(problem: SparkProblemContext): string {
+  const sampleBlock = (problem.samples || []).length > 0
+    ? [
+        '',
+        '===== 样例格式（只作格式与数据范围参照，不要照抄数值） =====',
+        ...(problem.samples || []).slice(0, 3).flatMap((s, i) => [
+          `样例 ${i + 1} 输入：`,
+          s.input.trim().slice(0, 500),
+          s.output ? `样例 ${i + 1} 输出：${s.output.trim().slice(0, 200)}` : ''
+        ]),
+        '===== 样例结束 ====='
+      ].join('\n')
+    : '';
+
   return [
     '你是一名算法竞赛造数据专家。请根据下面的题目描述，编写一个 Python 3 脚本。',
     '脚本的任务：每次运行都输出一组**符合题面所有约束**的合法输入数据到 stdout。',
+    '',
+    '【输出格式硬约束 —— 放在最前面】',
+    '1. 回复的第一行必须是 import、from、def 或 print(...) 之一，禁止先写解释、思考或 Markdown。',
+    '2. 不要输出 ``` 代码块标记。',
+    '3. 脚本可以定义函数，但必须在文件末尾调用它；运行 `python gen.py` 后 stdout 必须有数据。',
+    '4. 如果复杂格式暂时无法处理，至少输出一个最小的合法数据骨架（例如一行整数），绝不能无输出。',
     '',
     '硬性要求：',
     '1. 只使用 Python 标准库（random、string 等），不要依赖第三方库。',
@@ -375,17 +408,67 @@ export function buildDataGenPrompt(problem: { title: string; id?: string; url?: 
     '4. 代码必须是完整可执行的 Python 脚本，不需要 Markdown 代码块。',
     '5. 如果题目有变量间依赖（如 n 和后面数组长度），请保证生成数据自洽。',
     '6. 在覆盖边界/特殊情况的前提下，生成的数据要尽可能多样化。',
-    '7. 脚本必须能直接执行并输出数据：如果定义了函数（如 main/generate_test_data），必须在文件末尾调用它，确保运行 `python gen.py` 后有 stdout。',
-    '8. 不要使用 input() 等待输入；不要只定义函数而不调用。',
-    '',
     `题目：${problem.title || ''}${problem.id ? ` (${problem.id})` : ''}`,
     problem.url ? `链接：${problem.url}` : '',
     '',
     '===== 题面开始 =====',
     problem.statement || '',
     '===== 题面结束 =====',
+    sampleBlock,
     '',
-    '请只输出 Python 代码本身。'
+    '【结尾再次提醒】',
+    '请只输出 Python 代码本身，不要带 Markdown 代码块，不要解释。',
+    '再次强调：脚本运行后必须向 stdout 输出数据；如果定义了函数，必须在文件末尾调用它。',
+    '如果实在无法生成复杂数据，请输出一个最小合法骨架（例如 print(1)），绝不能无输出。',
+    '只输出代码，直接以 import/from/def/print 开头。'
+  ].join('\n');
+}
+
+/** 构造“修正提示词”：把上一版脚本 + 运行错误喂回模型，让它做小步修正。 */
+function buildRepairPrompt(problem: SparkProblemContext | undefined, code: string, check: { stdout: string; stderr: string }): string {
+  const errorDetail = check.stderr.trim()
+    || (check.stdout.trim() ? '脚本没有输出任何数据（可能只定义了函数但没有调用）' : '脚本没有输出任何数据');
+  return [
+    '你之前生成的 Python 造数据脚本没有通过本地验证。',
+    '请根据下面的错误信息修正脚本，只输出修正后的完整 Python 3 代码。',
+    '',
+    '【输出格式硬约束】',
+    '1. 回复第一行必须是 import、from、def 或 print(...) 之一，禁止解释和 Markdown。',
+    '2. 脚本运行后 stdout 必须有数据；如果定义了函数，必须在文件末尾调用它。',
+    '3. 如果不知道如何完整修正，请直接输出一个最小合法数据骨架（例如 print(1)），绝不能无输出。',
+    '',
+    `题目：${problem?.title || ''}${problem?.id ? ` (${problem.id})` : ''}`,
+    problem?.url ? `链接：${problem.url}` : '',
+    '',
+    '===== 上一版脚本 =====',
+    code.slice(0, 6000),
+    '===== 验证结果 =====',
+    errorDetail.slice(0, 2000),
+    '',
+    problem && problem.samples && problem.samples.length > 0
+      ? [
+          '===== 样例格式（只作格式参照） =====',
+          ...problem.samples.slice(0, 2).map((s, i) => `样例 ${i + 1} 输入：\n${s.input.trim().slice(0, 500)}`),
+          '===== 样例结束 ====='
+        ].join('\n')
+      : '',
+    '',
+    '请只输出修正后的完整 Python 代码，不要 Markdown、不要解释。'
+  ].join('\n');
+}
+
+/** 保底脚本：多次修正仍失败时写入，至少保证有 stdout，流程不卡死。 */
+function buildFallbackScript(): string {
+  return [
+    'import random',
+    '',
+    'def gen():',
+    '    # ACM Workflow 保底脚本：模型多次修正失败后写入，至少保证有输出。',
+    '    print(1)',
+    '',
+    'if __name__ == "__main__":',
+    '    gen()',
+    ''
   ].join('\n');
 }
 
@@ -401,7 +484,7 @@ export class SparkService {
   }
 
   /** 根据题目上下文生成 Python 造数据脚本并返回代码。 */
-  async generateScriptForProblem(problem: { title: string; id?: string; url?: string; statement?: string }): Promise<string> {
+  async generateScriptForProblem(problem: SparkProblemContext): Promise<string> {
     return this.generateScript(buildDataGenPrompt(problem));
   }
 
@@ -450,7 +533,8 @@ export class SparkService {
     // Spark 带思维链时会先把内容放进 reasoning_content，content 反而为空。
     // 只从 reasoning 里提取明确 ```python 代码块，避免把解题分析/解释保存成脚本。
     const reasoning = String(message?.reasoning_content || '');
-    const code = extractPythonCode(content) || extractFencedPythonCode(reasoning);
+    // 先取正文；正文只有分析时再取 reasoning 的代码块；部分模型 reasoning 也不加围栏，最后再用暴力解析兜底。
+    const code = extractPythonCode(content) || extractFencedPythonCode(reasoning) || extractPythonCode(reasoning);
     if (!code) {
       const detail = (content || reasoning).slice(0, 150);
       throw new Error(`Spark 没有返回可用的 Python 代码（可能把解题分析当成了脚本）${detail ? `：${detail}` : ''}`);
@@ -458,11 +542,12 @@ export class SparkService {
     return code;
   }
 
-  /** 验证并保存到固定脚本路径，返回保存后的路径与验证输出。 */
-  async validateAndSave(code: string): Promise<{ path: string; stdout: string; stderr: string }> {
+  /** 验证并保存到固定脚本路径；验证失败时把错误回喂 Spark 做最多 3 次小步修正。
+   *  仍失败则写入一个保底可运行脚本，避免工作流因“无输出”卡死。
+   *  @param problem 题目上下文，用于修正提示词里的样例/题面。 */
+  async validateAndSave(code: string, problem?: SparkProblemContext): Promise<{ path: string; code: string; stdout: string; stderr: string; fallback?: boolean }> {
     let finalCode = code;
     let check = await runPythonCode(finalCode);
-    // 模型常见问题：只定义函数但没调用 → 自动补一个入口再验证。
     if (!check.ok && !check.stdout && !check.stderr) {
       const repaired = tryCallGeneratorFunctions(finalCode);
       if (repaired) {
@@ -473,15 +558,51 @@ export class SparkService {
         }
       }
     }
-    if (!check.ok) {
-      throw new Error(`生成的脚本验证失败：${check.stderr || '无输出'}`);
+
+    // 小模型“草稿-执行-报错-修正”闭环：把错误回喂，允许模型自行修复。
+    for (let attempt = 1; attempt <= MAX_REPAIR_ATTEMPTS && !check.ok; attempt++) {
+      console.warn(`[ACM-Workflow][Spark] 第 ${attempt}/${MAX_REPAIR_ATTEMPTS} 次修正：${check.stderr.trim().slice(0, 300) || '无输出'}`);
+      await new Promise((r) => setTimeout(r, REPAIR_DELAY_MS));
+      const fixed = await this.generateScript(buildRepairPrompt(problem, finalCode, check)).catch(() => null);
+      if (!fixed) break;
+      finalCode = fixed;
+      check = await runPythonCode(finalCode);
+      // 修正稿也可能只定义函数未调用，自动补入口。
+      if (!check.ok && !check.stdout && !check.stderr) {
+        const repaired = tryCallGeneratorFunctions(finalCode);
+        if (repaired) {
+          const check2 = await runPythonCode(repaired);
+          if (check2.ok) {
+            finalCode = repaired;
+            check = check2;
+          }
+        }
+      }
     }
+
+    let fallback = false;
+    if (!check.ok) {
+      console.warn('[ACM-Workflow][Spark] 多次修正仍失败，写入保底可运行脚本');
+      finalCode = buildFallbackScript();
+      check = await runPythonCode(finalCode);
+      fallback = true;
+      if (!check.ok) {
+        throw new Error(`生成的脚本验证失败：${check.stderr || '无输出'}`);
+      }
+    }
+
     const target = getScriptPath();
     if (!target) throw new Error('未配置 sparkScriptPath，无法保存生成脚本');
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, finalCode, 'utf8');
     scheduleSparkStop();
-    return { path: target, stdout: check.stdout.slice(0, 200), stderr: check.stderr };
+    return {
+      path: target,
+      code: finalCode,
+      stdout: check.stdout.slice(0, 200),
+      stderr: check.stderr,
+      fallback
+    };
   }
 
   /** 暴露给 SupportService/扩展退出时调用。 */

@@ -304,11 +304,8 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     }
     if (!problem) { empty(); return; }
     console.log(`[ACM-Workflow][题面] 解析成功: ${problem.platform} ${problem.id}（${filePath}）`);
-    // 最多等 1.2s 补难度，避免 CF 题集未缓存且网络慢时阻塞题面显示
-    await Promise.race([
-      this.services.codeforces.ensureDifficulty(problem),
-      new Promise((r) => setTimeout(r, 1200))
-    ]);
+    // 难度补全不再阻塞题面显示：后台加载题集，完成后通过 statementDifficulty 再推给前端。
+    void this.refreshDifficultyAndNotify(problem);
 
     const st = this.services.statement;
     if (!force) {
@@ -348,6 +345,19 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
       await task;
     } finally {
       st.statementTasks.delete(filePath);
+    }
+  }
+
+  /** 后台补齐题目难度；若从题集/本地记录拿到了新值，通知前端更新共用指示器。 */
+  private async refreshDifficultyAndNotify(problem: Problem): Promise<void> {
+    try {
+      await this.services.codeforces.ensureDifficulty(problem);
+      const difficulty = this.services.codeforces.difficultyOf(problem.id);
+      if (difficulty !== undefined) {
+        this.post({ type: 'statementDifficulty', payload: { id: problem.id, difficulty } });
+      }
+    } catch {
+      /* 题集不可用时保持 — */
     }
   }
 
@@ -630,15 +640,14 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
         } catch { /* 读失败按未登录处理 */ }
       }
       this.post({ type: 'cfBound', handle });
-      const [records, stats] = await Promise.all([
-        this.services.records.list(),
-        this.services.records.stats()
-      ]);
-      for (const r of records) {
+      const dashboard = await this.services.dashboard.snapshot();
+      for (const r of dashboard.records) {
         if (r.difficulty) this.services.codeforces.difficultyById.set(r.id, r.difficulty);
       }
-      this.post({ type: 'recordsList', records, stats });
-      await this.pushTodayStats();
+      this.post({ type: 'recordsList', records: dashboard.records, stats: dashboard.stats });
+      this.post({ type: 'todayStats', stats: dashboard.todayStats });
+      // 历史图表（标签统计）需要题集，后台异步刷新，不阻塞记录列表/今日统计展示。
+      void this.pushHistoryData(dashboard.records);
       this.services.support.trace('service', 'pushRecords', 'ok');
     } catch (e: any) {
       this.services.support.trace('service', 'pushRecords', `fail: ${e?.message || e}`);
@@ -651,40 +660,23 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     }
   }
 
-  public async pushTodayStats() {
+  public async pushTodayStats(records?: ProblemRecord[]) {
     try {
-      const records = await this.services.records.list();
-      const stats = this.services.records.todayStats(records);
+      const all = records ?? await this.services.records.list();
+      const stats = this.services.records.todayStats(all);
       this.post({ type: 'todayStats', stats });
     } catch {
       this.post({ type: 'todayStats', stats: { acToday: 0, streak: 0 } });
     }
   }
 
-  public async pushHistoryData() {
-    const records = await this.services.records.list().catch(() => [] as ProblemRecord[]);
-    let tagStats: { tag: string; ac: number }[] = [];
-    try {
-      const all = await this.services.codeforces.getProblems();
-      const byId = new Map(all.map((p) => [p.id, p]));
-      const acCount = new Map<string, number>();
-      for (const r of records) {
-        if (r.status !== 'ac') continue;
-        const p = byId.get(r.id);
-        if (!p) continue;
-        for (const t of p.tags) {
-          acCount.set(t, (acCount.get(t) || 0) + 1);
-        }
-      }
-      tagStats = [...acCount.entries()]
-        .map(([tag, ac]) => ({ tag, ac }))
-        .sort((a, b) => b.ac - a.ac)
-        .slice(0, 12);
-    } catch {
-      /* 题集缓存不可用（离线）时图表为空 */
-    }
-    const diffStats = this.services.records.difficultyBins(records);
-    this.post({ type: 'historyData', tagStats, difficultyBins: diffStats });
+  public async pushHistoryData(records?: ProblemRecord[]) {
+    const all = records ?? await this.services.records.list().catch(() => [] as ProblemRecord[]);
+    const history = await this.services.dashboard.history(all).catch(() => ({
+      tagStats: [] as { tag: string; ac: number }[],
+      difficultyBins: this.services.records.difficultyBins(all)
+    }));
+    this.post({ type: 'historyData', tagStats: history.tagStats, difficultyBins: history.difficultyBins });
   }
 
   /** 供扩展入口注册命令：重新获取当前题目测试数据 */

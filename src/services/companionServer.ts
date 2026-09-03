@@ -2,6 +2,7 @@ import * as http from 'http';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { Problem } from '../types';
+import { parseCfProblemUrl } from './cfUrl';
 import { createProblemFile } from './template';
 
 /**
@@ -24,10 +25,12 @@ function problemFromCompanion(raw: any): { problem: Problem; tests: { input: str
 
   const platform = 'codeforces' as const;
   let id = '';
-  if (url.includes('codeforces.com')) {
-    const m = /problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/.exec(url)
-      || /contest\/(\d+)\/problem\/([A-Za-z0-9]+)/.exec(url);
-    id = m ? m[1] + m[2] : '';
+  if (url) {
+    try {
+      id = parseCfProblemUrl(url).id;
+    } catch {
+      id = '';
+    }
   }
 
   // name 形如 "P1000. 超级玛丽游戏" / "1650C. Weight ..."，去掉题号前缀

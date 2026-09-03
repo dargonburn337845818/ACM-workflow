@@ -78,8 +78,12 @@ function readProblemStatement(filePath: string): string {
   return '';
 }
 
-/** 从当前打开的 .cpp 提取题目上下文（.prob + 题面缓存）。 */
-function resolveCurrentProblemContext(filePath: string, probPath: string): { title: string; id?: string; url?: string; statement: string } {
+/** 从当前打开的 .cpp 提取题目上下文（.prob + 题面缓存）；URL 解析复用 ProblemWorkspace。 */
+function resolveCurrentProblemContext(
+  filePath: string,
+  probPath: string,
+  workspace: Pick<Services, 'workspace'>['workspace']
+): { title: string; id?: string; url?: string; statement: string; samples?: { input: string; output?: string }[] } {
   let prob: any = {};
   try {
     prob = JSON.parse(fs.readFileSync(probPath, 'utf8'));
@@ -88,10 +92,26 @@ function resolveCurrentProblemContext(filePath: string, probPath: string): { tit
   }
   const rawName = String(prob?.name || '');
   const title = rawName.replace(/^\d+[A-Za-z]?\.\s*/, '').trim() || rawName || path.basename(filePath, '.cpp');
-  const url = String(prob?.url || '');
-  const m = /problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/.exec(url) || /contest\/(\d+)\/problem\/([A-Za-z0-9]+)/.exec(url);
-  const id = m ? m[1] + m[2] : undefined;
-  return { title, id, url: url || undefined, statement: readProblemStatement(filePath) };
+  const rawUrl = String(prob?.url || '');
+  let url = rawUrl;
+  let id: string | undefined;
+  if (rawUrl) {
+    try {
+      const parsed = workspace.parseCfProblemUrl(rawUrl);
+      url = parsed.url;
+      id = parsed.id;
+    } catch {
+      id = undefined;
+    }
+  }
+  // 把 .prob 里的样例一起带去提示词，让小模型有“格式锚点”可模仿。
+  const samples = Array.isArray(prob.tests)
+    ? prob.tests.slice(0, 3).map((t: any) => ({
+        input: String(t.input || ''),
+        output: t.output !== undefined ? String(t.output || '') : undefined
+      }))
+    : undefined;
+  return { title, id, url: url || undefined, statement: readProblemStatement(filePath), samples };
 }
 
 async function handleSparkGenerateScript(host: WorkbenchHost, deps: Pick<Services, 'workspace' | 'spark'>): Promise<void> {
@@ -109,10 +129,13 @@ async function handleSparkGenerateScript(host: WorkbenchHost, deps: Pick<Service
 
   host.post({ type: 'sparkStatus', message: '正在读取题面并调用本地 Spark 生成脚本…', busy: true });
   try {
-    const ctx = resolveCurrentProblemContext(filePath, probPath);
+    const ctx = resolveCurrentProblemContext(filePath, probPath, deps.workspace);
     const code = await deps.spark.generateScriptForProblem(ctx);
-    const saved = await deps.spark.validateAndSave(code);
-    host.post({ type: 'sparkGenerated', payload: { path: saved.path, code, stdout: saved.stdout } });
+    const saved = await deps.spark.validateAndSave(code, ctx);
+    host.post({ type: 'sparkGenerated', payload: { path: saved.path, code: saved.code, stdout: saved.stdout, fallback: saved.fallback } });
+    if (saved.fallback) {
+      host.post({ type: 'sparkStatus', message: '已生成保底脚本：模型多次修正未通过，先保存可运行的最小骨架以便继续流程', isError: false, busy: false });
+    }
   } catch (e: any) {
     host.post({ type: 'sparkStatus', message: e?.message || 'AI 生成脚本失败', isError: true, busy: false });
   }

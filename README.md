@@ -251,6 +251,7 @@ src/
 ├── services/                 # 通用服务
 │   ├── fetchers/             #   codeforces / statement / userStats
 │   ├── runner.ts             #   编译（缓存）/ 运行 / 比对 / 环境探测
+│   ├── dashboard.ts          #   记录面板展示数据组合（一次读库产出列表/统计/图表）
 │   ├── diagnostics.ts        #   工作流诊断：轨迹 / 网络 / 异常分析 / 报告
 │   ├── template.ts           #   生成 cpp + .prob（CPH 兼容双盘符）
 │   ├── cfSession.ts          #   CF 会话（SecretStorage）

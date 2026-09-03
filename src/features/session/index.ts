@@ -57,7 +57,6 @@ async function handleCfLogin(host: WorkbenchHost, deps: Pick<Services, 'codeforc
 
     await pushCfSessionState(host, deps);
     host.pushRecords();
-    host.pushHistoryData();
   } catch (e: any) {
     const msg = e instanceof CfSessionError
       ? e.message

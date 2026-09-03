@@ -2195,6 +2195,14 @@
         loadStatementLibs(renderStatementBody);
         break;
       }
+      case 'statementDifficulty': {
+        const data = msg.payload || msg;
+        if (stData && stData.id === data.id) {
+          stData.difficulty = data.difficulty;
+          renderCurFile({ id: stData.id, title: stData.title, fileName: stData.title, difficulty: stData.difficulty });
+        }
+        break;
+      }
       case 'translationStatus': {
         const data = msg.payload || msg;
         if (data.busy) beginTranslationStatus();

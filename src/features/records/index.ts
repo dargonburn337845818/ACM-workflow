@@ -22,7 +22,6 @@ async function handleRecordAction(host: WorkbenchHost, deps: Pick<Services, 'rec
     if (action === 'delete') {
       await deps.records.remove(id);
       await host.pushRecords();
-      await host.pushHistoryData();
       return;
     }
     if (action !== 'open') return; // V0.10：记录仅保留「打开题目」+ 未开始的「删除」
@@ -77,7 +76,6 @@ async function handleImportCfHistory(host: WorkbenchHost, deps: Pick<Services, '
   }
   await importAndNotify(host, deps, handle);
   await host.pushRecords();
-  await host.pushHistoryData();
 }
 
 

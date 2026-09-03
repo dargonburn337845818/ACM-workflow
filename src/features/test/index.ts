@@ -102,9 +102,7 @@ async function handleTestRun(host: WorkbenchHost, deps: Pick<Services, 'records'
             status: allPassed ? 'ac' : 'trying',
             attempts: rec.attempts + 1
           });
-          host.pushRecords();
-          host.pushTodayStats();
-          host.pushHistoryData(); // V0.8：记录变化后饼图实时刷新
+          host.pushRecords(); // V0.8：一次刷新同时更新列表、统计、今日与饼图
         }
       }
     } catch {

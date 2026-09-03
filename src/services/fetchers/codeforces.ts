@@ -85,6 +85,7 @@ export function writeSessionCookiesToJar(cookies: CfCookie[]): void {
 const CF_PROBLEMS_TTL_MS = 12 * 3600 * 1000;
 
 let cache: Problem[] | null = null;
+let problemsLoading: Promise<Problem[]> | null = null;
 
 function cfCacheDir(): string {
   return path.join(resolveBaseDir(), 'cache');
@@ -311,6 +312,17 @@ export async function getCodeforcesProblems(): Promise<Problem[]> {
     return disk;
   }
 
+  // 并发去重：薄弱推荐、难度补全、历史图表同时触发时只发一次网络请求
+  if (problemsLoading) return problemsLoading;
+  problemsLoading = loadCodeforcesProblems();
+  try {
+    return await problemsLoading;
+  } finally {
+    problemsLoading = null;
+  }
+}
+
+async function loadCodeforcesProblems(): Promise<Problem[]> {
   let lastError: Error | null = null;
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {

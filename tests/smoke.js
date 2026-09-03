@@ -99,6 +99,16 @@ console.log('== 4. CF 难度分档 ==');
   assert(labeled.includes('800') && labeled.includes('1400') && labeled.includes('3000+'), `分档 ${labeled.join(',')}`);
 }
 
+console.log('== 4b. 记录展示统计 ==');
+{
+  const { computeStats } = require(out('services/recordService.js'));
+  const mk = (status, id) => ({ id, platform: 'codeforces', title: id, url: 'u', status, attempts: 1, updatedAt: 0 });
+  const stats = computeStats([mk('ac', '1'), mk('ac', '2'), mk('trying', '3'), mk('untouched', '4')]);
+  assert(stats.total === 4 && stats.ac === 2 && stats.trying === 1 && stats.rate === '50%',
+    'computeStats 汇总正确', JSON.stringify(stats));
+  assert(computeStats([]).rate === '–', '空记录 rate 为 –');
+}
+
 console.log('== 5. 造数据确定性 ==');
 {
   const { generateInput, mulberry32 } = require(out('services/dataGen.js'));
@@ -228,6 +238,18 @@ console.log('== 8. 题面 LaTeX 排版（CF $$$ 行内公式） ==');
   }
 })();
 
+console.log('== 8b. 题面 viewHtml 缓存 ==');
+{
+  const { StatementService } = require(out('services/statementService.js'));
+  const st = new StatementService({});
+  const html = '<h1 class="st-title">T</h1><div class="st-sample"><pre>1</pre></div><div class="st-block st-p"><div class="st-en">desc</div></div>';
+  const a = st.viewHtml(html);
+  const b = st.viewHtml(html);
+  assert(a === b, 'viewHtml 重复调用返回同一缓存结果');
+  assert(!a.includes('st-sample'), 'viewHtml 移除样例内容');
+  assert(a.includes('desc'), 'viewHtml 保留正文');
+}
+
 console.log('== 9. 诊断服务（轨迹 / 脱敏 / 异常分析 / 报告） ==');
 {
   const diag = require(out('services/diagnostics.js'));
@@ -328,6 +350,25 @@ console.log('== 11. 测试页签 CSS（样例运行区只出现在样例页） =
   const m = css.match(/\.test-lower\s*\{([^}]*)\}/);
   assert(!!m, '找到 .test-lower 规则');
   assert(m && !/display\s*:\s*flex/.test(m[1]), '样例运行区不覆盖 .test-page-panel 的隐藏逻辑', m && m[1]);
+}
+
+console.log('== 12. Spark 解析器与提示词锚定 ==');
+{
+  const { extractPythonCode, buildDataGenPrompt } = require(out('services/spark.js'));
+  const fenced = extractPythonCode('Here:\n```python\nprint(1)\n```\nDone');
+  assert(fenced === 'print(1)', '代码块优先提取', fenced);
+  const plain = extractPythonCode('Here is your code:\nprint(1)\n');
+  assert(plain === 'print(1)', '无代码块时按 print 起始暴力降级', plain);
+  const def = extractPythonCode('Let me help.\ndef solve():\n    print(1)\n\nif __name__ == "__main__":\n    solve()\n');
+  assert(def.startsWith('def solve():') && def.includes('solve()'), '按 def 起始提取完整脚本', def);
+  assert(extractPythonCode('这段只是解题分析，没有代码。') === '', '无代码行返回空串，允许回退 reasoning 代码块');
+  const prompt = buildDataGenPrompt({
+    title: 'T',
+    id: '1A',
+    samples: [{ input: '3\n1 2 3\n', output: '6\n' }]
+  });
+  assert(prompt.includes('输出格式硬约束') && prompt.includes('样例格式') && prompt.includes('绝不能无输出'),
+    '提示词含首尾锚定与样例格式', prompt.slice(0, 200));
 }
 
 setTimeout(() => {

@@ -21,20 +21,18 @@ import { Problem } from '../types';
 export class ProblemWorkspace {
   urlImportBusy = false;
 
-  /** 从 .prob 内容构造 Problem（用于刷题记录登记） */
+  /** 从 .prob 内容构造 Problem（用于刷题记录登记）；URL 解析统一走 `parseCfProblemUrl`。 */
   problemFromProb(prob: any): Problem | null {
     const url = String(prob?.url || '');
     if (!url) return null;
     const name = String(prob?.name || '');
     const title = name.replace(/^[A-Za-z0-9]+\.[\s\u00a0]*/, '').trim() || name;
-    if (url.includes('codeforces.com')) {
-      const m = /problemset\/problem\/(\d+)\/([A-Za-z0-9]+)/.exec(url)
-        || /contest\/(\d+)\/problem\/([A-Za-z0-9]+)/.exec(url);
-      if (!m) return null;
-      const id = m[1] + m[2];
-      return { id, platform: 'codeforces', title, tags: [], url };
+    try {
+      const parsed = parseCfProblemUrl(url);
+      return { id: parsed.id, platform: 'codeforces', title, tags: [], url: parsed.url };
+    } catch {
+      return null;
     }
-    return null;
   }
 
   /** 从文件名 / 路径解析题目 ID（V0.13：修复「文件名是题目名、题号在目录名」的场景） */

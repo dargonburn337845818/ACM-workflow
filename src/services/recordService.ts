@@ -20,6 +20,20 @@ export interface TodayStats {
   streak: number;
 }
 
+/** 从记录数组计算展示统计（避免重复读库/重复扫描） */
+export function computeStats(records: ProblemRecord[]): { total: number; ac: number; trying: number; abandoned: number; rate: string } {
+  const ac = records.filter((r) => r.status === 'ac').length;
+  const trying = records.filter((r) => r.status === 'trying').length;
+  const abandoned = records.filter((r) => r.status === 'abandoned').length;
+  return {
+    total: records.length,
+    ac,
+    trying,
+    abandoned,
+    rate: records.length > 0 ? Math.round((ac / records.length) * 100) + '%' : '–'
+  };
+}
+
 /** 今日 AC 数 + 连续刷题天数（以 ac 记录的 updatedAt 为据） */
 export function computeTodayStats(records: ProblemRecord[]): TodayStats {
   const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -67,6 +81,11 @@ export class RecordService {
 
   stats(): Promise<{ total: number; ac: number; trying: number; abandoned: number; rate: string }> {
     return getStats();
+  }
+
+  /** 从已读取的记录数组计算统计；`pushRecords` 等批量刷新场景使用，避免二次读库。 */
+  statsFrom(records: ProblemRecord[]): { total: number; ac: number; trying: number; abandoned: number; rate: string } {
+    return computeStats(records);
   }
 
   bulkImport(

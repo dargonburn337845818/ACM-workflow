@@ -136,12 +136,21 @@ export async function listRecords(): Promise<ProblemRecord[]> {
   return rowsToRecords(res[0].values);
 }
 
-/** 记录存在则返回，不存在则插入（untouched） */
+/** 记录存在则返回，不存在则插入（untouched）。
+ *  已存在时直接返回，避免每次切换编辑器都对整库做一次无谓持久化。 */
 export async function ensureRecord(problem: Problem): Promise<ProblemRecord> {
   const d = await getDb();
+  const existing = d.exec(
+    'SELECT id, platform, title, difficulty, url, status, attempts, updated_at FROM records WHERE id = ?',
+    [problem.id]
+  );
+  if (existing.length > 0 && existing[0].values.length > 0) {
+    return rowsToRecords(existing[0].values)[0];
+  }
+
   const now = Date.now();
   d.run(
-    `INSERT OR IGNORE INTO records (id, platform, title, difficulty, url, status, attempts, updated_at)
+    `INSERT INTO records (id, platform, title, difficulty, url, status, attempts, updated_at)
      VALUES (?, ?, ?, ?, ?, 'untouched', 0, ?)`,
     [problem.id, problem.platform, problem.title, problem.difficulty ?? null, problem.url, now]
   );

@@ -6,6 +6,7 @@ import { JudgeService } from './judgeService';
 import { RecordService } from './recordService';
 import { SupportService } from './supportService';
 import { SparkService } from './spark';
+import { DashboardService } from './dashboard';
 
 export { CfSessionError } from './cfSession';
 export type { DataGenSpec, DataGenType, DataGenStepSpec } from './dataGen';
@@ -20,18 +21,22 @@ export interface Services {
   workspace: ProblemWorkspace;
   judge: JudgeService;
   records: RecordService;
+  dashboard: DashboardService;
   support: SupportService;
   spark: SparkService;
 }
 
 /** 组合根：统一构建并注入所有服务门面。 */
 export function createServices(context: vscode.ExtensionContext): Services {
+  const codeforces = new CodeforcesClient(context);
+  const records = new RecordService();
   return {
-    codeforces: new CodeforcesClient(context),
+    codeforces,
     statement: new StatementService(context),
     workspace: new ProblemWorkspace(),
     judge: new JudgeService(),
-    records: new RecordService(),
+    records,
+    dashboard: new DashboardService(records, codeforces),
     support: new SupportService(context),
     spark: new SparkService()
   };
