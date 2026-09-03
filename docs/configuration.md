@@ -30,8 +30,8 @@
 | `acmWorkflow.sparkBatchSize` | number | `512` | Spark llama-server 批大小。 |
 | `acmWorkflow.sparkThreads` | number | `8` | Spark llama-server CPU 线程数。 |
 | `acmWorkflow.sparkGpuLayers` | number | `99` | Spark 加载到 GPU 的层数；99 表示全量 GPU 加速。 |
-| `acmWorkflow.sparkMaxTokens` | number | `8192` | Spark 单次生成的最大 token 数。 |
-| `acmWorkflow.sparkRequestTimeoutMs` | number | `120000` | Spark 生成请求超时（毫秒）。 |
+| `acmWorkflow.sparkMaxTokens` | number | `4096` | Spark 单次生成的最大 token 数（造数据脚本通常足够）。 |
+| `acmWorkflow.sparkRequestTimeoutMs` | number | `300000` | Spark 生成请求超时（毫秒），默认 5 分钟。 |
 | `acmWorkflow.sparkScriptPath` | string | `D:\vscode_code\code\shell\gen.py` | AI 生成的造数据 Python 脚本固定保存路径；生成后自动覆盖并插入流水线。 |
 | `acmWorkflow.browserPath` | string | `""` | Puppeteer 使用的浏览器可执行文件路径。留空自动探测 Edge/Chrome/Chromium。 |
 | `acmWorkflow.followHandles` | string[] | `[]` | 比赛面板「我的关注」榜单的额外关注 handle（逗号分隔编辑；自己的 `cfHandle` 自动包含，大小写不敏感）。 |

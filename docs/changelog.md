@@ -9,6 +9,7 @@
 - 新增 `acmWorkflow.spark*` 全套配置
 - 修复下拉框完全白色、鼠标扫过才显示内容的问题（`select`/`option` 深色配色）
 - 修复 Spark 启动失败：`--ngl` 改为当前 llama.cpp 构建支持的 `-ngl`
+- 修复 AI 生成请求超时：默认超时放宽到 5 分钟，最大 token 降到 4096，超时提示更明确
 - 新增 GitHub Actions CI：lint / test / compile
 
 ## 0.21.0 — 可组装对拍器 / 造数据流水线 / 联动 VSCode Background（2026-08-28）

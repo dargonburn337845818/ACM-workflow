@@ -28,8 +28,8 @@ const DEFAULT_CTX_SIZE = 16384;
 const DEFAULT_BATCH_SIZE = 512;
 const DEFAULT_THREADS = 8;
 const DEFAULT_GPU_LAYERS = 99;
-const DEFAULT_MAX_TOKENS = 8192;
-const DEFAULT_REQUEST_TIMEOUT_MS = 120000;
+const DEFAULT_MAX_TOKENS = 4096;
+const DEFAULT_REQUEST_TIMEOUT_MS = 300000;
 const DEFAULT_IDLE_TIMEOUT_MS = 180000;
 
 let sparkProcess: ChildProcess | null = null;
@@ -387,6 +387,7 @@ export class SparkService {
     scheduleSparkStop();
 
     const target = resolveLocalEndpoint(getEndpoint());
+    const timeoutMs = cfg('sparkRequestTimeoutMs', DEFAULT_REQUEST_TIMEOUT_MS);
     const payload = {
       model: getModelName(),
       messages: [
@@ -398,12 +399,21 @@ export class SparkService {
       max_tokens: cfg('sparkMaxTokens', DEFAULT_MAX_TOKENS),
       stream: false
     };
-    const res = await fetch(llamaApiBase(target) + '/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(cfg('sparkRequestTimeoutMs', DEFAULT_REQUEST_TIMEOUT_MS))
-    });
+    let res: Response;
+    try {
+      res = await fetch(llamaApiBase(target) + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      if (e?.name === 'AbortError' || /timeout|aborted/i.test(msg)) {
+        throw new Error(`Spark 生成超时（超过 ${Math.round(timeoutMs / 1000)} 秒）。可调大 acmWorkflow.sparkRequestTimeoutMs，或检查模型速度/显存。`);
+      }
+      throw new Error(`Spark 请求异常：${msg}`);
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       throw new Error(`Spark 生成请求失败 HTTP ${res.status}: ${body.slice(0, 300)}`);
