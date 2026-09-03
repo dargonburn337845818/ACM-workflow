@@ -133,6 +133,7 @@ function buildSparkArgs(port: number): string[] {
     '--alias', getModelName(),
     '-ngl', String(cfg('sparkGpuLayers', DEFAULT_GPU_LAYERS)),
     '--flash-attn', 'on',
+    '--reasoning', 'off',
     '--log-file', getLogPath()
   ];
   return args;
@@ -419,9 +420,15 @@ export class SparkService {
       throw new Error(`Spark 生成请求失败 HTTP ${res.status}: ${body.slice(0, 300)}`);
     }
     const data: any = await res.json();
-    const content = String(data?.choices?.[0]?.message?.content || '');
-    const code = extractPythonCode(content);
-    if (!code) throw new Error('Spark 没有返回可用的 Python 代码');
+    const message = data?.choices?.[0]?.message || {};
+    const content = String(message?.content || '');
+    // Spark 带思维链时会先把内容放进 reasoning_content，content 反而为空。
+    const reasoning = String(message?.reasoning_content || '');
+    const code = extractPythonCode(content) || extractPythonCode(reasoning);
+    if (!code) {
+      const detail = (content || reasoning).slice(0, 200);
+      throw new Error(`Spark 没有返回可用的 Python 代码${detail ? `（响应片段：${detail}）` : ''}`);
+    }
     return code;
   }
 

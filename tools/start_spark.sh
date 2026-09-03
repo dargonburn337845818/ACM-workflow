@@ -98,7 +98,7 @@ start_spark_windows() {
   win_model="$(wslpath -w "$SPARK_MODEL" 2>/dev/null || echo "$SPARK_MODEL")"
   win_log_file="$(wslpath -w "$SPARK_LOG_FILE" 2>/dev/null || echo "$SPARK_LOG_FILE")"
   say "尝试启动 Windows llama-server: $win_exe"
-  powershell.exe -NoProfile -Command "Start-Process -FilePath '$win_exe' -ArgumentList '-m','$win_model','--host','0.0.0.0','--port','$SPARK_PORT','--ctx-size','$SPARK_CTX','--batch-size','$SPARK_BATCH','--ubatch-size','$SPARK_BATCH','--threads','$SPARK_THREADS','--parallel','1','--no-webui','--jinja','--alias','$SPARK_MODEL_ALIAS','-ngl','$SPARK_GPU_LAYERS','--flash-attn','on','--log-file','$win_log_file' -WindowStyle Hidden" >/dev/null 2>&1 || true
+  powershell.exe -NoProfile -Command "Start-Process -FilePath '$win_exe' -ArgumentList '-m','$win_model','--host','0.0.0.0','--port','$SPARK_PORT','--ctx-size','$SPARK_CTX','--batch-size','$SPARK_BATCH','--ubatch-size','$SPARK_BATCH','--threads','$SPARK_THREADS','--parallel','1','--no-webui','--jinja','--alias','$SPARK_MODEL_ALIAS','-ngl','$SPARK_GPU_LAYERS','--flash-attn','on','--reasoning','off','--log-file','$win_log_file' -WindowStyle Hidden" >/dev/null 2>&1 || true
 }
 
 start_spark_linux() {
@@ -107,7 +107,7 @@ start_spark_linux() {
     nohup "$SPARK_SERVER" -m "$SPARK_MODEL" --host 0.0.0.0 --port "$SPARK_PORT" \
       --ctx-size "$SPARK_CTX" --batch-size "$SPARK_BATCH" --ubatch-size "$SPARK_BATCH" \
       --threads "$SPARK_THREADS" --parallel 1 --no-webui --jinja --alias "$SPARK_MODEL_ALIAS" \
-      -ngl "$SPARK_GPU_LAYERS" --flash-attn on --log-file "$SPARK_LOG_FILE" >/dev/null 2>&1 &
+      -ngl "$SPARK_GPU_LAYERS" --flash-attn on --reasoning off --log-file "$SPARK_LOG_FILE" >/dev/null 2>&1 &
   fi
 }
 
