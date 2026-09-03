@@ -12,6 +12,7 @@ VSCode 内 Codeforces 刷题全流程工作台：选题 → 题面翻译 → 测
 - **修复生成超时**：Spark 请求超时放宽到 5 分钟，默认最大 token 降到 4096，并给出明确超时提示。
 - **修复无代码返回**：Spark 推理链在 `reasoning_content` 时自动回退提取；并默认以 `--reasoning off` 启动，更快直接返回代码。
 - **对齐 startmain.ps1**：默认上下文 131072、线程 16、KV cache `q4_0`、flash-attn on、`--reasoning off`。
+- **修复无输出**：提示词强调脚本必须直接执行并输出；验证失败时自动尝试补 `main()/generate_test_data()` 入口。
 
 ## 安装
 
