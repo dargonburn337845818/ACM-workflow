@@ -281,6 +281,19 @@ export function stopSparkServer(): void {
   stopAutoStartedSparkWindows();
 }
 
+/** 如果生成的脚本只定义了函数但没调用，尝试补一个入口再验证。 */
+function tryCallGeneratorFunctions(code: string): string | null {
+  if (/\bif\s+__name__\s*==\s*["']__main__["']/.test(code)) return null;
+  const candidates = ['main', 'generate_test_data', 'generate_data', 'gen', 'solve'];
+  for (const name of candidates) {
+    const defRe = new RegExp(`^\\s*def\\s+${name}\\s*\\(`, 'm');
+    if (defRe.test(code) && !code.includes(`${name}()`)) {
+      return `${code}\n\nif __name__ == "__main__":\n    ${name}()\n`;
+    }
+  }
+  return null;
+}
+
 /** 从模型输出中提取 Python 代码（兼容 markdown 代码块和纯文本）。 */
 export function extractPythonCode(raw: string): string {
   const text = String(raw || '');
@@ -356,6 +369,8 @@ export function buildDataGenPrompt(problem: { title: string; id?: string; url?: 
     '4. 代码必须是完整可执行的 Python 脚本，不需要 Markdown 代码块。',
     '5. 如果题目有变量间依赖（如 n 和后面数组长度），请保证生成数据自洽。',
     '6. 在覆盖边界/特殊情况的前提下，生成的数据要尽可能多样化。',
+    '7. 脚本必须能直接执行并输出数据：如果定义了函数（如 main/generate_test_data），必须在文件末尾调用它，确保运行 `python gen.py` 后有 stdout。',
+    '8. 不要使用 input() 等待输入；不要只定义函数而不调用。',
     '',
     `题目：${problem.title || ''}${problem.id ? ` (${problem.id})` : ''}`,
     problem.url ? `链接：${problem.url}` : '',
@@ -438,14 +453,26 @@ export class SparkService {
 
   /** 验证并保存到固定脚本路径，返回保存后的路径与验证输出。 */
   async validateAndSave(code: string): Promise<{ path: string; stdout: string; stderr: string }> {
-    const check = await runPythonCode(code);
+    let finalCode = code;
+    let check = await runPythonCode(finalCode);
+    // 模型常见问题：只定义函数但没调用 → 自动补一个入口再验证。
+    if (!check.ok && !check.stdout && !check.stderr) {
+      const repaired = tryCallGeneratorFunctions(finalCode);
+      if (repaired) {
+        const check2 = await runPythonCode(repaired);
+        if (check2.ok) {
+          finalCode = repaired;
+          check = check2;
+        }
+      }
+    }
     if (!check.ok) {
       throw new Error(`生成的脚本验证失败：${check.stderr || '无输出'}`);
     }
     const target = getScriptPath();
     if (!target) throw new Error('未配置 sparkScriptPath，无法保存生成脚本');
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, code, 'utf8');
+    fs.writeFileSync(target, finalCode, 'utf8');
     scheduleSparkStop();
     return { path: target, stdout: check.stdout.slice(0, 200), stderr: check.stderr };
   }
