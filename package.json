@@ -214,8 +214,8 @@
         },
         "acmWorkflow.sparkCtxSize": {
           "type": "number",
-          "default": 16384,
-          "description": "Spark 上下文长度（低占用调优，兼顾长题面与代码生成）。"
+          "default": 131072,
+          "description": "Spark 上下文长度（与 startmain.ps1 一致，131072）。"
         },
         "acmWorkflow.sparkBatchSize": {
           "type": "number",
@@ -224,8 +224,18 @@
         },
         "acmWorkflow.sparkThreads": {
           "type": "number",
-          "default": 8,
-          "description": "Spark llama-server CPU 线程数。"
+          "default": 16,
+          "description": "Spark llama-server CPU 线程数（与 startmain.ps1 一致，16）。"
+        },
+        "acmWorkflow.sparkCacheTypeK": {
+          "type": "string",
+          "default": "q4_0",
+          "description": "Spark KV cache K 类型（与 startmain.ps1 一致，q4_0）。"
+        },
+        "acmWorkflow.sparkCacheTypeV": {
+          "type": "string",
+          "default": "q4_0",
+          "description": "Spark KV cache V 类型（与 startmain.ps1 一致，q4_0）。"
         },
         "acmWorkflow.sparkGpuLayers": {
           "type": "number",

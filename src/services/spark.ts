@@ -24,10 +24,11 @@ const DEFAULT_MODEL_NAME = 'spark:latest';
 const DEFAULT_SERVER_PATH = 'D:\\llama-spark\\build\\bin\\llama-server.exe';
 const DEFAULT_MODEL_PATH = 'D:\\llama\\Spark-X2.5-4B-Q8_0\\Spark-X2.5-4B-Q8_0.gguf';
 const DEFAULT_SCRIPT_PATH = 'D:\\vscode_code\\code\\shell\\gen.py';
-const DEFAULT_CTX_SIZE = 16384;
+const DEFAULT_CTX_SIZE = 131072;
 const DEFAULT_BATCH_SIZE = 512;
-const DEFAULT_THREADS = 8;
+const DEFAULT_THREADS = 16;
 const DEFAULT_GPU_LAYERS = 99;
+const DEFAULT_CACHE_TYPE = 'q4_0';
 const DEFAULT_MAX_TOKENS = 4096;
 const DEFAULT_REQUEST_TIMEOUT_MS = 300000;
 const DEFAULT_IDLE_TIMEOUT_MS = 180000;
@@ -133,6 +134,8 @@ function buildSparkArgs(port: number): string[] {
     '--alias', getModelName(),
     '-ngl', String(cfg('sparkGpuLayers', DEFAULT_GPU_LAYERS)),
     '--flash-attn', 'on',
+    '--cache-type-k', cfg('sparkCacheTypeK', DEFAULT_CACHE_TYPE),
+    '--cache-type-v', cfg('sparkCacheTypeV', DEFAULT_CACHE_TYPE),
     '--reasoning', 'off',
     '--log-file', getLogPath()
   ];
@@ -150,6 +153,7 @@ function buildWslSparkEnv(): NodeJS.ProcessEnv {
     SPARK_BATCH: String(cfg('sparkBatchSize', DEFAULT_BATCH_SIZE)),
     SPARK_THREADS: String(cfg('sparkThreads', DEFAULT_THREADS)),
     SPARK_GPU_LAYERS: String(cfg('sparkGpuLayers', DEFAULT_GPU_LAYERS)),
+    SPARK_CACHE_TYPE: cfg('sparkCacheTypeK', DEFAULT_CACHE_TYPE),
     SPARK_LOG_FILE: getLogPath(),
     SPARK_PID_FILE: getPidFile()
   };

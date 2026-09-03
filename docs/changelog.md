@@ -11,6 +11,7 @@
 - 修复 Spark 启动失败：`--ngl` 改为当前 llama.cpp 构建支持的 `-ngl`
 - 修复 AI 生成请求超时：默认超时放宽到 5 分钟，最大 token 降到 4096，超时提示更明确
 - 修复 Spark 无代码返回：自动回退提取 `reasoning_content`，并默认 `--reasoning off` 启动
+- 默认启动参数对齐 `startmain.ps1`：ctx 131072、threads 16、KV cache q4_0
 - 新增 GitHub Actions CI：lint / test / compile
 
 ## 0.21.0 — 可组装对拍器 / 造数据流水线 / 联动 VSCode Background（2026-08-28）

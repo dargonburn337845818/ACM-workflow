@@ -26,9 +26,11 @@
 | `acmWorkflow.sparkModelName` | string | `spark:latest` | Spark 在 llama-server 中的模型别名（`--alias`）。 |
 | `acmWorkflow.sparkAutoStart` | boolean | `true` | 使用 Spark 生成脚本时，若服务未启动，扩展自动拉起。 |
 | `acmWorkflow.sparkIdleTimeoutMs` | number | `180000` | Spark 空闲多少毫秒后自动停止并释放显存；0 表示不自动停止。 |
-| `acmWorkflow.sparkCtxSize` | number | `16384` | Spark 上下文长度（低占用调优，兼顾长题面与代码生成）。 |
+| `acmWorkflow.sparkCtxSize` | number | `131072` | Spark 上下文长度（与 `startmain.ps1` 一致）。 |
 | `acmWorkflow.sparkBatchSize` | number | `512` | Spark llama-server 批大小。 |
-| `acmWorkflow.sparkThreads` | number | `8` | Spark llama-server CPU 线程数。 |
+| `acmWorkflow.sparkThreads` | number | `16` | Spark llama-server CPU 线程数（与 `startmain.ps1` 一致）。 |
+| `acmWorkflow.sparkCacheTypeK` | string | `q4_0` | Spark KV cache K 类型（与 `startmain.ps1` 一致）。 |
+| `acmWorkflow.sparkCacheTypeV` | string | `q4_0` | Spark KV cache V 类型（与 `startmain.ps1` 一致）。 |
 | `acmWorkflow.sparkGpuLayers` | number | `99` | Spark 加载到 GPU 的层数；99 表示全量 GPU 加速。 |
 | `acmWorkflow.sparkMaxTokens` | number | `4096` | Spark 单次生成的最大 token 数（造数据脚本通常足够）。 |
 | `acmWorkflow.sparkRequestTimeoutMs` | number | `300000` | Spark 生成请求超时（毫秒），默认 5 分钟。 |

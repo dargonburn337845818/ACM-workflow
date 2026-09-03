@@ -203,8 +203,8 @@ npm run compile
 | `acmWorkflow.sparkModelName` | `spark:latest` | Spark 在 llama-server 中的模型别名 |
 | `acmWorkflow.sparkAutoStart` | `true` | 使用 Spark 时未启动则自动拉起 |
 | `acmWorkflow.sparkIdleTimeoutMs` | `180000` | Spark 空闲自动停止毫秒数（3 分钟，0=不自动停止） |
-| `acmWorkflow.sparkCtxSize` | `16384` | Spark 上下文长度（低占用调优） |
-| `acmWorkflow.sparkThreads` | `8` | Spark CPU 线程数 |
+| `acmWorkflow.sparkCtxSize` | `131072` | Spark 上下文长度（与 `startmain.ps1` 一致） |
+| `acmWorkflow.sparkThreads` | `16` | Spark CPU 线程数（与 `startmain.ps1` 一致） |
 | `acmWorkflow.sparkGpuLayers` | `99` | Spark GPU 层数（全量加速） |
 | `acmWorkflow.sparkScriptPath` | `D:\vscode_code\code\shell\gen.py` | AI 生成的 Python 造数据脚本固定保存路径 |
 | `acmWorkflow.browserPath` | `""`（自动探测） | Puppeteer 浏览器路径；留空自动探测 Edge/Chrome/Chromium |
