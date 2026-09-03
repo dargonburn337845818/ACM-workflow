@@ -308,6 +308,12 @@ export function extractPythonCode(raw: string): string {
   return text.trim();
 }
 
+/** 只从 reasoning_content 中提取明确包裹的代码块，避免把解题分析当成脚本保存。 */
+function extractFencedPythonCode(raw: string): string {
+  const fence = /```(?:python|py)?\s*([\s\S]*?)```/i.exec(String(raw || ''));
+  return fence ? fence[1].trim() : '';
+}
+
 function pythonCommand(): string {
   const candidates = process.platform === 'win32' ? ['python'] : ['python3', 'python'];
   for (const c of candidates) {
@@ -411,7 +417,7 @@ export class SparkService {
     const payload = {
       model: getModelName(),
       messages: [
-        { role: 'system', content: '你是一名算法竞赛造数据专家，只输出可运行的 Python 3 代码。' },
+        { role: 'system', content: '你是一名算法竞赛数据生成器编写专家。唯一任务是编写生成随机合法输入数据的 Python 3 脚本；不要解题、不要解释算法、不要输出任何分析内容，只输出可运行的 Python 代码。' },
         { role: 'user', content: prompt }
       ],
       temperature: 0.3,
@@ -442,11 +448,12 @@ export class SparkService {
     const message = data?.choices?.[0]?.message || {};
     const content = String(message?.content || '');
     // Spark 带思维链时会先把内容放进 reasoning_content，content 反而为空。
+    // 只从 reasoning 里提取明确 ```python 代码块，避免把解题分析/解释保存成脚本。
     const reasoning = String(message?.reasoning_content || '');
-    const code = extractPythonCode(content) || extractPythonCode(reasoning);
+    const code = extractPythonCode(content) || extractFencedPythonCode(reasoning);
     if (!code) {
-      const detail = (content || reasoning).slice(0, 200);
-      throw new Error(`Spark 没有返回可用的 Python 代码${detail ? `（响应片段：${detail}）` : ''}`);
+      const detail = (content || reasoning).slice(0, 150);
+      throw new Error(`Spark 没有返回可用的 Python 代码（可能把解题分析当成了脚本）${detail ? `：${detail}` : ''}`);
     }
     return code;
   }
