@@ -80,10 +80,10 @@ http://localhost:8000
 
 ### Android APK
 
-方式一：GitHub Actions
+方式一：GitHub Actions（当前 monorepo）
 
-- 推送到 `main` 自动构建 APK，下载 artifact
-- 打 tag（如 `v1.0.0`）自动创建 GitHub Release
+- 推送到根仓库 `main` 时，根目录 `.github/workflows/build-apk.yml` 自动构建 APK，下载 artifact
+- 打 tag（如 `v1.0.0`）会触发根目录 Release 工作流；当前会自动发布 VSIX，APK 仍以 artifact 形式提供（后续可扩展为同一 Release 附带 APK）
 
 方式二：本地构建
 
@@ -123,28 +123,28 @@ build_windows.bat
 ├── knowledge_data.py          # 120 个算法数据
 ├── tiers_data.py              # 8 档难度数据
 ├── export_mobile_data.py      # 导出移动端 data.js
-├── .github/workflows/
-│   ├── build-apk.yml          # 自动构建 APK
-│   └── release.yml            # 打 tag 发 Release
 └── style.qss                  # 桌面端 Parallax Editorial 主题
+
+> 若把本目录抽成独立 GitHub 仓库，可参考 `mobile/build-apk.yml` 与根目录
+> `.github/workflows/build-apk.yml` 作为 Actions 模板；当前 monorepo 中由根 `.github/workflows` 统一执行。
 ```
 
 ---
 
 ## Release
 
-- 打 tag 自动构建 **Android APK**
-- 打 tag 自动构建 **Windows 桌面 EXE**（KnowledgeLadder.exe）
-- Windows EXE 可直接下载使用，无需源码构建
+在根仓库（monorepo）中：
 
-在 `main` 分支打 tag：
+- 根目录 `.github/workflows/build-apk.yml`：push 到 `main` 自动构建 Android APK
+- 根目录 `.github/workflows/release.yml`：VS Code 扩展 tag 自动构建 VSIX Release
+- 如果后续把 `knowledge-ladder` 抽成独立仓库，再从 `mobile/build-apk.yml` 模板恢复子项目自己的 Actions
+
+本地打 tag 示例：
 
 ```bash
 git tag v1.0.0
 git push origin main --tags
 ```
-
-GitHub Actions 会自动构建 APK 并创建 Release。
 
 ---
 

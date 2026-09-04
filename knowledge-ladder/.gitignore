@@ -5,6 +5,8 @@ __pycache__/
 # Capacitor / Android 构建产物（CI 自动生成）
 mobile/android/
 mobile/node_modules/
+mobile/www/data.js
+reports/
 
 # 本地运行产物
 .preview/

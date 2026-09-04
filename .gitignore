@@ -41,6 +41,8 @@ __pycache__/
 # 移动端 Capacitor 构建产物（CI 自动生成）
 knowledge-ladder/mobile/android/
 knowledge-ladder/mobile/node_modules/
+knowledge-ladder/mobile/www/data.js
+knowledge-ladder/reports/
 
 # 内部开发记录/决策文档（不随正式发布推送）
 CONTEXT.md

@@ -168,6 +168,18 @@ console.log('== 5. 造数据确定性 ==');
       ]
     }, mulberry32(1));
     assert(foolproof === '3\n1 1 1\n2\n7 8\n7 8\n', '傻瓜式 line+countRef 拼装', JSON.stringify(foolproof));
+    const graph = await generateInput({ type: 'graph', nMin: 5, nMax: 5, mMin: 4, mMax: 4 }, mulberry32(9));
+    const gLines = graph.trim().split('\n');
+    const [gN, gM] = gLines[0].split(' ').map(Number);
+    assert(gN === 5 && gM === 4 && gLines.length === 5, '图：首行/边数正确', graph);
+    const gEdges = gLines.slice(1).map((l) => l.split(' ').slice(0, 2).map(Number).sort((a, b) => a - b).join(','));
+    assert(new Set(gEdges).size === gM && gEdges.every((e) => e.split(',').every((x) => Number(x) >= 1 && Number(x) <= 5) && e.split(',')[0] !== e.split(',')[1]),
+      '图：无重边/无自环', JSON.stringify(gEdges));
+    const directed = await generateInput({ type: 'graph', nMin: 4, nMax: 4, mMin: 8, mMax: 8, directed: true }, mulberry32(11));
+    const dLines = directed.trim().split('\n');
+    const dEdges = dLines.slice(1).map((l) => l.split(' ').slice(0, 2).join(','));
+    assert(dLines[0] === '4 8' && new Set(dEdges).size === 8 && !dEdges.some((e) => e.split(',')[0] === e.split(',')[1]),
+      '有向图：无重边/无自环', directed);
   })().catch((e) => { assert(false, '造数据', e.message); });
 }
 

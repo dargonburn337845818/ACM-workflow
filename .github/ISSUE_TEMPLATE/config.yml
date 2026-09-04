@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 文档
+    url: https://github.com/dargonburn337845818/ACM-workflow/blob/main/docs/features.md
+    about: 功能与配置说明
+  - name: 故障排查
+    url: https://github.com/dargonburn337845818/ACM-workflow/blob/main/docs/troubleshooting.md
+    about: 常见问题与诊断步骤

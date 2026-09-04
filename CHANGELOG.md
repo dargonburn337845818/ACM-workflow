@@ -3,6 +3,13 @@
 最新版本：**0.22.0**（工作流性能重构 + AI 造数据脚本泛化修复）。
 上一版本：**0.21.3**（Spark 本地模型集成 / 启动参数与无代码返回修复）。
 
+## Unreleased
+
+- 性能：随机图生成改用边编号无放回抽样，内存从 O(n²) 降为 O(m)，大 n 不再构造全边数组；长字符串用数组 join；`.cpp` 造数据脚本编译改为异步。
+- AI 造数据：生成脚本默认保存到当前题目目录 `gen.py`（可被 `sparkScriptPath` 覆盖），不再绑定个人盘符路径；保存改为原子写；验证临时文件运行后即清理；提示词新增“不用 input()、控制数据规模、快速运行”约束。
+- 仓库设计：移除 `knowledge-ladder` 内不生效的嵌套 workflows，改为根目录统一 monorepo Actions；新增 SECURITY / CONTRIBUTING / docs/DEVELOPMENT / Issue 与 PR 模板 / Dependabot / Gitleaks 安全扫描；`knowledge-ladder` 生成产物（`mobile/www/data.js`、`reports/`）不再跟踪。
+- 隐私：README 与配置文档明确密钥只存 SecretStorage、默认数据目录、本地路径仅为示例；CI 增加“跟踪到私有产物立即失败”检查。
+
 完整迭代历史见 [docs/changelog.md](docs/changelog.md)：
 
 - **0.22.0** 重构记录/题面/CF 题集性能：新增 Dashboard 组合服务，一次读库产出列表、统计、今日与历史图表；题面 viewHtml 与可翻译数缓存；CF problemset 请求并发去重；题面难度补全改后台异步并新增 `statementDifficulty` 前端更新；已存在记录不再重复整库持久化。修复 AI 造数据脚本“换题无输出”：解析器三级兜底（正文代码 / reasoning 代码块 / 裸 Python）、提示词首尾锚定与样例注入、验证失败后最多 3 次“报错-修正”闭环、多次失败写入保底可运行脚本。CF URL 解析统一收敛到 `parseCfProblemUrl`。

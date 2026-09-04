@@ -23,7 +23,7 @@ const DEFAULT_ENDPOINT = 'http://127.0.0.1:8080';
 const DEFAULT_MODEL_NAME = 'spark:latest';
 const DEFAULT_SERVER_PATH = 'D:\\llama-spark\\build\\bin\\llama-server.exe';
 const DEFAULT_MODEL_PATH = 'D:\\llama\\Spark-X2.5-4B-Q8_0\\Spark-X2.5-4B-Q8_0.gguf';
-const DEFAULT_SCRIPT_PATH = 'D:\\vscode_code\\code\\shell\\gen.py';
+const DEFAULT_SCRIPT_PATH = '';
 const DEFAULT_CTX_SIZE = 131072;
 const DEFAULT_BATCH_SIZE = 512;
 const DEFAULT_THREADS = 16;
@@ -336,35 +336,35 @@ function pythonCommand(): string {
 
 function runPythonCode(code: string, timeoutMs = 15000): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const tmp = path.join(os.tmpdir(), 'acm-workflow-spark', `gen_${Date.now()}.py`);
+    const tmp = path.join(os.tmpdir(), 'acm-workflow-spark', `gen_${process.pid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.py`);
     fs.mkdirSync(path.dirname(tmp), { recursive: true });
     fs.writeFileSync(tmp, code, 'utf8');
+    const cleanup = () => {
+      try { fs.unlinkSync(tmp); } catch { /* 已清理 */ }
+    };
     const cmd = pythonCommand();
     const child = spawn(cmd, [tmp], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     let settled = false;
+    const finish = (r: { ok: boolean; stdout: string; stderr: string }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(r);
+    };
     const timer = setTimeout(() => {
       try { child.kill('SIGKILL'); } catch { /* ignore */ }
-      if (!settled) {
-        settled = true;
-        resolve({ ok: false, stdout, stderr: stderr || '生成脚本运行超时（>15s）' });
-      }
+      finish({ ok: false, stdout, stderr: stderr || '生成脚本运行超时（>15s）' });
     }, timeoutMs);
     child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
     child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
     child.on('error', (e) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timer);
-        resolve({ ok: false, stdout, stderr: `无法运行 Python：${e.message}` });
-      }
+      finish({ ok: false, stdout, stderr: `无法运行 Python：${e.message}` });
     });
     child.on('close', (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve({ ok: code === 0 && stdout.trim().length > 0, stdout, stderr });
+      finish({ ok: code === 0 && stdout.trim().length > 0, stdout, stderr });
     });
   });
 }
@@ -375,6 +375,8 @@ export interface SparkProblemContext {
   url?: string;
   statement?: string;
   samples?: { input: string; output?: string }[];
+  /** 可选：题目目录下的生成脚本保存路径（留空则用配置项或默认 ~/.acm-workflow/gen.py）。 */
+  scriptPath?: string;
 }
 
 export function buildDataGenPrompt(problem: SparkProblemContext): string {
@@ -408,6 +410,9 @@ export function buildDataGenPrompt(problem: SparkProblemContext): string {
     '4. 代码必须是完整可执行的 Python 脚本，不需要 Markdown 代码块。',
     '5. 如果题目有变量间依赖（如 n 和后面数组长度），请保证生成数据自洽。',
     '6. 在覆盖边界/特殊情况的前提下，生成的数据要尽可能多样化。',
+    '7. 脚本不得使用 input() 或等待交互；必须一次性直接输出到 stdout。',
+    '8. 生成数据规模必须符合题面约束；题面如果限制 N<=1e5，就不要生成 1e6 以上规模。',
+    '9. 脚本本身应快速运行，不要做重计算或死循环。',
     `题目：${problem.title || ''}${problem.id ? ` (${problem.id})` : ''}`,
     problem.url ? `链接：${problem.url}` : '',
     '',
@@ -591,10 +596,18 @@ export class SparkService {
       }
     }
 
-    const target = getScriptPath();
-    if (!target) throw new Error('未配置 sparkScriptPath，无法保存生成脚本');
+    // 保存优先级：调用方指定的题目目录 gen.py > sparkScriptPath 配置 > ~/.acm-workflow/gen.py。
+    const configured = getScriptPath();
+    const target = problem?.scriptPath || configured || path.join(os.homedir(), '.acm-workflow', 'gen.py');
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, finalCode, 'utf8');
+    // 原子写入：先写临时文件再 rename，避免生成中断留下半个 gen.py。
+    const tmp = `${target}.tmp-${process.pid}-${Date.now()}`;
+    try {
+      fs.writeFileSync(tmp, finalCode, 'utf8');
+      fs.renameSync(tmp, target);
+    } finally {
+      try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch { /* 已清理 */ }
+    }
     scheduleSparkStop();
     return {
       path: target,

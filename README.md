@@ -206,7 +206,7 @@ npm run compile
 | `acmWorkflow.sparkCtxSize` | `131072` | Spark 上下文长度（与 `startmain.ps1` 一致） |
 | `acmWorkflow.sparkThreads` | `16` | Spark CPU 线程数（与 `startmain.ps1` 一致） |
 | `acmWorkflow.sparkGpuLayers` | `99` | Spark GPU 层数（全量加速） |
-| `acmWorkflow.sparkScriptPath` | `D:\vscode_code\code\shell\gen.py` | AI 生成的 Python 造数据脚本固定保存路径 |
+| `acmWorkflow.sparkScriptPath` | `""` → 当前题目目录 `gen.py` | AI 生成的 Python 造数据脚本保存路径；留空时按题目隔离，避免互相覆盖 |
 | `acmWorkflow.browserPath` | `""`（自动探测） | Puppeteer 浏览器路径；留空自动探测 Edge/Chrome/Chromium |
 | `acmWorkflow.followHandles` | `[]` | 比赛「我的关注」额外 Handle（自己的自动包含） |
 | `acmWorkflow.proxy` | `""` | CF 网络代理（扩展请求不跟随系统代理，需代理时填写） |
@@ -222,6 +222,14 @@ npm run compile
 其余功能在工作台内点击即可；命令面板输入 `ACM Workflow` 可查看全部命令：
 
 `打开工作台` · `随机选题` · `重新获取测试数据` · `批量补充测试数据` · `环境配置引导` · `工作流诊断` · `应用硬边墨色美化` · `还原美化`
+
+## 🔐 隐私与安全
+
+- **密钥不进仓库**：CF Cookie、DeepSeek API Key 等敏感信息只存 `vscode.SecretStorage`（Windows 凭据管理器 / macOS 钥匙串 / Linux libsecret），不会写入 `settings.json`、日志或 Git。
+- **数据默认留在本机**：题目、记录、缓存默认在 `~/.acm-workflow/`；上传/推送不包含这些运行时数据。
+- **诊断报告脱敏**：诊断命令会自动隐藏主目录、邮箱与疑似密钥后再输出报告。
+- **日志与本地产物**：`*.db`、`*.log`、`cache/`、`node_modules/`、`out/`、`dist/` 等已加入 `.gitignore`，不会被提交。
+- **本地路径可配置**：工具脚本中的 `D:\...` 只是作者本机示例路径，公开使用前请在 VS Code 设置中改成自己的路径；`sparkScriptPath` 默认按题目目录保存，不再依赖个人盘符。
 
 ## ❓ 常见问题（FAQ）
 
@@ -269,6 +277,12 @@ tests/smoke.js                # 冒烟测试（无 VS Code 环境可跑）
 docs/                         # 完整文档
 ```
 
+## 🧱 仓库结构（monorepo）
+
+- `src/` + `media/`：VS Code 扩展主体。
+- `knowledge-ladder/`：独立 Python 知识阶梯子项目（桌面端 + 移动端 PWA）。其生成产物（`mobile/www/data.js`、`reports/`）已由 `.gitignore` 排除，CI 中自动重新生成。
+- `.github/workflows/`：根目录统一 Actions（扩展 CI/APK/Release/安全扫描）。`knowledge-ladder` 子目录不维护自己的 `.github`，避免“看起来会执行”的误判。
+
 ## 🛠 技术栈
 
 TypeScript · VS Code Extension API（WebviewView）· Node.js · puppeteer-core · cheerio · undici · sql.js（WASM SQLite，零原生依赖）
@@ -283,7 +297,8 @@ TypeScript · VS Code Extension API（WebviewView）· Node.js · puppeteer-core
 4. 提交前确保：`npm run lint`（零错误）`npm run test`（冒烟全过）
 5. 发起 Pull Request（说明改动与验证结果）
 
-详细规范见 [docs/features.md](docs/features.md) 与 [docs/changelog.md](docs/changelog.md)
+完整流程与开发建议见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)；
+功能详解见 [docs/features.md](docs/features.md)，变更记录见 [docs/changelog.md](docs/changelog.md)。
 
 ## 📜 开源协议
 

@@ -2,6 +2,17 @@
 
 版本号遵循语义化版本。本文件记录正式版本迭代历史。
 
+## Unreleased — 性能 / AI 造数据 / 仓库治理
+
+- 随机图生成改为边编号无放回抽样：不再构造 O(n²) 全边数组，大 n 内存从 O(n²) 降到 O(m)
+- 长字符串使用数组 `join` 生成；`.cpp` 造数据脚本编译改为异步，避免阻塞扩展事件循环
+- AI 造数据脚本默认保存到当前题目目录 `gen.py`（可用 `sparkScriptPath` 覆盖为全局路径），避免不同题目互相覆盖
+- Spark 验证临时文件运行后清理；生成脚本保存使用原子写（临时文件 + rename）
+- 提示词增加“禁止 `input()`、控制数据规模、脚本快速运行”约束
+- 仓库治理：移除 `knowledge-ladder` 内不执行的嵌套 Actions；新增 `SECURITY.md` / `CONTRIBUTING.md` / `docs/DEVELOPMENT.md` / Issue 与 PR 模板 / Dependabot / Gitleaks 安全扫描
+- `knowledge-ladder` 生成产物（`mobile/www/data.js`、`reports/*.html`）改为不跟踪，由 CI 重新生成
+- CI 增加“跟踪私有产物即失败”检查，强化隐私红线
+
 ## 0.22.0 — 工作流性能重构 / AI 造数据脚本泛化修复（2026-09-04）
 
 - 新增 `DashboardService` 组合服务：一次读取刷题记录，产出列表、统计、今日数据与历史图表，减少重复读库

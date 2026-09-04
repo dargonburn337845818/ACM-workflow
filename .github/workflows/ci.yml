@@ -7,9 +7,17 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -32,3 +40,11 @@ jobs:
 
       - name: Compile
         run: npm run compile
+
+      - name: Verify no private artifacts are tracked
+        run: |
+          if git ls-files | grep -E '(^|/)(records\.db|.*\.log|.*\.sqlite|.*\.sqlite3)$'; then
+            echo "::error::发现隐私/运行产物被 Git 跟踪，请从仓库移除。"
+            exit 1
+          fi
+          echo "tracked private-artifact check passed"

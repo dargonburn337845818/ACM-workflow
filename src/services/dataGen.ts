@@ -1,8 +1,11 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { spawn, execFileSync } from 'child_process';
+import { spawn, execFileSync, execFile } from 'child_process';
+import { promisify } from 'util';
 import { findCompiler } from './runner';
+
+const execFileAsync = promisify(execFile);
 
 /**
  * 造数据机器（模块三）：内置数组/树/图/字符串/排列生成器 + 用户脚本自定义。
@@ -123,6 +126,44 @@ function genTree(spec: DataGenSpec, rng: Rng): string {
   return lines.join('\n') + '\n';
 }
 
+/**
+ * 简单图的边用全局编号（0..totalEdges-1）表示，避免 n 较大时构造 O(n²) 全边数组。
+ * 无向边按行优先编号：(u,v), u<v；有向边按行优先编号：u!=v。
+ */
+function undirectedStartRow(n: number, u: number): number {
+  return (u - 1) * n - ((u - 1) * u) / 2;
+}
+
+function edgeFromIndex(n: number, directed: boolean, k: number): [number, number] {
+  if (directed) {
+    const row = Math.floor(k / (n - 1));
+    const local = k - row * (n - 1);
+    const u = row + 1;
+    const v = local < u - 1 ? local + 1 : local + 2;
+    return [u, v];
+  }
+  // 无向：找第 k 条边所在的行（第 u 行有 n-u 条边），二分避免逐行扫描。
+  let lo = 1;
+  let hi = n - 1;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi + 1) / 2);
+    if (undirectedStartRow(n, mid) <= k) lo = mid; else hi = mid - 1;
+  }
+  const u = lo;
+  const v = u + (k - undirectedStartRow(n, u)) + 1;
+  return [u, v];
+}
+
+/** Floyd 随机抽样：从 [0, N) 中无放回取 m 个不同编号，O(m) 时间与内存。 */
+function sampleDistinct(rng: Rng, m: number, n: number): number[] {
+  const picked = new Set<number>();
+  for (let i = n - m; i < n; i++) {
+    const t = randInt(rng, 0, i);
+    if (picked.has(t)) picked.add(i); else picked.add(t);
+  }
+  return Array.from(picked);
+}
+
 function genGraph(spec: DataGenSpec, rng: Rng): string {
   const n = clampInt(spec.nMin ?? spec.nMax, 8, 1, 100000);
   const directed = !!spec.directed;
@@ -135,52 +176,11 @@ function genGraph(spec: DataGenSpec, rng: Rng): string {
   const lo = Math.min(wMin, wMax);
   const hi = Math.max(wMin, wMax);
 
-  // 简单图随机不重复边：n 小时全量洗牌取前 m 条；n 大时拒绝采样（避免 O(n²) 内存）
-  const edges: [number, number][] = [];
-  if (n <= 4000) {
-    const all: [number, number][] = [];
-    for (let u = 1; u <= n; u++) {
-      for (let v = 1; v <= n; v++) {
-        if (u === v) continue;
-        if (!directed && u > v) continue;
-        all.push([u, v]);
-      }
-    }
-    shuffle(rng, all);
-    edges.push(...all.slice(0, m));
-  } else {
-    const seen = new Set<number>();
-    const key = (u: number, v: number) => u * (n + 1) + v;
-    let guard = 0;
-    while (edges.length < m && guard < m * 50 + 1000) {
-      const u = randInt(rng, 1, n);
-      const v = randInt(rng, 1, n);
-      if (u === v) continue;
-      if (!directed && u > v) continue;
-      const k = directed ? key(u, v) : key(Math.min(u, v), Math.max(u, v));
-      if (seen.has(k)) { guard++; continue; }
-      seen.add(k);
-      edges.push([u, v]);
-      guard = 0;
-    }
-    // 极端稀疏图兜底：顺序补边保证达到 m
-    if (edges.length < m) {
-      outer: for (let u = 1; u <= n && edges.length < m; u++) {
-        for (let v = 1; v <= n && edges.length < m; v++) {
-          if (u === v) continue;
-          if (!directed && u > v) continue;
-          const k = directed ? key(u, v) : key(Math.min(u, v), Math.max(u, v));
-          if (!seen.has(k)) {
-            seen.add(k);
-            edges.push([u, v]);
-          }
-        }
-      }
-    }
-  }
-
+  // 简单图随机不重复边：直接对全局边编号做无放回抽样，不构造全边数组。
+  const indexes = sampleDistinct(rng, m, maxEdges);
   const lines: string[] = [`${n} ${m}`];
-  for (const [u, v] of edges) {
+  for (const k of indexes) {
+    const [u, v] = edgeFromIndex(n, directed, k);
     lines.push(spec.weighted ? `${u} ${v} ${randInt(rng, lo, hi)}` : `${u} ${v}`);
   }
   return lines.join('\n') + '\n';
@@ -196,13 +196,12 @@ const CHARSETS: Record<string, string> = {
 
 function genString(spec: DataGenSpec, rng: Rng): string {
   const len = randInt(rng, clampInt(spec.lenMin, 10, 0, 1000000), clampInt(spec.lenMax, 10, 0, 1000000));
-  let pool = CHARSETS[spec.charset || 'lower'] || String(spec.charset || 'ab');
-  if (!pool) pool = 'ab';
-  let out = '';
+  const pool = CHARSETS[spec.charset || 'lower'] || String(spec.charset || 'ab') || 'ab';
+  const chars = new Array<string>(len);
   for (let i = 0; i < len; i++) {
-    out += pool[randInt(rng, 0, pool.length - 1)];
+    chars[i] = pool[randInt(rng, 0, pool.length - 1)];
   }
-  return `${out}\n`;
+  return chars.join('') + '\n';
 }
 
 function genPermutation(spec: DataGenSpec, rng: Rng): string {
@@ -330,8 +329,8 @@ async function runScript(scriptPath: string): Promise<string> {
     const exe = path.join(os.tmpdir(), 'acm-workflow', 'gen_' + Date.now() + (process.platform === 'win32' ? '.exe' : ''));
     fs.mkdirSync(path.dirname(exe), { recursive: true });
     try {
-      execFileSync(compiler, ['-O2', '-std=c++17', scriptPath, '-o', exe], {
-        encoding: 'utf8', timeout: 60000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']
+      await execFileAsync(compiler, ['-O2', '-std=c++17', scriptPath, '-o', exe], {
+        encoding: 'utf8', timeout: 60000, windowsHide: true
       });
     } catch (e: any) {
       throw new Error(`生成脚本编译失败：${String(e?.stderr || e?.message).slice(0, 400)}`);
@@ -347,28 +346,37 @@ async function runScript(scriptPath: string): Promise<string> {
     let stdout = '';
     let stderr = '';
     let settled = false;
+    const cleanup = () => {
+      if ((ext === '.cpp' || ext === '.cc') && cmd) {
+        try { fs.unlinkSync(cmd); } catch { /* 已清理 */ }
+      }
+    };
+    const finish = (err?: Error, out?: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      if (err) reject(err); else resolve(out!);
+    };
     const timer = setTimeout(() => {
       try { child.kill('SIGKILL'); } catch { /* ignore */ }
-      if (!settled) { settled = true; reject(new Error('生成脚本运行超时（>15s）')); }
+      finish(new Error('生成脚本运行超时（>15s）'));
     }, SCRIPT_RUN_TIMEOUT_MS);
     child.stdout.on('data', (d) => { stdout += d.toString(); });
     child.stderr.on('data', (d) => { stderr += d.toString(); });
     child.on('error', (e) => {
-      if (!settled) { settled = true; clearTimeout(timer); reject(new Error(`生成脚本无法运行：${e.message}`)); }
+      finish(new Error(`生成脚本无法运行：${e.message}`));
     });
     child.on('close', (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
       if (code !== 0) {
-        reject(new Error(`生成脚本退出码 ${code}：${stderr.slice(0, 400)}`));
+        finish(new Error(`生成脚本退出码 ${code}：${stderr.slice(0, 400)}`));
         return;
       }
       if (!stdout.trim()) {
-        reject(new Error('生成脚本没有输出任何数据'));
+        finish(new Error('生成脚本没有输出任何数据'));
         return;
       }
-      resolve(stdout);
+      finish(undefined, stdout);
     });
   });
 }

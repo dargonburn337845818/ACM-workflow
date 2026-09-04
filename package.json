@@ -254,8 +254,8 @@
         },
         "acmWorkflow.sparkScriptPath": {
           "type": "string",
-          "default": "D:\\vscode_code\\code\\shell\\gen.py",
-          "description": "AI 生成的造数据 Python 脚本固定保存路径；生成后自动在该路径覆盖并插入造数据流水线。"
+          "default": "",
+          "description": "AI 生成的造数据 Python 脚本保存路径。留空时保存到当前题目目录的 gen.py（推荐，避免不同题目互相覆盖）；也可指定全局固定路径。"
         },
         "acmWorkflow.browserPath": {
           "type": "string",

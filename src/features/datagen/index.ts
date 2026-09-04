@@ -83,7 +83,7 @@ function resolveCurrentProblemContext(
   filePath: string,
   probPath: string,
   workspace: Pick<Services, 'workspace'>['workspace']
-): { title: string; id?: string; url?: string; statement: string; samples?: { input: string; output?: string }[] } {
+): { title: string; id?: string; url?: string; statement: string; samples?: { input: string; output?: string }[]; scriptPath: string } {
   let prob: any = {};
   try {
     prob = JSON.parse(fs.readFileSync(probPath, 'utf8'));
@@ -111,7 +111,15 @@ function resolveCurrentProblemContext(
         output: t.output !== undefined ? String(t.output || '') : undefined
       }))
     : undefined;
-  return { title, id, url: url || undefined, statement: readProblemStatement(filePath), samples };
+  return {
+    title,
+    id,
+    url: url || undefined,
+    statement: readProblemStatement(filePath),
+    samples,
+    // 默认保存到当前题目目录，避免不同题目互相覆盖同一个 gen.py；用户可另配 sparkScriptPath 覆盖。
+    scriptPath: path.join(path.dirname(filePath), 'gen.py')
+  };
 }
 
 async function handleSparkGenerateScript(host: WorkbenchHost, deps: Pick<Services, 'workspace' | 'spark'>): Promise<void> {
