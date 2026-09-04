@@ -1,15 +1,18 @@
 # Changelog
 
-最新版本：**0.22.0**（工作流性能重构 + AI 造数据脚本泛化修复）。
-上一版本：**0.21.3**（Spark 本地模型集成 / 启动参数与无代码返回修复）。
+最新版本：**0.23.0**（AI 造数据脚本可靠性重做 + 性能与仓库治理）。
+上一版本：**0.22.0**（工作流性能重构 + AI 造数据脚本泛化修复）。
 
-## Unreleased
+## 0.23.0
 
-- 性能：随机图生成改用边编号无放回抽样，内存从 O(n²) 降为 O(m)，大 n 不再构造全边数组；长字符串用数组 join；`.cpp` 造数据脚本编译改为异步；`runner.compileCpp` 全链路异步化，不再阻塞扩展事件循环；编译缓存改用源码 SHA-1 内容哈希，减少 mtime 抖动导致的重编译。
-- AI 造数据：生成脚本默认保存到当前题目目录 `gen.py`（可被 `sparkScriptPath` 覆盖），不再绑定个人盘符路径；保存改为原子写；验证临时文件运行后即清理；提示词新增“不用 input()、控制数据规模、快速运行”约束；`spark.ts` 拆出 `sparkLifecycle.ts` 分离服务器生命周期；验证输出增加 8MB 上限。
-- 测试：新增 Tree/Graph/String 种子 golden 样例，冒烟升至 88 项。
-- 仓库设计：移除 `knowledge-ladder` 内不生效的嵌套 workflows，改为根目录统一 monorepo Actions；新增 SECURITY / CONTRIBUTING / docs/DEVELOPMENT / Issue 与 PR 模板 / Dependabot / Gitleaks 安全扫描；`knowledge-ladder` 生成产物（`mobile/www/data.js`、`reports/`）不再跟踪；tag Release 现在同时发布 VSIX + APK。
-- 隐私：README 与配置文档明确密钥只存 SecretStorage、默认数据目录、本地路径仅为示例；CI 增加“跟踪到私有产物立即失败”检查。
+- AI 造数据修复：修正提示词现在会重新携带**完整题面与约束**，不再让模型在丢失题面的情况下盲修。
+- 代码提取增强：无 Markdown 围栏时，自动切除代码尾部夹带的中文散文/解释，避免“把说明当代码”导致语法错误。
+- 验证增强：输出必须通过轻量形状校验（不能夹带解释性文字；样例首行是整数 N 时输出首行也必须是整数），避免“有输出但数据其实是废话”的假通过。
+- 保底升级：多次修复失败后不再只写 `print(1)`，优先根据官方样例生成**样例形状随机化脚本**（保留行数/token 数结构并随机化数值/字符串）。
+- 性能：随机图生成改用边编号无放回抽样，内存从 O(n²) 降为 O(m)；长字符串用数组 join；`runner.compileCpp` 全链路异步化；编译缓存改用源码 SHA-1 内容哈希。
+- 模块化：`spark.ts` 拆出 `sparkLifecycle.ts` 分离服务器生命周期；`dataGen.runScript` 的 `.cpp` 编译异步化并清理临时产物。
+- 仓库设计：移除 `knowledge-ladder` 内不生效的嵌套 workflows，根目录统一 monorepo Actions；新增 SECURITY / CONTRIBUTING / docs/DEVELOPMENT / Issue 与 PR 模板 / Dependabot / Gitleaks / CODEOWNERS；`knowledge-ladder` 生成产物不再跟踪；tag Release 同时发布 VSIX + APK。
+- 测试：冒烟测试扩展到 **90 项**（新增代码尾部散文切除、样例形状保底脚本、Tree/Graph/String golden）。
 
 完整迭代历史见 [docs/changelog.md](docs/changelog.md)：
 

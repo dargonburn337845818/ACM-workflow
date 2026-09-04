@@ -32,7 +32,8 @@ src/
 - `dataGen.runScript` 的 `.cpp` 编译也已是异步子进程，并清理编译产物。
 - `spark.ts` 已拆成 `sparkLifecycle.ts` + `spark.ts`，生命周期与脚本生成职责分离。
 - Spark 验证增加 stdout 8MB 上限，防止模型写出天文数字。
-- 测试新增 Tree/Graph/String 种子 golden 样例，当前冒烟 88 项通过。
+- AI 修复提示词现在携带完整题面；代码提取会切除尾部散文；验证增加轻量形状校验；保底脚本升级为“样例形状随机化”。
+- 测试新增 Tree/Graph/String 种子 golden 样例、提取切散文、样例形状保底，当前冒烟 90 项通过。
 - tag Release 现在一次发布 VSIX + APK 两个资产。
 
 继续建议：

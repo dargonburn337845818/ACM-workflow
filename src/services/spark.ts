@@ -47,9 +47,19 @@ function tryCallGeneratorFunctions(code: string): string | null {
   return null;
 }
 
+/** 中文散文/解释行：不是代码，也不是 # 注释。用于把模型夹带的分析文字从代码尾部切掉。 */
+function isProseLine(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  if (t.startsWith('#')) return false;
+  if (/^\s*(?:import|from|def|class|if|for|while|try|except|print|return|sys|random|data)\b/.test(t)) return false;
+  if (/^\s*(?:@|[A-Za-z_]\w*\s*\(|=|\()/.test(t)) return false;
+  return /[\u4e00-\u9fff]/.test(t);
+}
+
 /** 从模型输出中提取 Python 代码（兼容 markdown 代码块和纯文本）。
  *  小模型常不写 ```python 标记，因此做“暴力降级”：找到第一行像 Python 代码的行，
- *  丢弃前面可能出现的解释性文字。 */
+ *  丢弃前面可能出现的解释性文字，并切除代码尾部夹带的散文说明。 */
 export function extractPythonCode(raw: string): string {
   const text = String(raw || '');
   const fence = /```(?:python|py)?\s*([\s\S]*?)```/i.exec(text);
@@ -60,9 +70,11 @@ export function extractPythonCode(raw: string): string {
   const lines = text.split('\n');
   const codeStart = /^\s*(?:import\s|from\s|def\s|class\s|@|#|if\s+__name__|print\s*\(|for\s|while\s|try\s*:|sys\.|data\s*=|random\.|[A-Za-z_]\w*\s*=)/;
   const start = lines.findIndex((l) => codeStart.test(l));
-  if (start >= 0) return lines.slice(start).join('\n').trim();
-  // 没有识别到任何 Python 代码行时返回空串，让上层有机会改从 reasoning 提取代码块。
-  return '';
+  if (start < 0) return '';
+  const candidate = lines.slice(start);
+  const proseAt = candidate.findIndex((l) => isProseLine(l));
+  const codeLines = proseAt >= 0 ? candidate.slice(0, proseAt) : candidate;
+  return codeLines.join('\n').trim();
 }
 
 /** 只从 reasoning_content 中提取明确包裹的代码块，避免把解题分析当成脚本保存。 */
@@ -207,6 +219,10 @@ function buildRepairPrompt(problem: SparkProblemContext | undefined, code: strin
     `题目：${problem?.title || ''}${problem?.id ? ` (${problem.id})` : ''}`,
     problem?.url ? `链接：${problem.url}` : '',
     '',
+    '===== 题面开始（必须重新满足这些约束） =====',
+    problem?.statement || '',
+    '===== 题面结束 =====',
+    '',
     '===== 上一版脚本 =====',
     code.slice(0, 6000),
     '===== 验证结果 =====',
@@ -224,6 +240,20 @@ function buildRepairPrompt(problem: SparkProblemContext | undefined, code: strin
   ].join('\n');
 }
 
+const PROSE_MARKERS = /(说明|解析|思路|答案|解释|总结|注意|样例|输出|复杂度)/;
+
+/** 轻量形状校验：输出不能夹带解释性文字；若样例首行是一个整数 N，则生成输出首行也应是整数。 */
+function outputLooksLikeData(output: string, samples?: { input: string; output?: string }[]): boolean {
+  const text = String(output || '').trim();
+  if (!text) return false;
+  const lines = text.split('\n');
+  if (lines.some((l) => PROSE_MARKERS.test(l) && !l.trim().startsWith('#'))) return false;
+  const first = lines[0]?.trim() || '';
+  const sampleFirst = samples?.[0]?.input.trim().split('\n')[0]?.trim() || '';
+  if (/^\d+$/.test(sampleFirst) && !/^-?\d+$/.test(first)) return false;
+  return true;
+}
+
 /** 保底脚本：多次修正仍失败时写入，至少保证有 stdout，流程不卡死。 */
 function buildFallbackScript(): string {
   return [
@@ -237,6 +267,36 @@ function buildFallbackScript(): string {
     '    gen()',
     ''
   ].join('\n');
+}
+
+/**
+ * 样例形状随机化保底：根据第一个官方样例的“行数 + 每行 token 数 + 类型”生成脚本。
+ * 不依赖模型能力，比 print(1) 更可能满足题面输入结构。
+ */
+export function buildSampleShapeFallbackScript(samples?: { input: string; output?: string }[]): string | null {
+  const sample = samples?.[0]?.input;
+  if (!sample || !sample.trim()) return null;
+  const lines = sample.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  const out: string[] = ['import random', ''];
+  for (const line of lines) {
+    const tokens = line.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) continue;
+    if (tokens.every((t) => /^-?\d+$/.test(t))) {
+      out.push(`print(${tokens.map(() => 'random.randint(1, 10)').join(', ')})`);
+    } else if (tokens.every((t) => /^[A-Za-z]+$/.test(t))) {
+      const parts = tokens.map((t) => {
+        const len = Math.max(1, t.length);
+        return `''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(${len}))`;
+      });
+      out.push(`print(${parts.join(', ')})`);
+    } else {
+      const quoted = tokens.map((t) => `'${t.replace(/'/g, "\\'")}'`);
+      out.push(`print(${quoted.join(', ')})`);
+    }
+  }
+  out.push('');
+  return out.join('\n');
 }
 
 export class SparkService {
@@ -313,12 +373,23 @@ export class SparkService {
    *  仍失败则写入一个保底可运行脚本，避免工作流因“无输出”卡死。
    *  @param problem 题目上下文，用于修正提示词里的样例/题面。 */
   async validateAndSave(code: string, problem?: SparkProblemContext): Promise<{ path: string; code: string; stdout: string; stderr: string; fallback?: boolean }> {
+    const evaluate = (c: { ok: boolean; stdout: string; stderr: string }) => {
+      if (c.ok && !outputLooksLikeData(c.stdout, problem?.samples)) {
+        return {
+          ok: false,
+          stdout: c.stdout,
+          stderr: c.stderr || '输出疑似包含解释性文字，或与样例输入首行形状不符'
+        };
+      }
+      return c;
+    };
+
     let finalCode = code;
-    let check = await runPythonCode(finalCode);
+    let check = evaluate(await runPythonCode(finalCode));
     if (!check.ok && !check.stdout && !check.stderr) {
       const repaired = tryCallGeneratorFunctions(finalCode);
       if (repaired) {
-        const check2 = await runPythonCode(repaired);
+        const check2 = evaluate(await runPythonCode(repaired));
         if (check2.ok) {
           finalCode = repaired;
           check = check2;
@@ -333,12 +404,12 @@ export class SparkService {
       const fixed = await this.generateScript(buildRepairPrompt(problem, finalCode, check)).catch(() => null);
       if (!fixed) break;
       finalCode = fixed;
-      check = await runPythonCode(finalCode);
+      check = evaluate(await runPythonCode(finalCode));
       // 修正稿也可能只定义函数未调用，自动补入口。
       if (!check.ok && !check.stdout && !check.stderr) {
         const repaired = tryCallGeneratorFunctions(finalCode);
         if (repaired) {
-          const check2 = await runPythonCode(repaired);
+          const check2 = evaluate(await runPythonCode(repaired));
           if (check2.ok) {
             finalCode = repaired;
             check = check2;
@@ -350,8 +421,9 @@ export class SparkService {
     let fallback = false;
     if (!check.ok) {
       console.warn('[ACM-Workflow][Spark] 多次修正仍失败，写入保底可运行脚本');
-      finalCode = buildFallbackScript();
-      check = await runPythonCode(finalCode);
+      // 优先用“样例形状随机化”，比 print(1) 更有用；没有样例时退回最小骨架。
+      finalCode = buildSampleShapeFallbackScript(problem?.samples) || buildFallbackScript();
+      check = evaluate(await runPythonCode(finalCode));
       fallback = true;
       if (!check.ok) {
         throw new Error(`生成的脚本验证失败：${check.stderr || '无输出'}`);

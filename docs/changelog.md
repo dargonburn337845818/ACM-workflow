@@ -2,8 +2,12 @@
 
 版本号遵循语义化版本。本文件记录正式版本迭代历史。
 
-## Unreleased — 性能 / AI 造数据 / 仓库治理
+## 0.23.0 — AI 造数据脚本可靠性重做 / 性能 / 仓库治理（2026-09-05）
 
+- AI 造数据修复：修正提示词现在重新携带**完整题面与约束**，不再让模型盲修
+- 代码提取增强：无 Markdown 围栏时自动切除代码尾部中文散文/解释，避免“把说明当代码”
+- 验证增强：输出必须通过轻量形状校验（不能夹带解释性文字；样例首行是整数 N 时输出首行也必须是整数）
+- 保底升级：多次修复失败后优先生成**样例形状随机化脚本**，而不是只写 `print(1)`
 - 随机图生成改为边编号无放回抽样：不再构造 O(n²) 全边数组，大 n 内存从 O(n²) 降到 O(m)
 - 长字符串使用数组 `join` 生成；`.cpp` 造数据脚本编译改为异步，避免阻塞扩展事件循环
 - `runner.compileCpp` 全链路异步化：`judgeService` / `workbench.compileFor` / `verifier` 改为 Promise，不再同步阻塞事件循环
@@ -13,8 +17,8 @@
 - AI 造数据脚本默认保存到当前题目目录 `gen.py`（可用 `sparkScriptPath` 覆盖为全局路径），避免不同题目互相覆盖
 - Spark 验证临时文件运行后清理；生成脚本保存使用原子写（临时文件 + rename）
 - 提示词增加“禁止 `input()`、控制数据规模、脚本快速运行”约束
-- 测试新增 Tree/Graph/String 种子 golden 样例，冒烟升至 88 项
-- 仓库治理：移除 `knowledge-ladder` 内不执行的嵌套 Actions；新增 `SECURITY.md` / `CONTRIBUTING.md` / `docs/DEVELOPMENT.md` / Issue 与 PR 模板 / Dependabot / Gitleaks 安全扫描
+- 测试新增 Tree/Graph/String 种子 golden 样例，冒烟升至 90 项
+- 仓库治理：移除 `knowledge-ladder` 内不执行的嵌套 Actions；新增 `SECURITY.md` / `CONTRIBUTING.md` / `docs/DEVELOPMENT.md` / Issue 与 PR 模板 / Dependabot / Gitleaks / CODEOWNERS
 - `knowledge-ladder` 生成产物（`mobile/www/data.js`、`reports/*.html`）改为不跟踪，由 CI 重新生成
 - tag Release 现在同时发布 VSIX + APK
 - CI 增加“跟踪私有产物即失败”检查，强化隐私红线

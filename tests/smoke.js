@@ -377,14 +377,19 @@ console.log('== 11. 测试页签 CSS（样例运行区只出现在样例页） =
 
 console.log('== 12. Spark 解析器与提示词锚定 ==');
 {
-  const { extractPythonCode, buildDataGenPrompt } = require(out('services/spark.js'));
+  const { extractPythonCode, buildDataGenPrompt, buildSampleShapeFallbackScript } = require(out('services/spark.js'));
   const fenced = extractPythonCode('Here:\n```python\nprint(1)\n```\nDone');
   assert(fenced === 'print(1)', '代码块优先提取', fenced);
   const plain = extractPythonCode('Here is your code:\nprint(1)\n');
   assert(plain === 'print(1)', '无代码块时按 print 起始暴力降级', plain);
   const def = extractPythonCode('Let me help.\ndef solve():\n    print(1)\n\nif __name__ == "__main__":\n    solve()\n');
   assert(def.startsWith('def solve():') && def.includes('solve()'), '按 def 起始提取完整脚本', def);
+  const withProse = extractPythonCode('import random\nprint(1)\n说明：这是解释\n后面还有解释');
+  assert(withProse === 'import random\nprint(1)', '切除代码尾部散文说明', JSON.stringify(withProse));
   assert(extractPythonCode('这段只是解题分析，没有代码。') === '', '无代码行返回空串，允许回退 reasoning 代码块');
+  const fallback = buildSampleShapeFallbackScript([{ input: '3\n1 2 3\n4 5 6\n', output: '6\n' }]);
+  assert(fallback && fallback.includes('random.randint') && fallback.split('\n').filter((l) => l.startsWith('print(')).length === 3,
+    '样例形状保底脚本按行生成', JSON.stringify(fallback));
   const prompt = buildDataGenPrompt({
     title: 'T',
     id: '1A',
