@@ -1,4 +1,4 @@
-name: Release VSIX
+name: Release VSIX + APK
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     permissions:
       contents: write
 
@@ -47,10 +47,53 @@ jobs:
       - name: Package VSIX
         run: npm run package
 
+      - name: Setup Python (Knowledge Ladder)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Regenerate mobile data
+        working-directory: knowledge-ladder
+        run: |
+          python3 export_mobile_data.py
+          test -f mobile/www/data.js
+
+      - name: Setup Node.js (Knowledge Ladder)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor
+        working-directory: knowledge-ladder/mobile
+        run: npm install
+
+      - name: Sync Android platform
+        working-directory: knowledge-ladder/mobile
+        run: |
+          npx cap add android || true
+          npx cap sync android
+
+      - name: Build debug APK
+        working-directory: knowledge-ladder/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.vsix \
+          gh release create "$GITHUB_REF_NAME" \
+            dist/*.vsix \
+            knowledge-ladder/mobile/android/app/build/outputs/apk/debug/app-debug.apk \
             --notes-file RELEASE_NOTES.md \
             --title "$GITHUB_REF_NAME"

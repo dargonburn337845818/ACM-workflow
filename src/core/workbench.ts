@@ -37,7 +37,7 @@ export interface WorkbenchHost {
   /** 单用例超时：优先按题面时间限制 + 1s 缓冲，否则用配置 testTimeoutMs */
   testTimeoutMs(): number;
   /** 编译当前文件（带缓存）；失败时向 webview 发送错误提示并返回 { ok: false } */
-  compileFor(filePath: string, caseCount: number, mode?: string): { ok: boolean; exePath?: string; message: string };
+  compileFor(filePath: string, caseCount: number, mode?: string): Promise<{ ok: boolean; exePath?: string; message: string }>;
 }
 
 /** 选题视图状态（globalState 持久化） */
@@ -137,8 +137,8 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
   }
 
   /** 编译当前文件（带缓存）；失败时向 webview 发送错误提示并返回 { ok: false } */
-  public compileFor(filePath: string, _caseCount: number, _mode?: string): { ok: boolean; exePath?: string; message: string } {
-    const res = this.services.judge.compile(filePath);
+  public async compileFor(filePath: string, _caseCount: number, _mode?: string): Promise<{ ok: boolean; exePath?: string; message: string }> {
+    const res = await this.services.judge.compile(filePath);
     this.services.support.trace('service', 'compile', res.ok ? 'ok' : `fail: ${res.message}`);
     if (!res.ok) {
       this.post({ type: 'testStatus', message: res.message, isError: true });

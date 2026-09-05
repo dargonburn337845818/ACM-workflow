@@ -168,7 +168,7 @@ https://codeforces.com/gym/104053/problem/A
 2. VS Code 扩展面板 → `...` → **从 VSIX 安装...** → 选择文件
 3. 安装后按 `Ctrl+Alt+A` 打开工作台（首次安装会自动弹出三步入门指引）
 
-> 每次推送 `vX.Y.Z` tag 到 `main`，GitHub Actions 会自动构建 VSIX 并发布到 Releases。
+> 每次推送 `vX.Y.Z` tag 到 `main`，GitHub Actions 会自动构建 **VSIX + Knowledge Ladder APK** 并发布到 Releases。
 
 ### 方式二：源码运行（开发模式）
 

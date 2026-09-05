@@ -16,7 +16,7 @@ src/
 
 - `services/judgeService.ts` + `runner.ts` 承担“编译/运行/比对/环境探测”，是典型的深模块。接口稳定，后续可替换实现。
 - `services/dataGen.ts` 是纯函数生成器的主干；建议把“脚本子进程运行”与“内置生成器”继续分开，保持可单测。
-- `services/spark.ts` 生命周期较复杂；建议下一步把“服务器生命周期”与“生成/验证/保存”拆成两个类，降低单文件认知负担。
+- `services/spark.ts` 已拆为 `sparkLifecycle.ts`（服务器生命周期）+ `spark.ts`（生成/验证/保存），降低单文件认知负担。
 - `media/main.js` 已经很大，Webview 前端建议按视图拆文件（pick/contest/datagen/test/records），用构建工具打包。
 
 ## 2. 性能优化（已做/建议）
@@ -27,11 +27,15 @@ src/
 - 长字符串生成改用数组 `join`，避免逐字符字符串拼接。
 - Spark 验证脚本临时文件每次清理，避免 `/tmp` 堆积。
 - AI 生成脚本默认保存到当前题目目录 `gen.py`，并按原子写落盘，避免不同题目互相覆盖、半文件中断。
+- `runner.compileCpp` 已改为异步 `execFile`，`judgeService` / `workbench.compileFor` / `verifier` 全部走 Promise，不再阻塞扩展事件循环。
+- `dataGen.runScript` 的 `.cpp` 编译也已是异步子进程，并清理编译产物。
+- `spark.ts` 已拆成 `sparkLifecycle.ts` + `spark.ts`，生命周期与脚本生成职责分离。
+- 测试新增 Tree/Graph/String 种子 golden 样例，当前冒烟 88 项通过。
+- tag Release 现在一次发布 VSIX + APK 两个资产。
 
 继续建议：
 
-- `runner.ts` 的 `compileCpp` 仍使用同步 `execFileSync`，会短暂阻塞扩展事件循环；改为 `execFile` 异步 + `compileCache` 键增加源码 hash，进一步减少重编译。
-- `dataGen.runScript` 编译 `.cpp` 也是同步调用；可统一改为异步子进程。
+- `compileCache` 键可再增加源码 hash（不止 mtime），进一步减少重编译。
 - `cfContest` / `fetchers` 的串行抓取可以增加有界并发（如 2~3）并保留 800ms 防风控；不要让并发数无上限。
 - `statementHtml` / `translate` 长文本处理已有缓存；可对翻译段落做并发请求但保持结果顺序稳定。
 - Webview 前端大量 DOM 重建，建议引入虚拟列表/增量渲染，尤其记录页与比赛榜单。
@@ -61,10 +65,10 @@ src/
 
 建议：
 
-- **根工作流只留三件套**：`ci.yml`（扩展 CI）、`build-apk.yml`（子项目 APK）、`release.yml`（VSIX Release）。
-- `knowledge-ladder/.github/workflows/` 是“如果抽成独立仓库”的模板；在 monorepo 中不执行，建议在子项目 README 中明确说明，避免误以为已触发。
+- **根工作流已统一**：`ci.yml`（扩展 CI）、`security.yml`（Gitleaks）、`build-apk.yml`（日常 APK artifact）、`release.yml`（tag 时 VSIX + APK 一起发 Release）。
+- 已删除 `knowledge-ladder/.github/workflows/` 内不生效的嵌套模板，monorepo 中由根 `.github/workflows` 统一执行；子项目 README 已说明。
 - 发布规范：`main` 只走 PR；tag 必须是 `vX.Y.Z` 且指向 `main`；Release 由 CI 自动产物生成。
-- 建议增加 `dependabot.yml` 与 `CODEOWNERS`；Issue/PR 模板可提升有效贡献。
+- 已加 `dependabot.yml` 与 Issue/PR 模板；`CODEOWNERS` 可按需补充。
 - 配置项默认值避免绑定作者本机路径；所有机器相关路径应可配置、可覆盖。
 
 ## 5. 隐私与安全清单
@@ -72,13 +76,20 @@ src/
 - [x] 密钥仅存 SecretStorage；诊断报告脱敏。
 - [x] `.gitignore` 排除运行数据库/日志/缓存/构建产物。
 - [x] AI 生成脚本按题目隔离，不写个人盘符默认值。
-- [ ] 建议未来增加：提交前 secret scan（如 gitleaks）、CI 中禁止上传 `*.db/*.log` 的检查。
-- [ ] `tools/*.sh` 中本机路径改为从环境变量/设置读取，README 只保留示例。
+- [x] 提交前 secret scan（Gitleaks）已接入；CI 中禁止跟踪 `*.db/*.log/*.sqlite*` 的检查已接入。
+- [ ] `tools/*.sh` 中本机路径改为从环境变量/设置读取，README 只保留示例（可后续继续收敛）。
 
-## 6. 建议的近期路线
+## 6. 后续路线
 
-1. 把 `spark.ts` 拆成 `sparkLifecycle.ts` + `sparkScript.ts`，分别写单测。
-2. 为 `dataGen` 图/树/组合流水线增加基于种子的 golden 测试。
-3. 为 runner/translate 增加异步化与超时可配置化。
-4. 清理 knowledge-ladder 生成产物（`mobile/www/data.js`、`reports/*.html`）为由 CI 生成，减少仓库体积。
-5. 如有用户反馈，优先处理题面抓取与本地模型启动两个最高频问题。
+已完成：
+1. `spark.ts` 拆成 `sparkLifecycle.ts` + `spark.ts`。
+2. `dataGen` 增加 Tree/Graph/String 种子 golden 测试。
+3. `runner.compileCpp` 异步化，`dataGen.runScript` C++ 编译异步化。
+4. 清理 `knowledge-ladder` 生成产物（`mobile/www/data.js`、`reports/*.html`），由 CI 重新生成。
+5. tag Release 附带 VSIX + APK；Gitleaks + Dependabot + Issue/PR 模板。
+
+后续候选：
+1. Webview 前端按视图拆分，引入构建工具打包。
+2. `compileCache` 键加源码 hash，降低重编译率。
+3. Spark 生成脚本增加语法预检与输出上限。
+4. `tools/*.sh` 本机路径继续向环境变量收敛。

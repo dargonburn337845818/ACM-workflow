@@ -83,7 +83,7 @@ http://localhost:8000
 方式一：GitHub Actions（当前 monorepo）
 
 - 推送到根仓库 `main` 时，根目录 `.github/workflows/build-apk.yml` 自动构建 APK，下载 artifact
-- 打 tag（如 `v1.0.0`）会触发根目录 Release 工作流；当前会自动发布 VSIX，APK 仍以 artifact 形式提供（后续可扩展为同一 Release 附带 APK）
+- 打 tag（如 `v1.0.0`）会触发根目录 Release 工作流，自动发布 **VSIX + APK** 两个资产
 
 方式二：本地构建
 
@@ -135,8 +135,8 @@ build_windows.bat
 
 在根仓库（monorepo）中：
 
-- 根目录 `.github/workflows/build-apk.yml`：push 到 `main` 自动构建 Android APK
-- 根目录 `.github/workflows/release.yml`：VS Code 扩展 tag 自动构建 VSIX Release
+- 根目录 `.github/workflows/build-apk.yml`：push 到 `main` 自动构建 Android APK（artifact）
+- 根目录 `.github/workflows/release.yml`：tag 自动构建 **VSIX + APK** 并创建 GitHub Release
 - 如果后续把 `knowledge-ladder` 抽成独立仓库，再从 `mobile/build-apk.yml` 模板恢复子项目自己的 Actions
 
 本地打 tag 示例：

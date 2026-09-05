@@ -142,13 +142,13 @@ function pythonCommand(): string {
  * - .js/.mjs/.cjs 用扩展宿主 Node 运行
  * - .exe 直接运行
  */
-function prepareChecker(checkerPath: string): CheckerLauncher {
+async function prepareChecker(checkerPath: string): Promise<CheckerLauncher> {
   if (!checkerPath || !fs.existsSync(checkerPath)) {
     throw new Error(`SPJ 程序不存在：${checkerPath || '(未填写)'}`);
   }
   const ext = path.extname(checkerPath).toLowerCase();
   if (ext === '.cpp' || ext === '.cc' || ext === '.cxx') {
-    const c = compileCpp(checkerPath);
+    const c = await compileCpp(checkerPath);
     if (!c.ok || !c.exePath) {
       throw new Error(`SPJ 编译失败：${c.message}`);
     }
@@ -250,13 +250,13 @@ export async function runVerifier(
   const maxRounds = Math.max(1, Math.min(100000, Math.round(params.maxRounds) || 1000));
 
   // 编译两份代码（compileCpp 带缓存，同源码不重复编译）
-  const compileSolve = compileCpp(params.solvePath);
+  const compileSolve = await compileCpp(params.solvePath);
   if (!compileSolve.ok || !compileSolve.exePath) {
     const r: VerifierResult = { stopped: true, cancelled: false, passed: 0, rounds: 0, reason: '正解编译失败：' + compileSolve.message };
     callbacks.onDone?.(r);
     return r;
   }
-  const compileBrute = compileCpp(params.brutePath);
+  const compileBrute = await compileCpp(params.brutePath);
   if (!compileBrute.ok || !compileBrute.exePath) {
     const r: VerifierResult = { stopped: true, cancelled: false, passed: 0, rounds: 0, reason: '暴力编译失败：' + compileBrute.message };
     callbacks.onDone?.(r);
@@ -268,7 +268,7 @@ export async function runVerifier(
   let checkerLauncher: CheckerLauncher | null = null;
   if (compareMode === 'spj') {
     try {
-      checkerLauncher = prepareChecker(params.checker?.checkerPath || '');
+      checkerLauncher = await prepareChecker(params.checker?.checkerPath || '');
     } catch (e: any) {
       const r: VerifierResult = { stopped: true, cancelled: false, passed: 0, rounds: 0, reason: `SPJ 准备失败：${e?.message || e}` };
       callbacks.onDone?.(r);

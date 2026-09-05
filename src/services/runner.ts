@@ -1,7 +1,10 @@
-import { spawn, execFileSync } from 'child_process';
+import { spawn, execFileSync, execFile } from 'child_process';
+import { promisify } from 'util';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+
+const execFileAsync = promisify(execFile);
 
 export interface RunResult {
   stdout: string;
@@ -51,7 +54,7 @@ let compileCache: CompileCacheEntry | null = null;
  * 编译 cpp；exe 输出到系统临时目录，避免污染题目目录。
  * 同一源码（mtime 未变）复用上次编译结果，单用例/连续运行不再重复编译。
  */
-export function compileCpp(srcPath: string): { ok: boolean; exePath?: string; message: string } {
+export async function compileCpp(srcPath: string): Promise<{ ok: boolean; exePath?: string; message: string }> {
   const compiler = findCompiler();
   if (!compiler) {
     return { ok: false, message: process.platform === 'win32'
@@ -80,11 +83,10 @@ export function compileCpp(srcPath: string): { ok: boolean; exePath?: string; me
   fs.mkdirSync(exeDir, { recursive: true });
   const exePath = path.join(exeDir, path.parse(srcPath).name + '_' + Date.now() + (process.platform === 'win32' ? '.exe' : ''));
   try {
-    execFileSync(compiler, ['-O2', '-std=c++17', srcPath, '-o', exePath], {
+    await execFileAsync(compiler, ['-O2', '-std=c++17', srcPath, '-o', exePath], {
       encoding: 'utf8',
       timeout: 60000,
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe']
+      windowsHide: true
     });
     compileCache = { srcPath, srcMtime, exePath };
     return { ok: true, exePath, message: '编译成功' };

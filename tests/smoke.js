@@ -183,6 +183,17 @@ console.log('== 5. 造数据确定性 ==');
   })().catch((e) => { assert(false, '造数据', e.message); });
 }
 
+console.log('== 5b. 造数据黄金样例 ==');
+(async () => {
+  const { generateInput, mulberry32 } = require(out('services/dataGen.js'));
+  const tree = await generateInput({ type: 'tree', nMin: 4, nMax: 4 }, mulberry32(42));
+  assert(tree === '4\n1 2\n1 3\n3 4\n', '树 golden 输出', JSON.stringify(tree));
+  const str = await generateInput({ type: 'string', lenMin: 8, lenMax: 8, charset: 'lower' }, mulberry32(42));
+  assert(str === 'lwrenhqw\n', '字符串 golden 输出', JSON.stringify(str));
+  const graph = await generateInput({ type: 'graph', nMin: 5, nMax: 5, mMin: 4, mMax: 4 }, mulberry32(42));
+  assert(graph === '5 4\n1 5\n2 5\n3 5\n1 3\n', '图 golden 输出', JSON.stringify(graph));
+})().catch((e) => { assert(false, '造数据黄金样例', e.message); });
+
 console.log('== 6. WSL 路径适配 ==');
 {
   const { normalizePath } = require(out('utils/paths.js'));

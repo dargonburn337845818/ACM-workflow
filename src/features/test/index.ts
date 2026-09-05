@@ -49,7 +49,7 @@ async function handleTestRun(host: WorkbenchHost, deps: Pick<Services, 'records'
 
   // Bug4：优先按题面抓取的 CF 时间限制判定 TLE（+1s 本地缓冲），否则用配置默认值
   const timeoutMs = host.testTimeoutMs();
-  const compile = host.compileFor(filePath, cases.length);
+  const compile = await host.compileFor(filePath, cases.length);
   if (!compile.ok || !compile.exePath) return;
 
   let passed = 0;
@@ -120,7 +120,7 @@ async function handleTestRunOne(host: WorkbenchHost, deps: Pick<Services, 'judge
   if (!filePath || caseId === undefined) return;
 
   const timeoutMs = host.testTimeoutMs(); // Bug4：按题目时间限制判定 TLE
-  const compile = host.compileFor(filePath, 1, 'one');
+  const compile = await host.compileFor(filePath, 1, 'one');
   if (!compile.ok || !compile.exePath) return;
 
   host.post({ type: 'testStatus', message: '正在运行该用例...' });

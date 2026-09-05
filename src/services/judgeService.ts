@@ -7,7 +7,7 @@ import { DataGenSpec, generateInput, Rng } from './dataGen';
  * JudgeService facade：封装编译、运行、输出比对、对拍与造数据能力。
  */
 export class JudgeService {
-  compile(srcPath: string): { ok: boolean; exePath?: string; message: string } {
+  compile(srcPath: string): Promise<{ ok: boolean; exePath?: string; message: string }> {
     return compileCpp(srcPath);
   }
 
