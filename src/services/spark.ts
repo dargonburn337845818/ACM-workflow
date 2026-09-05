@@ -292,14 +292,17 @@ function extractInputSection(text: string): string {
   return plain?.[1]?.trim() || '';
 }
 
-/** 展开 “10^5” / “2×10^5” 这类约束写法。 */
+/** 展开 “10^5” / “2×10^5” / “-10^9” 这类约束写法。 */
 function parseConstraintNumber(s: string): number | null {
-  const m1 = /(\d+(?:\.\d+)?)\s*×\s*10\^(\d+)/i.exec(s);
-  if (m1) return Number(m1[1]) * Math.pow(10, Number(m1[2]));
-  const m2 = /10\^(\d+)/i.exec(s);
-  if (m2) return Math.pow(10, Number(m2[1]));
-  const n = Number(s.replace(/[^\d.]/g, ''));
-  return Number.isFinite(n) ? n : null;
+  const raw = s.trim();
+  const sign = raw.startsWith('-') ? -1 : 1;
+  const core = raw.replace(/^-/, '');
+  const m1 = /(\d+(?:\.\d+)?)\s*×\s*10\^(\d+)/i.exec(core);
+  if (m1) return sign * Number(m1[1]) * Math.pow(10, Number(m1[2]));
+  const m2 = /10\^(\d+)/i.exec(core);
+  if (m2) return sign * Math.pow(10, Number(m2[1]));
+  const n = Number(core.replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) ? sign * n : null;
 }
 
 /** 从输入格式文本中推断变量名的大致范围；缺省 1..10。 */
@@ -325,6 +328,31 @@ function inferVarRange(text: string, varName: string): [number, number] {
   return [lo, hi];
 }
 
+/** 只返回文本中明确出现的变量范围；找不到返回 null，不强行给默认值。 */
+function tryInferVarRange(text: string, varName: string): [number, number] | null {
+  const num = '(-?\\d+(?:\\.\\d+)?(?:×10\\^\\d+)?)';
+  const full = new RegExp(`${num}\\s*(?:≤|<=|<)\\s*${varName}\\s*(?:≤|<=|<)\\s*${num}`, 'i');
+  const m = full.exec(text);
+  if (m) {
+    const a = parseConstraintNumber(m[1]);
+    const b = parseConstraintNumber(m[2]);
+    if (a !== null && b !== null) return [Math.min(a, b), Math.max(a, b)];
+  }
+  const upper = new RegExp(`${varName}\\s*(?:≤|<=|<)\\s*${num}`, 'i');
+  const mu = upper.exec(text);
+  if (mu) {
+    const hi = parseConstraintNumber(mu[1]);
+    if (hi !== null) return [1, hi];
+  }
+  const lower = new RegExp(`${varName}\\s*(?:≥|>=|>)\\s*${num}`, 'i');
+  const ml = lower.exec(text);
+  if (ml) {
+    const lo = parseConstraintNumber(ml[1]);
+    if (lo !== null) return [lo, 10];
+  }
+  return null;
+}
+
 /**
  * 优先按题面「输入格式」小节生成：理解变量（n/m）、依赖（数组长度、行数）与约束范围。
  * 这是规则解析，不是 LLM；解析不了时返回 null，由样例形状路径兜底。
@@ -343,6 +371,11 @@ export function buildInputFormatScript(statement: string): string | null {
   const rowsM = /(?:接下来|随后|后面|之后)\s*([mM])\s*行|([mM])\s*行，每行/.exec(text) || /([mM])\s*行/.exec(text);
   const rowsN = /(?:接下来|随后|后面|之后)\s*([nN])\s*行|([nN])\s*行，每行/.exec(text) || /([nN])\s*行/.exec(text);
 
+  // 元素范围：优先 a_i / x_i / u / v 等约束，找不到时使用常见的 1..1e9。
+  const aRange = tryInferVarRange(text, 'a_i') || tryInferVarRange(text, 'a') || [1, 1000000000];
+  const col1Range = tryInferVarRange(text, 'u') || tryInferVarRange(text, 'x_i') || tryInferVarRange(text, 'x') || [1, 1000000000];
+  const col2Range = tryInferVarRange(text, 'v') || tryInferVarRange(text, 'y_i') || tryInferVarRange(text, 'y') || col1Range;
+
   if (twoVars) {
     const nVar = twoVars[1] || 'n';
     const mVar = twoVars[2] || 'm';
@@ -359,7 +392,7 @@ export function buildInputFormatScript(statement: string): string | null {
         `m = random.randint(${mLo}, ${mHi})`,
         'print(n, m)',
         `for _ in range(${rowVar}):`,
-        '    print(random.randint(1, 100000), random.randint(1, 100000))',
+        `    print(random.randint(${col1Range[0]}, ${col1Range[1]}), random.randint(${col2Range[0]}, ${col2Range[1]}))`,
         ''
       ].join('\n');
     }
@@ -373,7 +406,7 @@ export function buildInputFormatScript(statement: string): string | null {
       '',
       `n = random.randint(${nLo}, ${nHi})`,
       'print(n)',
-      `print(' '.join(str(random.randint(1, 100000)) for _ in range(n)))`,
+      `print(' '.join(str(random.randint(${aRange[0]}, ${aRange[1]})) for _ in range(n)))`,
       ''
     ].join('\n');
   }
@@ -384,7 +417,7 @@ export function buildInputFormatScript(statement: string): string | null {
       `n = random.randint(${nLo}, ${nHi})`,
       'print(n)',
       'for _ in range(n):',
-      '    print(random.randint(1, 100000), random.randint(1, 100000))',
+      `    print(random.randint(${col1Range[0]}, ${col1Range[1]}), random.randint(${col2Range[0]}, ${col2Range[1]}))`,
       ''
     ].join('\n');
   }

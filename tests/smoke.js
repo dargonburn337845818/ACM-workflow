@@ -400,9 +400,13 @@ console.log('== 12. Spark 解析器与提示词锚定 ==');
   const inputArray = buildInputFormatScript('## 输入格式\n第一行包含一个整数 n (1≤n≤5)。\n第二行包含 n 个整数 a_i。\n\n## 输出格式\n输出答案\n');
   assert(inputArray && inputArray.includes('n = random.randint(1, 5)') && inputArray.includes('print(n)'),
     '输入格式解析：首行N+数组', JSON.stringify(inputArray));
-  const inputRows = buildInputFormatScript('## 输入格式\n第一行包含两个整数 n 和 m。\n接下来 m 行，每行两个整数 u v。\n\n## 输出格式\n输出答案\n');
-  assert(inputRows && inputRows.includes('print(n, m)') && inputRows.includes('for _ in range(m):'),
-    '输入格式解析：N M+边列表', JSON.stringify(inputRows));
+  const rangeArray = buildInputFormatScript('## 输入格式\n第一行包含一个整数 n。\n第二行包含 n 个整数 a_i (0≤a_i≤10)。\n\n## 输出格式\n输出答案\n');
+  assert(rangeArray && rangeArray.includes('random.randint(0, 10)'),
+    '输入格式解析：数组元素范围应用', JSON.stringify(rangeArray));
+  const inputRows = buildInputFormatScript('## 输入格式\n第一行包含两个整数 n 和 m。\n接下来 m 行，每行两个整数 u v (1≤u≤5, 1≤v≤5)。\n\n## 输出格式\n输出答案\n');
+  assert(inputRows && inputRows.includes('print(n, m)') && inputRows.includes('for _ in range(m):') &&
+    inputRows.includes('random.randint(1, 5)') && inputRows.includes('random.randint(1, 5)'),
+    '输入格式解析：N M+边列表+范围', JSON.stringify(inputRows));
   const prompt = buildDataGenPrompt({
     title: 'T',
     id: '1A',
