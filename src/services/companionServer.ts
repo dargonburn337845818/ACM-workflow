@@ -38,6 +38,8 @@ function problemFromCompanion(raw: any): { problem: Problem; tests: { input: str
   return { problem: { id, platform, title, tags: [], url }, tests };
 }
 
+const MAX_BODY_BYTES = 1024 * 1024; // 1MB：companion 题目 JSON 足够，防止本地服务被塞大请求
+
 export function startCompanionServer(port: number): http.Server {
   const server = http.createServer((req, res) => {
     if (req.method !== 'POST') {
@@ -45,8 +47,18 @@ export function startCompanionServer(port: number): http.Server {
       return;
     }
     let raw = '';
-    req.on('data', (c) => (raw += c));
+    let bodyTooLarge = false;
+    req.on('data', (c) => {
+      if (bodyTooLarge) return;
+      raw += c;
+      if (Buffer.byteLength(raw) > MAX_BODY_BYTES) {
+        bodyTooLarge = true;
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: '请求体过大（超过 1MB）' }));
+      }
+    });
     req.on('end', () => {
+      if (bodyTooLarge) return;
       void (async () => {
         try {
           const json = JSON.parse(raw);
@@ -75,6 +87,6 @@ export function startCompanionServer(port: number): http.Server {
       `接收端口 ${port} 启动失败：${err?.message || err}（可能被占用或已有 cph 在运行，可在设置 acmWorkflow.companionPort 修改端口）`
     );
   });
-  server.listen(port);
+  server.listen(port, '127.0.0.1');
   return server;
 }

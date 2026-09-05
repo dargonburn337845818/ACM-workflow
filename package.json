@@ -1,7 +1,7 @@
 {
   "name": "acm-workflow",
   "displayName": "ACM Workflow",
-  "description": "ACM Workflow 是 VSCode 中的 Codeforces 刷题工作台：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录一站式完成；支持玻璃拟态工作台，可联动 VSCode Background 背景插件（https://github.com/caoge5524/vscode-background）将所选壁纸一键设为全局背景。",
+  "description": "ACM Workflow 是 VSCode 中的 Codeforces 刷题工作台：选题、题面翻译、测试、对拍、造数据、比赛管理与刷题记录；支持玻璃拟态工作台，可联动 VSCode Background 背景插件（https://github.com/caoge5524/vscode-background）把所选壁纸设为全局背景。",
   "version": "0.25.0",
   "publisher": "deepseekharness",
   "license": "MIT",
@@ -93,6 +93,11 @@
       {
         "command": "acmWorkflow.beautifyRestore",
         "title": "ACM Workflow: 还原美化",
+        "category": "ACM Workflow"
+      },
+      {
+        "command": "acmWorkflow.applyGlobalWallpaper",
+        "title": "ACM Workflow: 将当前壁纸设为全局背景",
         "category": "ACM Workflow"
       },
       {
@@ -274,6 +279,11 @@
           "type": "string",
           "default": "",
           "description": "CF 网络代理地址（如 http://127.0.0.1:7890）。VS Code 扩展的请求不跟随系统代理，需要代理访问 CF 时在此填写；留空则尝试环境变量 HTTPS_PROXY/HTTP_PROXY。"
+        },
+        "acmWorkflow.glassBackground": {
+          "type": "string",
+          "default": "",
+          "description": "玻璃拟态工作台背景：本地图片/视频路径、file:// URI 或 https 直链（也可在工作台壁纸栏选择）。留空则使用内置深夜景光源。"
         }
       }
     },

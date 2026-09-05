@@ -8,7 +8,7 @@ import { fetchBinary } from './fetchers/codeforces';
  * 标题、时间/内存限制、题目描述、输入输出格式、样例、提示等区块。
  *
  * 排版规则：
- *  1. 文本节点智能拼接：合并同一父级下的相邻文本，块级元素之间换行，
+ *  1. 文本节点合并：合并同一父级下的相邻文本，块级元素之间换行，
  *     行内元素之间按「两侧都是文字则补一个空格」保留必要空格；
  *  2. LaTeX 公式边界保护：CF 的 span.tex-span 与文本中的 \(..\) \[..\] $..$ $$..$$
  *     统一包进 <span class="acm-math"> / <div class="acm-math acm-math-block">，

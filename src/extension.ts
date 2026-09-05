@@ -87,7 +87,7 @@ export function activate(context: vscode.ExtensionContext) {
     return services.support.runSetupGuide();
   });
 
-  // 沉浸式美化（硬边墨色配色，无毛玻璃/半透明）：应用 / 还原
+  // 硬边墨色美化（实色深色，无毛玻璃/半透明）：应用 / 还原
   registerTracedCommand(context, services, 'acmWorkflow.beautify', async () => {
     await services.support.applyBeautify();
   });

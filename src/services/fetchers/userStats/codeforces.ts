@@ -7,6 +7,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { resolveBaseDir } from '../../../utils/paths';
+import { getFetchDispatcher } from '../codeforces';
 
 const CF_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 const USER_STATS_TTL_MS = 15 * 60 * 1000;
@@ -99,10 +100,12 @@ export async function fetchUserStatusAll(
   let from = 1;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = `https://codeforces.com/api/user.status?handle=${encodeURIComponent(handle)}&from=${from}&count=${PAGE_SIZE}`;
+    const dispatcher = getFetchDispatcher();
     const res = await fetch(url, {
       headers: { 'User-Agent': CF_UA, 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(30000)
-    });
+      signal: AbortSignal.timeout(30000),
+      ...(dispatcher ? { dispatcher } : {})
+    } as any);
     if (!res.ok) {
       throw new Error(`CF API 请求失败：HTTP ${res.status}（第 ${page} 页）`);
     }

@@ -210,7 +210,7 @@ function genPermutation(spec: DataGenSpec, rng: Rng): string {
   return `${n}\n${p.join(' ')}\n`;
 }
 
-/** 原语：单行单数，始终独占一行（傻瓜式，不用管换行） */
+/** 原语：单行单数，始终独占一行（自带换行） */
 function genLine(spec: DataGenSpec, rng: Rng): string {
   const vMin = clampInt(spec.vMin, 1, -1e9, 1e9);
   const vMax = clampInt(spec.vMax, 1e9, -1e9, 1e9);

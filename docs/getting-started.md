@@ -55,9 +55,9 @@ https://codeforces.com/problemset/problem/1791/E
 
 回车即完成：生成 cpp + 样例 + 题面。重复导入同一题会直接打开已有文件。
 
-### 方式三：比赛一键创建
+### 方式三：比赛一次创建
 
-「CF 比赛」视图 → 展开某场 Round → **一键创建** → 生成全部题目
+「CF 比赛」视图 → 展开某场 Round → **创建整场比赛** → 生成全部题目
 （`code/Codeforces/Contest_{id}/contest_{id}_{字母}.cpp`），自动抓样例，打开 A 题。
 
 ## 4. 第三步：测试与对拍

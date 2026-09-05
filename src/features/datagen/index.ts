@@ -1,6 +1,6 @@
 /**
  * datagen 功能模块（V0.18 结构重组：从 panel.ts 拆出）
- * V0.22 新增：Spark 本地模型一键生成 Python 造数据脚本。
+ * V0.22 新增：Spark 本地模型生成 Python 造数据脚本。
  */
 import * as vscode from 'vscode';
 import * as fs from 'fs';

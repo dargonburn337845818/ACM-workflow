@@ -4,7 +4,7 @@
   let lastPickPayload = null; // 记住上次选题条件，供"换一题/下一题"复用
   let contestLoaded = false; // 比赛列表是否已请求过（避免进入比赛页只显示“加载中”但不加载）
 
-  // ===== 题面与翻译（V0.8）：marked + KaTeX CDN 多源回退 =====
+  // ===== 题面与翻译（V0.20：扩展侧已排版 HTML，前端直接渲染，不再从 CDN 加载脚本） =====
   const stBody = document.getElementById('st-body');
   const stModeBtn = document.getElementById('st-mode-btn');
   const stRefetchBtn = document.getElementById('st-refetch-btn');
@@ -14,75 +14,8 @@
   let stData = null;   // {id,title,url,md,difficulty}
   let stZh = null;     // (string|null)[] 与原文段落一一对应
   let stMode = 'both'; // both | zh | en
-  let stLibsReady = false;
 
-  const CDN = {
-    marked: [
-      'https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js',
-      'https://unpkg.com/marked@12.0.2/marked.min.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js',
-      'https://cdn.staticfile.org/marked/12.0.2/marked.min.js'
-    ],
-    katex: [
-      'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/katex.min.js',
-      'https://unpkg.com/katex@0.16.11/dist/katex.min.js'
-    ],
-    katexAutoRender: [
-      'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js',
-      'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.11/contrib/auto-render.min.js',
-      'https://unpkg.com/katex@0.16.11/dist/contrib/auto-render.min.js'
-    ]
-  };
-
-  function loadScriptChain(urls, done) {
-    let i = 0;
-    (function next() {
-      if (i >= urls.length) { done(null); return; }
-      const s = document.createElement('script');
-      s.src = urls[i++];
-      s.onload = () => done(s.src);
-      s.onerror = () => next();
-      document.head.appendChild(s);
-    })();
-  }
-
-  function loadStatementLibs(done) {
-    if (stLibsReady) { done(); return; }
-    // V0.15：CDN 源不可达时脚本可能长时间不回调——3.5s 总超时兜底，渲染不卡死
-    let settled = false;
-    let timer = null;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      done();
-    };
-    timer = setTimeout(function () {
-      console.warn('[ACM-Workflow][题面] CDN 加载超时（3.5s），使用简易渲染');
-      stLibsReady = true;
-      finish();
-    }, 3500);
-    loadScriptChain(CDN.marked, () => {
-      loadScriptChain(CDN.katex, (url) => {
-        if (url) {
-          const base = url.replace(/\/katex\.min\.js$/, '');
-          const link = document.createElement('link');
-          link.rel = 'stylesheet';
-          link.href = base + '/katex.min.css';
-          document.head.appendChild(link);
-        }
-        loadScriptChain(CDN.katexAutoRender, () => {
-          stLibsReady = true;
-          finish();
-          // Bug2：若超时兜底已先渲染简易版，库就绪后再补一次完整渲染（KaTeX 公式生效）
-          try { done(); } catch (e) { /* 渲染函数异常不影响 */ }
-        });
-      });
-    });
-  }
-
-  /** 简易 Markdown → HTML（V0.12：marked CDN 不可用时降级渲染，题面不空白） */
+  /** 简易 Markdown → HTML（保留：无 KaTeX 时的兜底排版；marked CDN 已移除） */
   function simpleMdToHtml(md) {
     return String(md).split(/\n{2,}/).map(function (block) {
       const b = block.trim();
@@ -164,7 +97,7 @@
             return (block ? '$$' : '$') + me.textContent + (block ? '$$' : '$');
           });
         }
-        zhDiv.innerHTML = zh; // 含 $..$ / $$..$$ 公式标记
+        zhDiv.textContent = zh; // 含 $..$ / $$..$$ 公式标记；textContent 防止译文 HTML 注入
         el.insertBefore(zhDiv, el.firstChild);
       });
     }
@@ -1361,7 +1294,7 @@
       '<div class="contest-meta muted">' + meta + ' · 时长 ' + fmtDur(c.durationSeconds) + '</div>' +
       '<div class="contest-actions">' +
         '<button class="btn sm contest-expand-btn">题目 ▾</button>' +
-        '<button class="btn sm gold contest-create-btn" title="一键创建全部题目的 cpp + .prob 并打开 A 题">一键创建所有题目</button>' +
+        '<button class="btn sm gold contest-create-btn" title="创建全部题目的 cpp + .prob 并打开 A 题">创建所有题目</button>' +
       '</div>' +
       '<div class="contest-problems" style="display:none"><div class="muted chart-empty">加载中…</div></div>' +
     '</div>';
@@ -1481,7 +1414,7 @@
         }
         const zhDiv = document.createElement('div');
         zhDiv.className = 'st-zh';
-        zhDiv.innerHTML = t;
+        zhDiv.textContent = t; // textContent 防止译文 HTML 注入
         el.insertBefore(zhDiv, el.firstChild);
       });
     }
@@ -1526,7 +1459,7 @@
       }
       if (createBtn) {
         const name = card.querySelector('.contest-name') ? card.querySelector('.contest-name').textContent : contestId;
-        askConfirm('确定为一键创建比赛「' + name + '」的全部题目（cpp + .prob）？将自动打开 A 题。', '创建', () => {
+        askConfirm('确定创建比赛「' + name + '」的全部题目（cpp + .prob）？将自动打开 A 题。', '创建', () => {
           vscode.postMessage({ type: 'contestCreateAll', payload: { contestId } });
         });
         return;
@@ -2190,9 +2123,8 @@
         renderCurFile({ id: data.id, title: data.title, fileName: data.title, difficulty: data.difficulty });
         renderLimits();
         renderImageHint();
-        // V0.20：直接渲染排版好的 HTML（含 acm-math 公式标签）；CDN 库就绪后补一次公式渲染
+        // V0.20：直接渲染排版好的 HTML（含 acm-math 公式标签）；本地无 KaTeX 时按原文显示
         renderStatementBody();
-        loadStatementLibs(renderStatementBody);
         break;
       }
       case 'statementDifficulty': {

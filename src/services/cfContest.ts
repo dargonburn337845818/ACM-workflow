@@ -7,7 +7,7 @@ import { ContestProblemInfo } from './template';
  *
  * - contest.list（公开接口）→ 筛选 BEFORE（即将开始）/ CODING（进行中）
  * - contest.standings → 题目列表（题号/名称/Rating/标签）+ 参赛人数
- * - 一键创建：code/Codeforces/Contest_{id}/contest_{id}_{index}.cpp + .prob（见 template.ts）
+ * - 整场创建：code/Codeforces/Contest_{id}/contest_{id}_{index}.cpp + .prob（见 template.ts）
  */
 
 export interface CfContest {

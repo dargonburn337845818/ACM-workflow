@@ -37,8 +37,11 @@ export function curlProxyArgs(): string[] {
   return proxy ? ['--proxy', proxy] : [];
 }
 
-/** Node fetch 的 undici dispatcher（V0.17.3：无代理也强制 IPv4，规避 IPv6 路由差） */
-function fetchDispatcher(): unknown {
+/** dispatcher 模块级缓存：代理配置变化时重建，避免每次请求都新建 undici Agent */
+let cachedDispatcher: { proxy: string; dispatcher: unknown } | null = null;
+
+/** 创建 Node fetch 的 undici dispatcher（V0.17.3：无代理也强制 IPv4，规避 IPv6 路由差） */
+function createFetchDispatcher(): unknown {
   try {
     const proxy = resolveProxyUrl();
     if (proxy) {
@@ -52,9 +55,15 @@ function fetchDispatcher(): unknown {
   }
 }
 
-/** 统一获取 fetch dispatcher（供本文件与 cfApiGet 使用） */
+/** 统一获取 fetch dispatcher（模块级缓存；代理配置变化时自动重建） */
 export function getFetchDispatcher(): unknown {
-  return fetchDispatcher();
+  const proxy = resolveProxyUrl();
+  if (cachedDispatcher && cachedDispatcher.proxy === proxy) {
+    return cachedDispatcher.dispatcher;
+  }
+  const dispatcher = createFetchDispatcher();
+  cachedDispatcher = { proxy, dispatcher };
+  return dispatcher;
 }
 
 /**
@@ -149,7 +158,7 @@ function decodeHtmlEntities(s: string): string {
 }
 
 async function fetchPage(url: string): Promise<string> {
-  const dispatcher = fetchDispatcher();
+  const dispatcher = getFetchDispatcher();
   const res = await fetch(url, {
     headers: {
       'User-Agent': CF_UA,
@@ -251,7 +260,7 @@ export async function fetchBinary(url: string): Promise<{ mime: string; data: Bu
     }
   }
   try {
-    const dispatcher = fetchDispatcher();
+    const dispatcher = getFetchDispatcher();
     const res = await fetch(url, {
       headers: { 'User-Agent': CF_UA, 'Accept': 'image/*' },
       signal: AbortSignal.timeout(15000),
@@ -331,10 +340,12 @@ async function loadCodeforcesProblems(): Promise<Problem[]> {
       console.warn(`[ACM-Workflow][CF API] problemset.problems 第 ${attempt - 1} 次尝试失败，重试`);
     }
     try {
+      const dispatcher = getFetchDispatcher();
       const res = await fetch('https://codeforces.com/api/problemset.problems', {
         headers: { 'User-Agent': CF_UA, 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(30000)
-      });
+        signal: AbortSignal.timeout(30000),
+        ...(dispatcher ? { dispatcher } : {})
+      } as any);
       if (!res.ok) {
         const body = await res.text().catch(() => '');
         const snippet = body.trim().slice(0, 200);

@@ -167,7 +167,7 @@ console.log('== 5. 造数据确定性 ==');
         { type: 'pairs', countRef: 'm', vMin: 7, vMax: 7, wMin: 8, wMax: 8 }
       ]
     }, mulberry32(1));
-    assert(foolproof === '3\n1 1 1\n2\n7 8\n7 8\n', '傻瓜式 line+countRef 拼装', JSON.stringify(foolproof));
+    assert(foolproof === '3\n1 1 1\n2\n7 8\n7 8\n', 'line+countRef 拼装', JSON.stringify(foolproof));
     const graph = await generateInput({ type: 'graph', nMin: 5, nMax: 5, mMin: 4, mMax: 4 }, mulberry32(9));
     const gLines = graph.trim().split('\n');
     const [gN, gM] = gLines[0].split(' ').map(Number);

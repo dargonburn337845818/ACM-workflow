@@ -14,7 +14,7 @@ export type { StatementParseResult, StatementImageDownloader };
 /**
  * 抓取 Codeforces 题面并排版为 HTML（V0.20 重构）：
  * 1. 用 cheerio 解析页面 → 提取标题/限制/描述/输入输出/样例/提示；
- * 2. 文本节点智能拼接、公式边界保护（acm-math 标签，内部不拆分）；
+ * 2. 文本节点合并、公式边界保护（acm-math 标签，内部不拆分）；
  * 3. 配图下载为 data URI 内嵌；
  * 4. 返回排版后的 HTML（随本地缓存落盘，离线同样排版良好）。
  */

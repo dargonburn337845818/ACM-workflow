@@ -1,3 +1,4 @@
+import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 
 /** 选题视图 HTML（V0.23：URL 导入入口） */
@@ -5,7 +6,7 @@ export function renderPickView(): string {
   return `
     <div class="view" id="view-pick">
       <div class="pick-wrap">
-        <p class="muted">随机推荐训练通用能力，或基于 CF 提交通过率精准补弱。</p>
+        <p class="muted">随机推荐训练通用能力，或基于 CF 提交通过率补齐薄弱专题。</p>
 
         <div class="card pick-card">
           <div class="control-row diff-row">
@@ -45,7 +46,7 @@ export function renderPickView(): string {
         <div class="card url-import-card">
           <div class="url-import-head">
             <label>通过 URL 导入</label>
-            <span class="muted url-import-hint">粘贴 CF 题目链接，一键生成 cpp + 题面</span>
+            <span class="muted url-import-hint">粘贴 CF 题目链接，生成 cpp + 题面</span>
           </div>
           <div class="url-import-row">
             <input id="url-import-input" class="url-import-input mono" placeholder="https://codeforces.com/problemset/problem/1791/E" spellcheck="false">
@@ -69,8 +70,14 @@ export function renderPickView(): string {
   `;
 }
 
+/** 生成 Webview 脚本/样式 nonce（CSP 收紧后用 nonce 标识本地资源，防止内联注入） */
+function getNonce(): string {
+  return crypto.randomBytes(16).toString('hex');
+}
+
 /** 生成工作台 Webview HTML 模板（V0.18 从 panel.ts 拆出，ADR 0003 再拆到独立文件） */
 export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+  const nonce = getNonce();
   const styleUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'media', 'style.css')
   );
@@ -92,7 +99,7 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
     if (isVideo) {
       glassBgVideo = `<video class="wallpaper-bg" autoplay loop muted playsinline src="${bgUri}"></video>`;
     } else {
-      glassBgStyle = `<style>body { background-image: url("${bgUri}"), radial-gradient(560px 560px at 85% 8%, rgba(124,156,196,0.28), transparent 65%), radial-gradient(520px 520px at 8% 92%, rgba(51,81,122,0.35), transparent 65%) !important; background-size: cover, auto, auto; background-position: center, center, center; background-attachment: fixed, fixed, fixed; }</style>`;
+      glassBgStyle = `<style nonce="${nonce}">body { background-image: url("${bgUri}"), radial-gradient(560px 560px at 85% 8%, rgba(124,156,196,0.28), transparent 65%), radial-gradient(520px 520px at 8% 92%, rgba(51,81,122,0.35), transparent 65%) !important; background-size: cover, auto, auto; background-position: center, center, center; background-attachment: fixed, fixed, fixed; }</style>`;
     }
   }
 
@@ -103,7 +110,7 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${webview.cspSource} https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; style-src ${webview.cspSource} 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; font-src https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://cdn.staticfile.org; img-src ${webview.cspSource} data: https: file:; media-src ${webview.cspSource} data: https: file: blob:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' ${webview.cspSource}; style-src 'nonce-${nonce}' ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data: https: file:; media-src ${webview.cspSource} data: https: file: blob:;">
   <link rel="stylesheet" href="${styleUri}">
   ${glassBgStyle}
   <title>ACM Workflow</title>
@@ -329,7 +336,7 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
       </div>
     </main>
   </div>
-  <script src="${scriptUri}"></script>
+  <script src="${scriptUri}" nonce="${nonce}"></script>
   <div id="confirm-modal">
     <div class="confirm-box">
       <p id="confirm-text"></p>

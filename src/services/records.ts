@@ -29,7 +29,7 @@ export interface ProblemRecord {
 let db: Database | null = null;
 let initPromise: Promise<Database> | null = null;
 
-/** 旧库迁移：补充沉浸模式新增列（notes / canvas_data） */
+/** 旧库迁移：补充旧版全屏模式新增列（notes / canvas_data） */
 function migrate(d: Database) {
   const res = d.exec('PRAGMA table_info(records)');
   if (res.length === 0) return;
@@ -226,7 +226,7 @@ export async function bulkImport(
   return items.length;
 }
 
-// ===== 沉浸模式扩展字段（笔记 / 画板） =====
+// ===== 旧版全屏模式扩展字段（笔记 / 画板） =====
 
 export interface ProblemExtra {
   notes?: string;

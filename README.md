@@ -1,11 +1,11 @@
 # ACM Workflow
 
-> **VSCode 中强大的 Codeforces 刷题工作台** — 选题 → 题面翻译 → 生成 → 测试 → 对拍 → 造数据 → 比赛 → 记录，全流程在编辑器内闭环；同时支持玻璃拟态工作台，可联动 [VSCode Background](https://github.com/caoge5524/vscode-background) 背景插件将壁纸一键设为全局背景。
+> **VSCode 中的 Codeforces 刷题工作台** — 在编辑器内完成选题 → 题面翻译 → 生成 → 测试 → 对拍 → 造数据 → 比赛 → 记录；同时支持玻璃拟态工作台，可联动 [VSCode Background](https://github.com/caoge5524/vscode-background) 背景插件把壁纸设为全局背景。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![VS Code](https://img.shields.io/badge/VS%20Code-%5E1.85.0-blue)](https://code.visualstudio.com/)
 
-硬边墨色设计 · 左侧工作台 + 右侧原生编辑器 · 双语题面 · 一键测试 · 中文界面
+硬边墨色设计 · 左侧工作台 + 右侧原生编辑器 · 双语题面 · 运行测试 · 中文界面
 
 ---
 
@@ -16,7 +16,7 @@
 - 难度区间 **800~3500**，按 Codeforces Rating 滑动选择
 - **算法标签多选**：常用标签 chips + 搜索框，可回车添加任意 CF 标签；命中任一标签即可（OR），与难度区间共同过滤
 - **随机推荐**：从 CF 题集中抽取满足难度 + 标签条件的题目，换一题自动排除已推荐
-- **薄弱点推荐**：基于本地 AC 记录 × 题集标签，从通过率最低的 2~3 个专题中抽**未 AC** 的题，精准补弱
+- **薄弱点推荐**：基于本地 AC 记录 × 题集标签，从通过率最低的 2~3 个专题中抽**未 AC** 的题，按提交通过率补齐薄弱专题
 - 生成后自动创建 cpp、抓取样例、登记记录并打开编辑器
 
 ### 🔗 URL 导入
@@ -38,7 +38,7 @@ https://codeforces.com/gym/104053/problem/A
 - Round 列表：即将开始 / 进行中，自动加载并显示开始时间、时长、参赛人数
 - 展开查看题目列表（题号 / 名称 / Rating / 标签）与 **前 20 榜单**
 - **我的关注**：额外关注 Handle，查看 rank / 过题 / 罚时与每题状态
-- **一键创建整场比赛**：生成 `Contest_{id}/contest_{id}_{字母}.cpp` + `.prob`，自动抓取样例
+- **一次命令创建整场比赛**：生成 `Contest_{id}/contest_{id}_{字母}.cpp` + `.prob`，自动抓取样例
 
 ### 📖 题面与翻译
 
@@ -67,7 +67,7 @@ https://codeforces.com/gym/104053/problem/A
 
 - 只有流水线拼装：没有预设整块结构，自己一个个添加步骤，每一步保存各自参数
 - 流水线步骤：单行单数 / 单个数 / 一行多个数 / 每行两个数 / 固定文本 / 换行 / 重复块 / 数组 / 树 / 图 / 字符串 / 排列，种子可复现
-- 傻瓜式拼装：单行单数绑定变量，一行多个数/每行两个数直接引用变量当数量，不需要手动拼空格和换行
+- 拼装方式：单行单数绑定变量，一行多个数/每行两个数直接引用变量当数量，不用手动拼空格和换行
 - 变量联动：单行单数可绑定变量名，供后续数量/重复块引用
 - 支持自定义脚本：`.js` / `.py` / `.cpp`，生成结果只在造数据页预览，不自动覆盖测试样例
 - **按样例生成**：`按样例生成` 按钮不调用 LLM；直接根据官方样例的输入行数/token 结构生成随机化 Python 脚本，毫秒级完成，保存到当前题目 `gen.py` 并自动插入造数据流水线
@@ -93,7 +93,7 @@ https://codeforces.com/gym/104053/problem/A
 
 ### 🖥️ 浏览器推送
 
-兼容 **Competitive Companion** 协议（端口 27121），浏览器插件一键推题，自动建题。
+兼容 **Competitive Companion** 协议（端口 27121），浏览器插件推题后自动建题。
 
 ### 🛠 环境配置引导
 
@@ -109,7 +109,7 @@ https://codeforces.com/gym/104053/problem/A
 
 ### 🎨 硬边墨色美化
 
-命令 `ACM Workflow: 应用硬边墨色美化` 可一键应用/还原：活动栏沉底、单标签页、隐藏状态栏、实色深色配色。
+命令 `ACM Workflow: 应用硬边墨色美化` 可用一条命令应用/还原：活动栏沉底、单标签页、隐藏状态栏、实色深色配色。
 
 ### 📰 主题
 
@@ -130,7 +130,7 @@ https://codeforces.com/gym/104053/problem/A
 
 填入 wallpaper 图库直链（建议 https）后，工作台玻璃面板会透出背景；留空则使用内置深夜景光源，正常显示。
 
-工作台壁纸栏中的 **「设为全局背景」** 会把当前壁纸一键写入联动插件 [VSCode Background](https://github.com/caoge5524/vscode-background) 的配置，让整个 VSCode（编辑器、侧边栏、状态栏等）都使用同一张壁纸。
+工作台壁纸栏中的 **「设为全局背景」** 会把当前壁纸写入联动插件 [VSCode Background](https://github.com/caoge5524/vscode-background) 的配置，让整个 VSCode（编辑器、侧边栏、状态栏等）都使用同一张壁纸。
 
 > 联动插件 GitHub：<https://github.com/caoge5524/vscode-background>
 >
@@ -151,7 +151,7 @@ https://codeforces.com/gym/104053/problem/A
 
 - **选题页** → 设置难度 → 「随机推荐」或「薄弱点推荐」
 - **选题页底部** → 粘贴题目 URL（`https://codeforces.com/problemset/problem/1791/E`）→ 导入
-- **比赛页** → 展开 Round → 「一键创建」生成整场题目
+- **比赛页** → 展开 Round → 「创建整场比赛」生成整场题目
 
 ### ③ 开始刷题
 
@@ -244,37 +244,46 @@ npm run compile
 
 ```
 src/
-├── extension.ts              # 入口：仅激活 + 命令注册
+├── extension.ts              # 入口：激活 + 命令注册
 ├── core/
-│   └── workbench.ts          # 工作台宿主：WebviewView、消息路由、联动状态
+│   ├── workbench.ts          # 工作台宿主：WebviewView、消息路由、联动状态
+│   └── workbenchHtml.ts      # Webview HTML 模板
 ├── features/                 # 功能模块（每模块一个目录，自注册消息处理器）
 │   ├── pick/                 #   CF 选题 + 薄弱点推荐
 │   ├── urlImport/            #   URL 导入题目
-│   ├── contest/              #   比赛管理 + 一键创建
+│   ├── contest/              #   比赛管理 + 创建整场比赛
 │   ├── test/                 #   内置测试器 + 题面/翻译联动
 │   ├── verifier/             #   通用对拍器
 │   ├── datagen/              #   造数据机器
 │   ├── session/              #   CF 登录态
 │   └── records/              #   刷题记录 + 历史导入
-├── services/                 # 通用服务
+├── services/                 # 通用服务（深模块优先，跨模块走 index.ts 组合根）
 │   ├── fetchers/             #   codeforces / statement / userStats
-│   ├── runner.ts             #   编译（缓存）/ 运行 / 比对 / 环境探测
-│   ├── dashboard.ts          #   记录面板展示数据组合（一次读库产出列表/统计/图表）
+│   ├── judgeService.ts       #   编译/运行/判定/环境探测
+│   ├── runner.ts             #   编译缓存与子进程运行
+│   ├── dataGen.ts            #   造数据生成器（纯函数 + 脚本子进程）
+│   ├── verifier.ts           #   对拍执行
+│   ├── records.ts            #   记录/统计/历史导入
+│   ├── dashboard.ts          #   记录面板展示数据组合
 │   ├── diagnostics.ts        #   工作流诊断：轨迹 / 网络 / 异常分析 / 报告
-│   ├── template.ts           #   生成 cpp + .prob（CPH 兼容双盘符）
+│   ├── template.ts           #   生成 cpp + .prob（CPH 兼容）
 │   ├── cfSession.ts          #   CF 会话（SecretStorage）
 │   ├── cfContest.ts          #   比赛 API + 榜单提取
 │   ├── translate.ts          #   题面翻译（多后端）
 │   ├── statementHtml.ts      #   题面 HTML 排版
-│   ├── dataGen.ts / verifier.ts / records.ts ...
-│   └── companionServer.ts    #   Competitive Companion 接收服务
+│   ├── statementCache.ts     #   题面三级缓存
+│   ├── companionServer.ts    #   Competitive Companion 接收服务
+│   ├── spark.ts              #   本地 4B 造数据脚本生成
+│   └── sparkLifecycle.ts     #   Spark 服务器生命周期
 ├── types/                    # 统一类型定义
 └── utils/
-    └── paths.ts              # 路径解析（配置化，跨平台默认）
-tools/                        # 本地翻译：llama.cpp hy-mt2:latest 启动/检查脚本 + HTTP 服务
+    ├── paths.ts              # 路径解析（配置化，跨平台默认）
+    └── wsl.ts                # WSL 环境探测
+tools/                        # 本地翻译：llama.cpp 启动/检查脚本 + HTTP 服务
 media/                        # 工作台前端（main.js / style.css / icon / walkthrough）
-tests/smoke.js                # 冒烟测试（无 VS Code 环境可跑）
-docs/                         # 完整文档
+themes/                       # 两套 VS Code 颜色主题
+tests/                        # 无 VS Code 环境可跑的冒烟测试
+docs/                         # 用户与研发文档
 ```
 
 ## 🧱 仓库结构（monorepo）
@@ -282,6 +291,7 @@ docs/                         # 完整文档
 - `src/` + `media/`：VS Code 扩展主体。
 - `knowledge-ladder/`：独立 Python 知识阶梯子项目（桌面端 + 移动端 PWA）。其生成产物（`mobile/www/data.js`、`reports/`）已由 `.gitignore` 排除，CI 中自动重新生成。
 - `.github/workflows/`：根目录统一 Actions（扩展 CI/APK/Release/安全扫描）。`knowledge-ladder` 子目录不维护自己的 `.github`，避免“看起来会执行”的误判。
+- `CODE_OF_CONDUCT.md` / `CONTRIBUTING.md` / `SECURITY.md`：社区协作、贡献与安全上报约定。
 
 ## 🛠 技术栈
 
@@ -299,6 +309,7 @@ TypeScript · VS Code Extension API（WebviewView）· Node.js · puppeteer-core
 
 完整流程与开发建议见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)；
 功能详解见 [docs/features.md](docs/features.md)，变更记录见 [docs/changelog.md](docs/changelog.md)。
+社区行为约定见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)，安全与隐私见 [SECURITY.md](SECURITY.md)。
 
 ## 📜 开源协议
 
@@ -306,4 +317,4 @@ TypeScript · VS Code Extension API（WebviewView）· Node.js · puppeteer-core
 
 ---
 
-*English: ACM Workflow is a powerful Codeforces problem-solving assistant for VSCode — problem picking, statement translation, one-click testing, stress-testing (duipai), test data generation, contest management and solving records, all inside your editor.*
+*English: ACM Workflow is a VS Code extension for Codeforces problem solving: problem picking, statement translation, testing, stress-testing (duipai), data generation, contest management, and progress records inside the editor.*

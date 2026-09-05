@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
  * - 硬边墨色 token：bg #1A1A1A / panel #2D2D2D / surface #3C3C3C / border #4B4B4B
  *   / fg #E8E0D5 / muted #9A928A，无圆角无蓝色调
  * - 布局走官方设置（可备份/还原）：活动栏沉底、隐藏状态栏、侧边栏居左、
- *   单标签页、隐藏命令中心与布局控制，最大化代码沉浸。
+ *   单标签页、隐藏命令中心与布局控制，让代码区更专注。
  */
 
 const BACKUP_KEY = 'acmWorkflow.beautifyBackup';
@@ -14,7 +14,7 @@ const APP_MARK_KEY = 'acmWorkflow.beautifyApplied';
 
 /** 视窗布局设置（应用前备份原值） */
 export const LAYOUT_SETTINGS: Record<string, any> = {
-  'workbench.activityBar.location': 'bottom',      // 活动栏沉底，主区域更沉浸
+  'workbench.activityBar.location': 'bottom',      // 活动栏沉底，主区域更专注
   'workbench.statusBar.visible': false,            // 隐藏状态栏
   'workbench.sideBar.location': 'left',            // 侧边栏居左（用户习惯）
   'workbench.editor.showTabs': 'single',           // 单标签页，减少干扰

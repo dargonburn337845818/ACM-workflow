@@ -47,46 +47,50 @@ async function handleTestRun(host: WorkbenchHost, deps: Pick<Services, 'records'
   host.testCancelled = false;
   host.post({ type: 'testRunning', running: true });
 
-  // Bug4：优先按题面抓取的 CF 时间限制判定 TLE（+1s 本地缓冲），否则用配置默认值
-  const timeoutMs = host.testTimeoutMs();
-  const compile = await host.compileFor(filePath, cases.length);
-  if (!compile.ok || !compile.exePath) return;
-
   let passed = 0;
   let cancelled = false;
-  for (let i = 0; i < cases.length; i++) {
-    if (host.testCancelled) {
-      cancelled = true;
-      break;
-    }
-    const c = cases[i];
-    host.post({ type: 'testStatus', message: `正在运行用例 ${i + 1}/${cases.length}...` });
-    const r = await deps.judge.run(compile.exePath, c.input, timeoutMs);
-    let status: 'passed' | 'failed' | 'error';
-    let message = '';
-    if (r.timedOut) {
-      status = 'error';
-      message = `超时（>${(timeoutMs / 1000).toFixed(0)}s）`;
-    } else if (r.code !== 0) {
-      status = 'error';
-      message = `运行错误（退出码 ${r.code}）${r.stderr ? '：' + r.stderr.slice(0, 400) : ''}`;
-    } else if (deps.judge.judge(r.stdout, c.output)) {
-      status = 'passed';
-      passed++;
-    } else {
-      status = 'failed';
-    }
-    host.post({ type: 'testResult', caseId: c.id, status, actual: r.stdout, timeMs: r.timeMs, message });
-  }
+  try {
+    // Bug4：优先按题面抓取的 CF 时间限制判定 TLE（+1s 本地缓冲），否则用配置默认值
+    const timeoutMs = host.testTimeoutMs();
+    const compile = await host.compileFor(filePath, cases.length);
+    if (!compile.ok || !compile.exePath) return;
 
-  host.post({
-    type: 'testRunDone',
-    passed,
-    total: cases.length,
-    message: cancelled ? '已取消' : `通过 ${passed}/${cases.length}`,
-    cancelled
-  });
-  host.post({ type: 'testRunning', running: false });
+    for (let i = 0; i < cases.length; i++) {
+      if (host.testCancelled) {
+        cancelled = true;
+        break;
+      }
+      const c = cases[i];
+      host.post({ type: 'testStatus', message: `正在运行用例 ${i + 1}/${cases.length}...` });
+      const r = await deps.judge.run(compile.exePath, c.input, timeoutMs);
+      let status: 'passed' | 'failed' | 'error';
+      let message = '';
+      if (r.timedOut) {
+        status = 'error';
+        message = `超时（>${(timeoutMs / 1000).toFixed(0)}s）`;
+      } else if (r.code !== 0) {
+        status = 'error';
+        message = `运行错误（退出码 ${r.code}）${r.stderr ? '：' + r.stderr.slice(0, 400) : ''}`;
+      } else if (deps.judge.judge(r.stdout, c.output)) {
+        status = 'passed';
+        passed++;
+      } else {
+        status = 'failed';
+      }
+      host.post({ type: 'testResult', caseId: c.id, status, actual: r.stdout, timeMs: r.timeMs, message });
+    }
+
+    host.post({
+      type: 'testRunDone',
+      passed,
+      total: cases.length,
+      message: cancelled ? '已取消' : `通过 ${passed}/${cases.length}`,
+      cancelled
+    });
+  } finally {
+    // 编译失败/运行异常/提前 return 都必须让前端结束“运行中”状态
+    host.post({ type: 'testRunning', running: false });
+  }
 
   // 刷题记录联动：完整跑完一轮（未取消）即更新——全过记 AC，否则记尝试中，attempts+1
   if (!cancelled && cases.length > 0) {

@@ -246,7 +246,7 @@ export function updateProblemTests(filePath: string, tests: { input: string; out
   return updated;
 }
 
-// ===== 比赛一键创建（模块二）=====
+// ===== 比赛整场创建（模块二）=====
 
 export interface ContestProblemInfo {
   contestId: number;
@@ -285,7 +285,7 @@ function writeCphProbForContest(filePath: string, prob: { name: string; url: str
 }
 
 /**
- * 一键创建比赛全部题目（模块二）：
+ * 创建比赛全部题目（模块二）：
  * 生成目录 {baseDir}\code\Codeforces\Contest_{contestId}\
  * 每道题生成 contest_{contestId}_{index}.cpp（如 contest_1234_A.cpp），
  * 同名 .prob 存储题号/名称/URL/难度/标签，另写 .cph/ 双盘符 .prob 供测试面板使用。
