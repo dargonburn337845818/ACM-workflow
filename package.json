@@ -327,7 +327,7 @@
   },
   "dependencies": {
     "cheerio": "^1.2.0",
-    "puppeteer-core": "^25.7.0",
+    "puppeteer-core": "^25.9.0",
     "sql.js": "^1.14.1",
     "undici": "^7.29.0"
   },
