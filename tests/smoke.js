@@ -390,6 +390,9 @@ console.log('== 12. Spark 解析器与提示词锚定 ==');
   const fallback = buildSampleShapeFallbackScript([{ input: '3\n1 2 3\n4 5 6\n', output: '6\n' }]);
   assert(fallback && fallback.includes('random.randint') && fallback.split('\n').filter((l) => l.startsWith('print(')).length === 3,
     '样例形状保底脚本按行生成', JSON.stringify(fallback));
+  const rangedFallback = buildSampleShapeFallbackScript([{ input: '3\n1 2 3\n4 5 6\n' }], '0≤a_i≤100');
+  assert(rangedFallback && rangedFallback.includes('random.randint(0, 100)'),
+    '样例兜底也应用题面元素范围', JSON.stringify(rangedFallback));
   const arrayFallback = buildSampleShapeFallbackScript([{ input: '5\n1 2 3 4 5\n' }]);
   assert(arrayFallback && arrayFallback.includes('n = 5') && arrayFallback.includes('print(n)') &&
     /print\(.*random\.randint/m.test(arrayFallback),

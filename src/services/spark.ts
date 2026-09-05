@@ -269,9 +269,11 @@ function buildFallbackScript(): string {
   ].join('\n');
 }
 
-function tokenExpressions(tokens: string[]): string[] {
+function tokenExpressions(tokens: string[], numericRange: [number, number] = [1, 10]): string[] {
   return tokens.map((t) => {
-    if (/^-?\d+$/.test(t)) return 'random.randint(1, 10)';
+    if (/^-?\d+$/.test(t)) {
+      return `random.randint(${numericRange[0]}, ${numericRange[1]})`;
+    }
     if (/^[A-Za-z]+$/.test(t)) {
       const len = Math.max(1, t.length);
       return `''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(${len}))`;
@@ -425,20 +427,33 @@ export function buildInputFormatScript(statement: string): string | null {
 }
 
 /** 只保留样例原始行数/token 结构的兜底：不推断变量依赖。 */
-function buildLiteralShapeScript(lines: string[]): string {
+function buildLiteralShapeScript(lines: string[], numericRange: [number, number]): string {
   const out: string[] = ['import random', ''];
   for (const line of lines) {
     const tokens = splitTokens(line);
     if (tokens.length === 0) continue;
-    out.push(`print(${tokenExpressions(tokens).join(', ')})`);
+    out.push(`print(${tokenExpressions(tokens, numericRange).join(', ')})`);
   }
   out.push('');
   return out.join('\n');
 }
 
 /** 推断“首行 N + 后面 N 行，每行 k 个 token”的矩阵/行结构。 */
-function buildRowsScript(n: number, cols: number, sampleRows: string[]): string {
-  const exprs = tokenExpressions(splitTokens(sampleRows[0] || ''));
+function buildRowsScript(
+  n: number,
+  cols: number,
+  sampleRows: string[],
+  col1Range: [number, number],
+  col2Range: [number, number]
+): string {
+  const sampleTokens = splitTokens(sampleRows[0] || '');
+  const exprs = sampleTokens.map((t, i) => {
+    if (/^-?\d+$/.test(t)) {
+      const r = i === 0 ? col1Range : i === 1 ? col2Range : col1Range;
+      return `random.randint(${r[0]}, ${r[1]})`;
+    }
+    return tokenExpressions([t], col1Range)[0];
+  });
   const out = [
     'import random',
     '',
@@ -452,8 +467,8 @@ function buildRowsScript(n: number, cols: number, sampleRows: string[]): string 
 }
 
 /** 推断“首行 N + 下一行正好 N 个 token”的数组/序列结构。 */
-function buildArrayScript(n: number, sampleLine: string): string {
-  const exprs = tokenExpressions(splitTokens(sampleLine));
+function buildArrayScript(n: number, sampleLine: string, numericRange: [number, number]): string {
+  const exprs = tokenExpressions(splitTokens(sampleLine), numericRange);
   return [
     'import random',
     '',
@@ -472,11 +487,21 @@ function buildArrayScript(n: number, sampleLine: string): string {
  * 无法识别时退化为“逐行保持 token 形状”。
  * 全程不依赖 LLM。
  */
-export function buildSampleShapeFallbackScript(samples?: { input: string; output?: string }[]): string | null {
+export function buildSampleShapeFallbackScript(
+  samples?: { input: string; output?: string }[],
+  statement = ''
+): string | null {
   const sample = samples?.[0]?.input;
   if (!sample || !sample.trim()) return null;
   const lines = sample.trim().split('\n').map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return null;
+
+  // 从题面中尝试取元素范围；取不到用常见的 CF 默认范围（避免全是 1..10）。
+  const numericRange = tryInferVarRange(statement, 'a_i') || tryInferVarRange(statement, 'a') ||
+    tryInferVarRange(statement, 'x_i') || tryInferVarRange(statement, 'x') || [1, 1000000000];
+  const col1Range = tryInferVarRange(statement, 'u') || numericRange;
+  const col2Range = tryInferVarRange(statement, 'v') || tryInferVarRange(statement, 'y_i') ||
+    tryInferVarRange(statement, 'y') || col1Range;
 
   const head = splitTokens(lines[0]);
   const headIsSingleInt = head.length === 1 && /^\d+$/.test(head[0]);
@@ -487,16 +512,16 @@ export function buildSampleShapeFallbackScript(samples?: { input: string; output
     const counts = rest.map((l) => splitTokens(l).length);
     // 规律：N 行，每行 token 数一致
     if (rest.length === n && counts.every((c) => c === counts[0]) && counts[0] > 0) {
-      return buildRowsScript(n, counts[0], rest);
+      return buildRowsScript(n, counts[0], rest, col1Range, col2Range);
     }
     // 规律：仅 1 行，且该行 token 数 = N
     if (rest.length === 1) {
       const tokens = splitTokens(rest[0]);
-      if (tokens.length === n) return buildArrayScript(n, rest[0]);
+      if (tokens.length === n) return buildArrayScript(n, rest[0], numericRange);
     }
   }
 
-  return buildLiteralShapeScript(lines);
+  return buildLiteralShapeScript(lines, numericRange);
 }
 
 export class SparkService {
@@ -522,7 +547,7 @@ export class SparkService {
   fastGenerate(problem: SparkProblemContext): { code: string; mode: 'input' | 'sample' | 'minimal' } {
     const fromInput = buildInputFormatScript(problem.statement || '');
     if (fromInput) return { code: fromInput, mode: 'input' };
-    const fromSample = buildSampleShapeFallbackScript(problem.samples);
+    const fromSample = buildSampleShapeFallbackScript(problem.samples, problem.statement || '');
     if (fromSample) return { code: fromSample, mode: 'sample' };
     return { code: buildFallbackScript(), mode: 'minimal' };
   }
@@ -634,7 +659,7 @@ export class SparkService {
     if (!check.ok) {
       console.warn('[ACM-Workflow][Spark] 多次修正仍失败，写入保底可运行脚本');
       // 优先用“样例形状随机化”，比 print(1) 更有用；没有样例时退回最小骨架。
-      finalCode = buildSampleShapeFallbackScript(problem?.samples) || buildFallbackScript();
+      finalCode = buildSampleShapeFallbackScript(problem?.samples, problem?.statement || '') || buildFallbackScript();
       check = evaluate(await runPythonCode(finalCode));
       fallback = true;
       if (!check.ok) {

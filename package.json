@@ -2,7 +2,7 @@
   "name": "acm-workflow",
   "displayName": "ACM Workflow",
   "description": "ACM Workflow 是 VSCode 中的 Codeforces 刷题工作台：选题、题面翻译、一键测试、对拍、造数据、比赛管理与刷题记录一站式完成；支持玻璃拟态工作台，可联动 VSCode Background 背景插件（https://github.com/caoge5524/vscode-background）将所选壁纸一键设为全局背景。",
-  "version": "0.24.3",
+  "version": "0.24.4",
   "publisher": "deepseekharness",
   "license": "MIT",
   "icon": "media/icon.png",
