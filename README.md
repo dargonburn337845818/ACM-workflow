@@ -70,7 +70,7 @@ https://codeforces.com/gym/104053/problem/A
 - 傻瓜式拼装：单行单数绑定变量，一行多个数/每行两个数直接引用变量当数量，不需要手动拼空格和换行
 - 变量联动：单行单数可绑定变量名，供后续数量/重复块引用
 - 支持自定义脚本：`.js` / `.py` / `.cpp`，生成结果只在造数据页预览，不自动覆盖测试样例
-- **AI 生成脚本**：`AI 生成脚本` 按钮调用本地 Spark 模型，根据当前题目题面自动生成 Python 造数据脚本，验证通过后覆盖 `gen.py` 并自动插入造数据流水线
+- **按样例生成**：`按样例生成` 按钮不调用 LLM；直接根据官方样例的输入行数/token 结构生成随机化 Python 脚本，毫秒级完成，保存到当前题目 `gen.py` 并自动插入造数据流水线
 - 生成后可预览、保存为 `data_*.txt`
 
 ### 📊 刷题记录
@@ -201,11 +201,11 @@ npm run compile
 | `acmWorkflow.sparkServerPath` | `D:\llama-spark\build\bin\llama-server.exe` | Spark 使用的 llama-server.exe（CUDA DLL 同目录） |
 | `acmWorkflow.sparkModelPath` | `D:\llama\Spark-X2.5-4B-Q8_0\Spark-X2.5-4B-Q8_0.gguf` | Spark GGUF 模型文件 |
 | `acmWorkflow.sparkModelName` | `spark:latest` | Spark 在 llama-server 中的模型别名 |
-| `acmWorkflow.sparkAutoStart` | `true` | 使用 Spark 时未启动则自动拉起 |
+| `acmWorkflow.sparkAutoStart` | `false` | 默认关闭；当前「按样例生成」不依赖 LLM，仅可选 Spark 理解模式需开启 |
 | `acmWorkflow.sparkIdleTimeoutMs` | `180000` | Spark 空闲自动停止毫秒数（3 分钟，0=不自动停止） |
-| `acmWorkflow.sparkCtxSize` | `131072` | Spark 上下文长度（与 `startmain.ps1` 一致） |
-| `acmWorkflow.sparkThreads` | `16` | Spark CPU 线程数（与 `startmain.ps1` 一致） |
-| `acmWorkflow.sparkGpuLayers` | `99` | Spark GPU 层数（全量加速） |
+| `acmWorkflow.sparkCtxSize` | `8192` | Spark 上下文长度（轻量默认，非 131K） |
+| `acmWorkflow.sparkThreads` | `8` | Spark CPU 线程数（轻量默认） |
+| `acmWorkflow.sparkGpuLayers` | `0` | Spark GPU 层数（默认 CPU 轻量运行） |
 | `acmWorkflow.sparkScriptPath` | `""` → 当前题目目录 `gen.py` | AI 生成的 Python 造数据脚本保存路径；留空时按题目隔离，避免互相覆盖 |
 | `acmWorkflow.browserPath` | `""`（自动探测） | Puppeteer 浏览器路径；留空自动探测 Edge/Chrome/Chromium |
 | `acmWorkflow.followHandles` | `[]` | 比赛「我的关注」额外 Handle（自己的自动包含） |

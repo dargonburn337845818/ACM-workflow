@@ -11,10 +11,10 @@
 #   SPARK_MODEL        GGUF 模型路径（默认 D:\llama\Spark-X2.5-4B-Q8_0\Spark-X2.5-4B-Q8_0.gguf）
 #   SPARK_MODEL_ALIAS  对外模型名（默认 spark:latest）
 #   SPARK_PORT         服务端口（默认 8080）
-#   SPARK_CTX          上下文长度（默认 16384）
-#   SPARK_BATCH        批大小（默认 512）
+#   SPARK_CTX          上下文长度（默认 8192）
+#   SPARK_BATCH        批大小（默认 256）
 #   SPARK_THREADS      CPU 线程数（默认 8）
-#   SPARK_GPU_LAYERS   GPU 层数（默认 99）
+#   SPARK_GPU_LAYERS   GPU 层数（默认 0 = CPU 轻量）
 #   SPARK_LOG_FILE     llama-server 日志文件（默认 tools/spark-server.log）
 #   SPARK_PID_FILE     PID 文件（默认 tools/.spark-server.pid）
 
@@ -24,10 +24,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SPARK_PORT="${SPARK_PORT:-8080}"
 SPARK_URL="${SPARK_URL:-http://127.0.0.1:${SPARK_PORT}}"
 SPARK_MODEL_ALIAS="${SPARK_MODEL_ALIAS:-spark:latest}"
-SPARK_CTX="${SPARK_CTX:-131072}"
-SPARK_BATCH="${SPARK_BATCH:-512}"
-SPARK_THREADS="${SPARK_THREADS:-16}"
-SPARK_GPU_LAYERS="${SPARK_GPU_LAYERS:-99}"
+SPARK_CTX="${SPARK_CTX:-8192}"
+SPARK_BATCH="${SPARK_BATCH:-256}"
+SPARK_THREADS="${SPARK_THREADS:-8}"
+SPARK_GPU_LAYERS="${SPARK_GPU_LAYERS:-0}"
 SPARK_CACHE_TYPE="${SPARK_CACHE_TYPE:-q4_0}"
 SPARK_PID_FILE="${SPARK_PID_FILE:-$SCRIPT_DIR/.spark-server.pid}"
 SPARK_LOG_FILE="${SPARK_LOG_FILE:-$SCRIPT_DIR/spark-server.log}"

@@ -173,7 +173,7 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
             <div class="control-row dg-actions">
               <button class="primary-btn" id="dg-gen-btn">生成数据</button>
               <button class="btn" id="dg-save-btn" title="把当前生成的数据保存为文件">保存为文件</button>
-              <button class="primary-btn" id="dg-ai-btn" title="使用本地 Spark 模型根据当前题面自动生成 Python 造数据脚本">AI 生成脚本</button>
+              <button class="primary-btn" id="dg-ai-btn" title="按官方样例格式自动生成随机化数据脚本；不调用本地大模型，毫秒级完成">按样例生成</button>
               <button class="btn" id="dg-open-script-btn" style="display:none" title="打开刚生成的 gen.py">打开脚本</button>
             </div>
             <div id="dg-status" class="dg-status"></div>

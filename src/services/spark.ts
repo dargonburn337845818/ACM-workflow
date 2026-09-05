@@ -315,6 +315,16 @@ export class SparkService {
     return this.generateScript(buildDataGenPrompt(problem));
   }
 
+  /**
+   * 轻量首选路径：不使用 LLM，只按官方样例的输入结构生成随机化脚本。
+   * 目标：毫秒级、零模型依赖、零上下文开销；模型理解题面不再是默认路径。
+   */
+  fastGenerate(problem: SparkProblemContext): { code: string; mode: 'sample' | 'minimal' } {
+    const fromSample = buildSampleShapeFallbackScript(problem.samples);
+    if (fromSample) return { code: fromSample, mode: 'sample' };
+    return { code: buildFallbackScript(), mode: 'minimal' };
+  }
+
   /** 调用 Spark 生成 Python 造数据脚本并返回代码。 */
   async generateScript(prompt: string): Promise<string> {
     if (!(await ensureSparkServer())) {

@@ -126,26 +126,29 @@ async function handleSparkGenerateScript(host: WorkbenchHost, deps: Pick<Service
   const editor = vscode.window.activeTextEditor;
   const filePath = editor?.document.fileName || '';
   if (!filePath.toLowerCase().endsWith('.cpp')) {
-    host.post({ type: 'sparkStatus', message: '请先打开一个题目 .cpp 文件，再让 AI 生成造数据脚本', isError: true, busy: false });
+    host.post({ type: 'sparkStatus', message: '请先打开一个题目 .cpp 文件，再生成造数据脚本', isError: true, busy: false });
     return;
   }
   const probPath = deps.workspace.findProbFile(filePath);
   if (!probPath) {
-    host.post({ type: 'sparkStatus', message: '未找到当前题目的 .prob 配置，无法自动获取题面上下文', isError: true, busy: false });
+    host.post({ type: 'sparkStatus', message: '未找到当前题目的 .prob 配置，无法自动获取样例上下文', isError: true, busy: false });
     return;
   }
 
-  host.post({ type: 'sparkStatus', message: '正在读取题面并调用本地 Spark 生成脚本…', busy: true });
+  // 轻量路径：只按样例格式随机化，不调用本地大模型，毫秒级完成。
+  host.post({ type: 'sparkStatus', message: '正在按样例格式快速生成随机化脚本…', busy: true });
   try {
     const ctx = resolveCurrentProblemContext(filePath, probPath, deps.workspace);
-    const code = await deps.spark.generateScriptForProblem(ctx);
-    const saved = await deps.spark.validateAndSave(code, ctx);
-    host.post({ type: 'sparkGenerated', payload: { path: saved.path, code: saved.code, stdout: saved.stdout, fallback: saved.fallback } });
-    if (saved.fallback) {
-      host.post({ type: 'sparkStatus', message: '已生成保底脚本：模型多次修正未通过，先保存可运行的最小骨架以便继续流程', isError: false, busy: false });
+    const generated = deps.spark.fastGenerate(ctx);
+    const saved = await deps.spark.validateAndSave(generated.code, ctx);
+    host.post({ type: 'sparkGenerated', payload: { path: saved.path, code: saved.code, stdout: saved.stdout, fallback: saved.fallback, source: generated.mode } });
+    if (saved.fallback || generated.mode === 'minimal') {
+      host.post({ type: 'sparkStatus', message: '未找到可用样例，已生成最小骨架；建议先抓取样例后再生成', isError: false, busy: false });
+      return;
     }
+    host.post({ type: 'sparkStatus', message: '已按样例格式生成随机化脚本（未使用 LLM），并保存到当前题目目录', isError: false, busy: false });
   } catch (e: any) {
-    host.post({ type: 'sparkStatus', message: e?.message || 'AI 生成脚本失败', isError: true, busy: false });
+    host.post({ type: 'sparkStatus', message: e?.message || '生成脚本失败', isError: true, busy: false });
   }
 }
 

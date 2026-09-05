@@ -4,11 +4,11 @@
  *
  * 用途：在「造数据」页根据当前题目生成 Python 数据生成脚本。
  *
- * 设计要点：
- *  - 默认使用用户已验证的 Spark 构建 D:\llama-spark\build\bin\llama-server.exe；
- *  - 低占用调优：ctx 16384、单 slot、关闭 webui，GPU 全量加载保证生成速度；
- *  - 空闲 3 分钟自动停止并释放显存；下次点击生成自动拉起；
- *  - 不主动抢占翻译服务（翻译优先）；翻译与 Spark 能共存时保持并发。
+ * 设计要点（轻量化优先）：
+ *  - 当前“按样例生成”不依赖 LLM；Spark 仅保留为可选理解模式。
+ *  - 低占用调优：ctx 8192、batch 256、线程 8、默认 CPU 运行；
+ *  - 默认 sparkAutoStart=false，避免无谓拉起大模型；
+ *  - 空闲 3 分钟自动停止并释放显存；不主动抢占翻译服务。
  */
 
 import * as vscode from 'vscode';
@@ -22,13 +22,13 @@ const DEFAULT_ENDPOINT = 'http://127.0.0.1:8080';
 const DEFAULT_MODEL_NAME = 'spark:latest';
 const DEFAULT_SERVER_PATH = 'D:\\llama-spark\\build\\bin\\llama-server.exe';
 const DEFAULT_MODEL_PATH = 'D:\\llama\\Spark-X2.5-4B-Q8_0\\Spark-X2.5-4B-Q8_0.gguf';
-const DEFAULT_CTX_SIZE = 131072;
-const DEFAULT_BATCH_SIZE = 512;
-const DEFAULT_THREADS = 16;
-const DEFAULT_GPU_LAYERS = 99;
+const DEFAULT_CTX_SIZE = 8192;
+const DEFAULT_BATCH_SIZE = 256;
+const DEFAULT_THREADS = 8;
+const DEFAULT_GPU_LAYERS = 0;
 const DEFAULT_CACHE_TYPE = 'q4_0';
-export const DEFAULT_MAX_TOKENS = 4096;
-export const DEFAULT_REQUEST_TIMEOUT_MS = 300000;
+export const DEFAULT_MAX_TOKENS = 1024;
+export const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 export const DEFAULT_IDLE_TIMEOUT_MS = 180000;
 
 let sparkProcess: ChildProcess | null = null;

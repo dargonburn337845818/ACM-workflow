@@ -1939,7 +1939,7 @@
         dgAiBtn.disabled = true;
         if (dgOpenScriptBtn) dgOpenScriptBtn.style.display = 'none';
         if (dgStatusEl) {
-          dgStatusEl.textContent = '正在调用本地 Spark 生成脚本…';
+          dgStatusEl.textContent = '正在按样例格式快速生成随机化脚本…';
           dgStatusEl.className = 'dg-status busy';
         }
         vscode.postMessage({ type: 'sparkGenerateScript' });
@@ -2530,7 +2530,7 @@
       }
       case 'sparkGenerated': {
         if (dgStatusEl) {
-          dgStatusEl.textContent = 'AI 已生成并保存：' + (msg.payload && msg.payload.path || '');
+          dgStatusEl.textContent = '已按样例生成并保存：' + (msg.payload && msg.payload.path || '');
           dgStatusEl.className = 'dg-status ok';
         }
         if (dgAiBtn) dgAiBtn.disabled = false;

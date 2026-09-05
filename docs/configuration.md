@@ -24,16 +24,16 @@
 | `acmWorkflow.sparkServerPath` | string | `D:\llama-spark\build\bin\llama-server.exe` | Spark 使用的 `llama-server.exe` 路径（含 CUDA DLL 的构建目录）。 |
 | `acmWorkflow.sparkModelPath` | string | `D:\llama\Spark-X2.5-4B-Q8_0\Spark-X2.5-4B-Q8_0.gguf` | Spark GGUF 模型文件路径。 |
 | `acmWorkflow.sparkModelName` | string | `spark:latest` | Spark 在 llama-server 中的模型别名（`--alias`）。 |
-| `acmWorkflow.sparkAutoStart` | boolean | `true` | 使用 Spark 生成脚本时，若服务未启动，扩展自动拉起。 |
+| `acmWorkflow.sparkAutoStart` | boolean | `false` | 默认关闭；当前「按样例生成」不依赖 LLM，仅可选 Spark 理解模式需开启。 |
 | `acmWorkflow.sparkIdleTimeoutMs` | number | `180000` | Spark 空闲多少毫秒后自动停止并释放显存；0 表示不自动停止。 |
-| `acmWorkflow.sparkCtxSize` | number | `131072` | Spark 上下文长度（与 `startmain.ps1` 一致）。 |
-| `acmWorkflow.sparkBatchSize` | number | `512` | Spark llama-server 批大小。 |
-| `acmWorkflow.sparkThreads` | number | `16` | Spark llama-server CPU 线程数（与 `startmain.ps1` 一致）。 |
+| `acmWorkflow.sparkCtxSize` | number | `8192` | Spark 上下文长度；默认 8192，轻量化本地运行。 |
+| `acmWorkflow.sparkBatchSize` | number | `256` | Spark llama-server 批大小；默认 256，降低内存占用。 |
+| `acmWorkflow.sparkThreads` | number | `8` | Spark llama-server CPU 线程数；默认 8，兼顾速度与 CPU 占用。 |
 | `acmWorkflow.sparkCacheTypeK` | string | `q4_0` | Spark KV cache K 类型（与 `startmain.ps1` 一致）。 |
 | `acmWorkflow.sparkCacheTypeV` | string | `q4_0` | Spark KV cache V 类型（与 `startmain.ps1` 一致）。 |
-| `acmWorkflow.sparkGpuLayers` | number | `99` | Spark 加载到 GPU 的层数；99 表示全量 GPU 加速。 |
-| `acmWorkflow.sparkMaxTokens` | number | `4096` | Spark 单次生成的最大 token 数（造数据脚本通常足够）。 |
-| `acmWorkflow.sparkRequestTimeoutMs` | number | `300000` | Spark 生成请求超时（毫秒），默认 5 分钟。 |
+| `acmWorkflow.sparkGpuLayers` | number | `0` | Spark 加载到 GPU 的层数；默认 0（CPU 轻量运行），有独立显卡时可调高。 |
+| `acmWorkflow.sparkMaxTokens` | number | `1024` | Spark 单次生成的最大 token 数；默认 1024，足够小型样例随机化脚本。 |
+| `acmWorkflow.sparkRequestTimeoutMs` | number | `60000` | Spark 生成请求超时（毫秒），默认 60 秒。 |
 | `acmWorkflow.sparkScriptPath` | string | `""` → 当前题目目录 `gen.py` | AI 生成的造数据 Python 脚本保存路径。留空按题目目录隔离，避免不同题目互相覆盖；填写后改为全局固定路径。 |
 | `acmWorkflow.browserPath` | string | `""` | Puppeteer 使用的浏览器可执行文件路径。留空自动探测 Edge/Chrome/Chromium。 |
 | `acmWorkflow.followHandles` | string[] | `[]` | 比赛面板「我的关注」榜单的额外关注 handle（逗号分隔编辑；自己的 `cfHandle` 自动包含，大小写不敏感）。 |
