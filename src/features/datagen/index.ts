@@ -139,7 +139,7 @@ async function handleSparkGenerateScript(host: WorkbenchHost, deps: Pick<Service
   host.post({ type: 'sparkStatus', message: '正在按样例格式快速生成随机化脚本…', busy: true });
   try {
     const ctx = resolveCurrentProblemContext(filePath, probPath, deps.workspace);
-    const generated = deps.spark.fastGenerate(ctx);
+    const generated = await deps.spark.fastGenerate(ctx);
     const saved = await deps.spark.validateAndSave(generated.code, ctx);
     host.post({ type: 'sparkGenerated', payload: { path: saved.path, code: saved.code, stdout: saved.stdout, fallback: saved.fallback, source: generated.mode } });
     if (saved.fallback || generated.mode === 'minimal') {

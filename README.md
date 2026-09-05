@@ -201,7 +201,7 @@ npm run compile
 | `acmWorkflow.sparkServerPath` | `D:\llama-spark\build\bin\llama-server.exe` | Spark 使用的 llama-server.exe（CUDA DLL 同目录） |
 | `acmWorkflow.sparkModelPath` | `D:\llama\Spark-X2.5-4B-Q8_0\Spark-X2.5-4B-Q8_0.gguf` | Spark GGUF 模型文件 |
 | `acmWorkflow.sparkModelName` | `spark:latest` | Spark 在 llama-server 中的模型别名 |
-| `acmWorkflow.sparkAutoStart` | `false` | 默认关闭；当前「按样例生成」不依赖 LLM，仅可选 Spark 理解模式需开启 |
+| `acmWorkflow.sparkAutoStart` | `true` | 规则模板未覆盖输入格式时自动拉起本地 4B 模型；简单格式不启动模型 |
 | `acmWorkflow.sparkIdleTimeoutMs` | `180000` | Spark 空闲自动停止毫秒数（3 分钟，0=不自动停止） |
 | `acmWorkflow.sparkCtxSize` | `8192` | Spark 上下文长度（轻量默认，非 131K） |
 | `acmWorkflow.sparkThreads` | `8` | Spark CPU 线程数（轻量默认） |

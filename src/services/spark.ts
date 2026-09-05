@@ -167,39 +167,45 @@ export function buildDataGenPrompt(problem: SparkProblemContext): string {
       ].join('\n')
     : '';
 
+  const inputSection = extractInputSection(problem.statement || '');
+  const formatBlock = inputSection
+    ? ['===== 输入格式 =====', inputSection.slice(0, 3000), '===== 输入格式结束 ====='].join('\n')
+    : ['===== 题面（未识别到独立输入格式时提供） =====', String(problem.statement || '').slice(0, 3000), '===== 题面结束 ====='].join('\n');
+
   return [
-    '你是一名算法竞赛造数据专家。请根据下面的题目描述，编写一个 Python 3 脚本。',
-    '脚本的任务：每次运行都输出一组**符合题面所有约束**的合法输入数据到 stdout。',
+    '你是一个算法竞赛造数据脚本生成器。',
+    '不要理解整道题，只根据下面的【输入格式】和【样例】编写一个 Python 3 脚本。',
+    '脚本每次运行都输出一组符合输入格式和约束的随机合法输入数据到 stdout。',
     '',
     '【输出格式硬约束 —— 放在最前面】',
-    '1. 回复的第一行必须是 import、from、def 或 print(...) 之一，禁止先写解释、思考或 Markdown。',
+    '1. 回复第一行必须是 import、from、def 或 print(...) 之一，禁止先写解释、思考或 Markdown。',
     '2. 不要输出 ``` 代码块标记。',
-    '3. 脚本可以定义函数，但必须在文件末尾调用它；运行 `python gen.py` 后 stdout 必须有数据。',
+    '3. 脚本可以定义函数，但必须在文件末尾调用它；运行 python gen.py 后 stdout 必须有数据。',
     '4. 如果复杂格式暂时无法处理，至少输出一个最小的合法数据骨架（例如一行整数），绝不能无输出。',
     '',
-    '硬性要求：',
+    '【硬性要求】',
     '1. 只使用 Python 标准库（random、string 等），不要依赖第三方库。',
-    '2. 必须严格满足题面给出的输入格式、数据范围、特殊约束。',
-    '3. 输出只包含题目要求的输入数据，不要输出解释、提示或多余字符。',
-    '4. 代码必须是完整可执行的 Python 脚本，不需要 Markdown 代码块。',
-    '5. 如果题目有变量间依赖（如 n 和后面数组长度），请保证生成数据自洽。',
-    '6. 在覆盖边界/特殊情况的前提下，生成的数据要尽可能多样化。',
-    '7. 脚本不得使用 input() 或等待交互；必须一次性直接输出到 stdout。',
-    '8. 生成数据规模必须符合题面约束；题面如果限制 N<=1e5，就不要生成 1e6 以上规模。',
-    '9. 脚本本身应快速运行，不要做重计算或死循环。',
+    '2. 必须满足输入格式、数据范围与变量依赖。',
+    '3. 只输出数据，不要输出解释、提示或多余字符。',
+    '4. 不得使用 input() 或等待交互；脚本必须快速运行。',
+    '5. 如果定义了函数，必须调用；推荐不用函数，直接 print。',
+    '',
+    '【参考模板】',
+    'import random',
+    'n = random.randint(1, 10)',
+    'print(n)',
+    "print(' '.join(str(random.randint(1, 100)) for _ in range(n)))",
+    '',
     `题目：${problem.title || ''}${problem.id ? ` (${problem.id})` : ''}`,
     problem.url ? `链接：${problem.url}` : '',
     '',
-    '===== 题面开始 =====',
-    problem.statement || '',
-    '===== 题面结束 =====',
+    formatBlock,
     sampleBlock,
     '',
-    '【结尾再次提醒】',
-    '请只输出 Python 代码本身，不要带 Markdown 代码块，不要解释。',
-    '再次强调：脚本运行后必须向 stdout 输出数据；如果定义了函数，必须在文件末尾调用它。',
-    '如果实在无法生成复杂数据，请输出一个最小合法骨架（例如 print(1)），绝不能无输出。',
-    '只输出代码，直接以 import/from/def/print 开头。'
+    '【结尾】',
+    '只输出 Python 代码本身，不要 Markdown、不要解释。',
+    '再次强调：脚本运行后 stdout 必须有数据；如果定义函数，末尾必须调用。',
+    '直接以 import/from/def/print 开头。'
   ].join('\n');
 }
 
@@ -219,9 +225,9 @@ function buildRepairPrompt(problem: SparkProblemContext | undefined, code: strin
     `题目：${problem?.title || ''}${problem?.id ? ` (${problem.id})` : ''}`,
     problem?.url ? `链接：${problem.url}` : '',
     '',
-    '===== 题面开始（必须重新满足这些约束） =====',
-    problem?.statement || '',
-    '===== 题面结束 =====',
+    '===== 输入格式（必须重新满足） =====',
+    extractInputSection(problem?.statement || '') || problem?.statement || '',
+    '===== 输入格式结束 =====',
     '',
     '===== 上一版脚本 =====',
     code.slice(0, 6000),
@@ -541,12 +547,22 @@ export class SparkService {
   }
 
   /**
-   * 轻量首选路径：不使用 LLM。
-   * 优先按题面「输入格式」小节生成（理解变量/依赖/约束），解析不了再用样例形状。
+   * 分层生成：
+   * 1. 规则模板：已知输入格式直接生成（毫秒级，不用 LLM）。
+   * 2. 本地 4B LLM：规则未命中时，用精简提示词（输入格式+样例+少样本）生成。
+   * 3. 样例形状：LLM 不可用/失败时兜底。
    */
-  fastGenerate(problem: SparkProblemContext): { code: string; mode: 'input' | 'sample' | 'minimal' } {
+  async fastGenerate(problem: SparkProblemContext): Promise<{ code: string; mode: 'input' | 'llm' | 'sample' | 'minimal' }> {
     const fromInput = buildInputFormatScript(problem.statement || '');
     if (fromInput) return { code: fromInput, mode: 'input' };
+    if (cfg<boolean>('sparkAutoStart', true)) {
+      try {
+        const code = await this.generateScriptForProblem(problem);
+        if (code && code.trim()) return { code, mode: 'llm' };
+      } catch (e: any) {
+        console.warn('[ACM-Workflow][Spark] LLM 生成失败，降级到样例形状：', e?.message || e);
+      }
+    }
     const fromSample = buildSampleShapeFallbackScript(problem.samples, problem.statement || '');
     if (fromSample) return { code: fromSample, mode: 'sample' };
     return { code: buildFallbackScript(), mode: 'minimal' };
@@ -567,8 +583,10 @@ export class SparkService {
         { role: 'system', content: '你是一名算法竞赛数据生成器编写专家。唯一任务是编写生成随机合法输入数据的 Python 3 脚本；不要解题、不要解释算法、不要输出任何分析内容，只输出可运行的 Python 代码。' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.3,
+      temperature: 0.2,
       top_p: 0.9,
+      top_k: 20,
+      repeat_penalty: 1.05,
       max_tokens: cfg('sparkMaxTokens', DEFAULT_MAX_TOKENS),
       stream: false
     };
