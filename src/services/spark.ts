@@ -284,6 +284,113 @@ function splitTokens(line: string): string[] {
   return line.split(/\s+/).filter(Boolean);
 }
 
+/** 从题面文本中截取“输入格式”小节；找不到返回空串。 */
+function extractInputSection(text: string): string {
+  const md = /(?:^|\n)##?\s*(?:输入格式|输入)\s*\n([\s\S]*?)(?=\n##?\s*(?:输出格式|输出)|$)/i.exec(text);
+  if (md?.[1]?.trim()) return md[1].trim();
+  const plain = /(?:^|\n)\s*(?:Input|输入格式)\s*[:：]?\s*\n?([\s\S]*?)(?=\n\s*(?:Output|输出格式))/i.exec(text);
+  return plain?.[1]?.trim() || '';
+}
+
+/** 展开 “10^5” / “2×10^5” 这类约束写法。 */
+function parseConstraintNumber(s: string): number | null {
+  const m1 = /(\d+(?:\.\d+)?)\s*×\s*10\^(\d+)/i.exec(s);
+  if (m1) return Number(m1[1]) * Math.pow(10, Number(m1[2]));
+  const m2 = /10\^(\d+)/i.exec(s);
+  if (m2) return Math.pow(10, Number(m2[1]));
+  const n = Number(s.replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 从输入格式文本中推断变量名的大致范围；缺省 1..10。 */
+function inferVarRange(text: string, varName: string): [number, number] {
+  const patterns = [
+    new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:≤|<=|<)\\s*${varName}\\s*(?:≤|<=|<)\\s*(\\d+(?:\\.\\d+)?)`, 'i'),
+    new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:≤|<=|<)\\s*${varName}`, 'i'),
+    new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:≥|>=|>)\\s*${varName}`, 'i')
+  ];
+  let lo = 1;
+  let hi = 10;
+  for (const re of patterns) {
+    const m = re.exec(text);
+    if (m) {
+      const a = parseConstraintNumber(m[1]);
+      const b = m[2] ? parseConstraintNumber(m[2]) : null;
+      if (a !== null && b !== null) return [a, b];
+      if (a !== null) {
+        if (re.source.includes('≥') || re.source.includes('>')) lo = a; else hi = a;
+      }
+    }
+  }
+  return [lo, hi];
+}
+
+/**
+ * 优先按题面「输入格式」小节生成：理解变量（n/m）、依赖（数组长度、行数）与约束范围。
+ * 这是规则解析，不是 LLM；解析不了时返回 null，由样例形状路径兜底。
+ */
+export function buildInputFormatScript(statement: string): string | null {
+  const section = extractInputSection(statement);
+  if (!section) return null;
+  const text = section.replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  const twoVars = /第一行[^\n]{0,80}?\b([nN])\b[^\n]{0,80}?\b([mM])\b/.exec(text) ||
+                  /^[^\n]{0,40}?([nN])\s*[,，和\s]+([mM])/.exec(text);
+  const oneVar = /第一行[^\n]{0,80}?\b([nN])\b/.exec(text) || /\b([nN])\b/.exec(text);
+
+  const hasArray = /([nN])\s*个(?:整数|正整数|数|元素)/.test(text) || /([nN])\s*个数/.test(text);
+  const rowsM = /(?:接下来|随后|后面|之后)\s*([mM])\s*行|([mM])\s*行，每行/.exec(text) || /([mM])\s*行/.exec(text);
+  const rowsN = /(?:接下来|随后|后面|之后)\s*([nN])\s*行|([nN])\s*行，每行/.exec(text) || /([nN])\s*行/.exec(text);
+
+  if (twoVars) {
+    const nVar = twoVars[1] || 'n';
+    const mVar = twoVars[2] || 'm';
+    const [nLo, nHi] = inferVarRange(text, nVar);
+    const [mLo, mHi] = inferVarRange(text, mVar);
+    const rowMatch = rowsM || rowsN;
+    if (rowMatch) {
+      const rowCountVar = rowMatch[1] || rowMatch[2] || 'm';
+      const rowVar = rowCountVar.toLowerCase();
+      return [
+        'import random',
+        '',
+        `n = random.randint(${nLo}, ${nHi})`,
+        `m = random.randint(${mLo}, ${mHi})`,
+        'print(n, m)',
+        `for _ in range(${rowVar}):`,
+        '    print(random.randint(1, 100000), random.randint(1, 100000))',
+        ''
+      ].join('\n');
+    }
+  }
+
+  const nVar = (oneVar?.[1] || 'n').toLowerCase();
+  const [nLo, nHi] = inferVarRange(text, nVar);
+  if (hasArray) {
+    return [
+      'import random',
+      '',
+      `n = random.randint(${nLo}, ${nHi})`,
+      'print(n)',
+      `print(' '.join(str(random.randint(1, 100000)) for _ in range(n)))`,
+      ''
+    ].join('\n');
+  }
+  if (rowsN) {
+    return [
+      'import random',
+      '',
+      `n = random.randint(${nLo}, ${nHi})`,
+      'print(n)',
+      'for _ in range(n):',
+      '    print(random.randint(1, 100000), random.randint(1, 100000))',
+      ''
+    ].join('\n');
+  }
+  return null;
+}
+
 /** 只保留样例原始行数/token 结构的兜底：不推断变量依赖。 */
 function buildLiteralShapeScript(lines: string[]): string {
   const out: string[] = ['import random', ''];
@@ -376,10 +483,12 @@ export class SparkService {
   }
 
   /**
-   * 轻量首选路径：不使用 LLM，只按官方样例的输入结构生成随机化脚本。
-   * 目标：毫秒级、零模型依赖、零上下文开销；模型理解题面不再是默认路径。
+   * 轻量首选路径：不使用 LLM。
+   * 优先按题面「输入格式」小节生成（理解变量/依赖/约束），解析不了再用样例形状。
    */
-  fastGenerate(problem: SparkProblemContext): { code: string; mode: 'sample' | 'minimal' } {
+  fastGenerate(problem: SparkProblemContext): { code: string; mode: 'input' | 'sample' | 'minimal' } {
+    const fromInput = buildInputFormatScript(problem.statement || '');
+    if (fromInput) return { code: fromInput, mode: 'input' };
     const fromSample = buildSampleShapeFallbackScript(problem.samples);
     if (fromSample) return { code: fromSample, mode: 'sample' };
     return { code: buildFallbackScript(), mode: 'minimal' };

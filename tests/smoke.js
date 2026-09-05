@@ -377,7 +377,7 @@ console.log('== 11. 测试页签 CSS（样例运行区只出现在样例页） =
 
 console.log('== 12. Spark 解析器与提示词锚定 ==');
 {
-  const { extractPythonCode, buildDataGenPrompt, buildSampleShapeFallbackScript } = require(out('services/spark.js'));
+  const { extractPythonCode, buildDataGenPrompt, buildSampleShapeFallbackScript, buildInputFormatScript } = require(out('services/spark.js'));
   const fenced = extractPythonCode('Here:\n```python\nprint(1)\n```\nDone');
   assert(fenced === 'print(1)', '代码块优先提取', fenced);
   const plain = extractPythonCode('Here is your code:\nprint(1)\n');
@@ -397,6 +397,12 @@ console.log('== 12. Spark 解析器与提示词锚定 ==');
   const rowsFallback = buildSampleShapeFallbackScript([{ input: '3\n1 2\n3 4\n5 6\n' }]);
   assert(rowsFallback && rowsFallback.includes('for _ in range(n):') && rowsFallback.includes('print(n)'),
     '样例形状识别：首行N+矩阵', JSON.stringify(rowsFallback));
+  const inputArray = buildInputFormatScript('## 输入格式\n第一行包含一个整数 n (1≤n≤5)。\n第二行包含 n 个整数 a_i。\n\n## 输出格式\n输出答案\n');
+  assert(inputArray && inputArray.includes('n = random.randint(1, 5)') && inputArray.includes('print(n)'),
+    '输入格式解析：首行N+数组', JSON.stringify(inputArray));
+  const inputRows = buildInputFormatScript('## 输入格式\n第一行包含两个整数 n 和 m。\n接下来 m 行，每行两个整数 u v。\n\n## 输出格式\n输出答案\n');
+  assert(inputRows && inputRows.includes('print(n, m)') && inputRows.includes('for _ in range(m):'),
+    '输入格式解析：N M+边列表', JSON.stringify(inputRows));
   const prompt = buildDataGenPrompt({
     title: 'T',
     id: '1A',

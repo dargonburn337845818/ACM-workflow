@@ -1,49 +1,39 @@
-# ACM Workflow 0.24.1
+# ACM Workflow 0.24.2
 
 VSCode 内 Codeforces 刷题全流程工作台：选题 → 题面翻译 → 测试 → 对拍 → 造数据 → 比赛 → 记录。
 
-## 本次更新：样例形式规律推断
+## 本次更新：读题面输入格式指导生成
 
-### 先理解样例规律，再生成数据
-「按样例生成」不再只是逐行照抄样例形状，而是先尝试理解样例结构：
+不只是看样例，现在会先提取题面中的「**输入格式**」小节，再生成脚本：
 
-- `首行 N + 下一行 N 个数` → **数组/序列**
-  ```text
-  5
-  1 2 3 4 5
-  ```
-  生成：
+### 已支持的格式规律
+- `第一行包含一个整数 n` + `第二行包含 n 个整数` → 数组/序列
   ```python
-  n = 5
+  n = random.randint(1, 100000)
   print(n)
-  print(randint, randint, randint, randint, randint)
+  print(' '.join(str(random.randint(...)) for _ in range(n)))
   ```
-
-- `首行 N + 后续 N 行` → **矩阵/边列表**
-  ```text
-  3
-  1 2
-  3 4
-  5 6
-  ```
-  生成：
+- `第一行包含两个整数 n 和 m` + `接下来 m 行，每行两个整数` → 行列/边列表
   ```python
-  n = 3
-  print(n)
-  for _ in range(n):
-      print(randint, randint)
+  n = random.randint(...)
+  m = random.randint(...)
+  print(n, m)
+  for _ in range(m):
+      print(random.randint(...), random.randint(...))
+  ```
+- 尝试识别约束范围：`1≤n≤10^5`、`0≤a_i≤10^9` 等，用于随机范围。
+- 识别不了时依次降级：
+  ```text
+  输入格式 → 样例形式规律 → 最小骨架
   ```
 
-- 无法识别时，按样例逐行 token 形状兜底。
-
-### 依然轻量
-- 不调用 LLM、不加载模型。
-- 毫秒级生成。
-- 本地部署参数保持轻量：ctx 8192 / batch 256 / threads 8 / GPU 0 / max_tokens 1024 / 默认不自动拉起 Spark。
+### 说明
+- SPJ / 交互题属于例外，不自动生成。
+- 全程不调用 LLM、不加载模型，毫秒级完成。
 
 ## 安装
 
-下载 `acm-workflow-0.24.1.vsix`，在 VS Code 扩展面板选择「从 VSIX 安装」。
+下载 `acm-workflow-0.24.2.vsix`，在 VS Code 扩展面板选择「从 VSIX 安装」。
 
 ## License
 
