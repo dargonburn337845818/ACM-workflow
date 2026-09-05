@@ -269,34 +269,94 @@ function buildFallbackScript(): string {
   ].join('\n');
 }
 
+function tokenExpressions(tokens: string[]): string[] {
+  return tokens.map((t) => {
+    if (/^-?\d+$/.test(t)) return 'random.randint(1, 10)';
+    if (/^[A-Za-z]+$/.test(t)) {
+      const len = Math.max(1, t.length);
+      return `''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(${len}))`;
+    }
+    return `'${t.replace(/'/g, "\\'")}'`;
+  });
+}
+
+function splitTokens(line: string): string[] {
+  return line.split(/\s+/).filter(Boolean);
+}
+
+/** 只保留样例原始行数/token 结构的兜底：不推断变量依赖。 */
+function buildLiteralShapeScript(lines: string[]): string {
+  const out: string[] = ['import random', ''];
+  for (const line of lines) {
+    const tokens = splitTokens(line);
+    if (tokens.length === 0) continue;
+    out.push(`print(${tokenExpressions(tokens).join(', ')})`);
+  }
+  out.push('');
+  return out.join('\n');
+}
+
+/** 推断“首行 N + 后面 N 行，每行 k 个 token”的矩阵/行结构。 */
+function buildRowsScript(n: number, cols: number, sampleRows: string[]): string {
+  const exprs = tokenExpressions(splitTokens(sampleRows[0] || ''));
+  const out = [
+    'import random',
+    '',
+    `n = ${n}`,
+    'print(n)',
+    'for _ in range(n):',
+    `    print(${exprs.join(', ')})`,
+    ''
+  ];
+  return out.join('\n');
+}
+
+/** 推断“首行 N + 下一行正好 N 个 token”的数组/序列结构。 */
+function buildArrayScript(n: number, sampleLine: string): string {
+  const exprs = tokenExpressions(splitTokens(sampleLine));
+  return [
+    'import random',
+    '',
+    `n = ${n}`,
+    'print(n)',
+    `print(${exprs.join(', ')})`,
+    ''
+  ].join('\n');
+}
+
 /**
- * 样例形状随机化保底：根据第一个官方样例的“行数 + 每行 token 数 + 类型”生成脚本。
- * 不依赖模型能力，比 print(1) 更可能满足题面输入结构。
+ * 样例形状随机化生成器：先尝试理解样例形式的规律，再据此生成脚本。
+ * 当前能识别的规律：
+ *  - 首行单个整数 N，后续恰好 N 行且每行 token 数相同 → 矩阵/行结构
+ *  - 首行单个整数 N，后续仅一行且 token 数 = N → 数组/序列结构
+ * 无法识别时退化为“逐行保持 token 形状”。
+ * 全程不依赖 LLM。
  */
 export function buildSampleShapeFallbackScript(samples?: { input: string; output?: string }[]): string | null {
   const sample = samples?.[0]?.input;
   if (!sample || !sample.trim()) return null;
   const lines = sample.trim().split('\n').map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return null;
-  const out: string[] = ['import random', ''];
-  for (const line of lines) {
-    const tokens = line.split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) continue;
-    if (tokens.every((t) => /^-?\d+$/.test(t))) {
-      out.push(`print(${tokens.map(() => 'random.randint(1, 10)').join(', ')})`);
-    } else if (tokens.every((t) => /^[A-Za-z]+$/.test(t))) {
-      const parts = tokens.map((t) => {
-        const len = Math.max(1, t.length);
-        return `''.join(random.choice('abcdefghijklmnopqrstuvwxyz') for _ in range(${len}))`;
-      });
-      out.push(`print(${parts.join(', ')})`);
-    } else {
-      const quoted = tokens.map((t) => `'${t.replace(/'/g, "\\'")}'`);
-      out.push(`print(${quoted.join(', ')})`);
+
+  const head = splitTokens(lines[0]);
+  const headIsSingleInt = head.length === 1 && /^\d+$/.test(head[0]);
+  const n = headIsSingleInt ? Number(head[0]) : null;
+  const rest = lines.slice(1);
+
+  if (n !== null && n > 0 && rest.length > 0) {
+    const counts = rest.map((l) => splitTokens(l).length);
+    // 规律：N 行，每行 token 数一致
+    if (rest.length === n && counts.every((c) => c === counts[0]) && counts[0] > 0) {
+      return buildRowsScript(n, counts[0], rest);
+    }
+    // 规律：仅 1 行，且该行 token 数 = N
+    if (rest.length === 1) {
+      const tokens = splitTokens(rest[0]);
+      if (tokens.length === n) return buildArrayScript(n, rest[0]);
     }
   }
-  out.push('');
-  return out.join('\n');
+
+  return buildLiteralShapeScript(lines);
 }
 
 export class SparkService {

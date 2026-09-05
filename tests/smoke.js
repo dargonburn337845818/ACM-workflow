@@ -390,6 +390,13 @@ console.log('== 12. Spark 解析器与提示词锚定 ==');
   const fallback = buildSampleShapeFallbackScript([{ input: '3\n1 2 3\n4 5 6\n', output: '6\n' }]);
   assert(fallback && fallback.includes('random.randint') && fallback.split('\n').filter((l) => l.startsWith('print(')).length === 3,
     '样例形状保底脚本按行生成', JSON.stringify(fallback));
+  const arrayFallback = buildSampleShapeFallbackScript([{ input: '5\n1 2 3 4 5\n' }]);
+  assert(arrayFallback && arrayFallback.includes('n = 5') && arrayFallback.includes('print(n)') &&
+    /print\(.*random\.randint/m.test(arrayFallback),
+    '样例形状识别：首行N+数组', JSON.stringify(arrayFallback));
+  const rowsFallback = buildSampleShapeFallbackScript([{ input: '3\n1 2\n3 4\n5 6\n' }]);
+  assert(rowsFallback && rowsFallback.includes('for _ in range(n):') && rowsFallback.includes('print(n)'),
+    '样例形状识别：首行N+矩阵', JSON.stringify(rowsFallback));
   const prompt = buildDataGenPrompt({
     title: 'T',
     id: '1A',
