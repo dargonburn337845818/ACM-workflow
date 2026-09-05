@@ -332,7 +332,7 @@
     "undici": "^7.29.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.4.1",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.9.2",
     "eslint": "^9.39.5",
