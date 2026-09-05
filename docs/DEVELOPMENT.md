@@ -69,7 +69,7 @@ src/
 - **根工作流已统一**：`ci.yml`（扩展 CI）、`security.yml`（Gitleaks）、`build-apk.yml`（日常 APK artifact）、`release.yml`（tag 时 VSIX + APK 一起发 Release）。
 - 已删除 `knowledge-ladder/.github/workflows/` 内不生效的嵌套模板，monorepo 中由根 `.github/workflows` 统一执行；子项目 README 已说明。
 - 发布规范：`main` 只走 PR；tag 必须是 `vX.Y.Z` 且指向 `main`；Release 由 CI 自动产物生成。
-- 已加 `dependabot.yml` 与 Issue/PR 模板；`CODEOWNERS` 可按需补充。
+- 已加 `dependabot.yml`、Issue/PR 模板与 `CODEOWNERS`。
 - 配置项默认值避免绑定作者本机路径；所有机器相关路径应可配置、可覆盖。
 
 ## 5. 隐私与安全清单
