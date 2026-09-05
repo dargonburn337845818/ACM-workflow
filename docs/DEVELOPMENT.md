@@ -28,14 +28,15 @@ src/
 - Spark 验证脚本临时文件每次清理，避免 `/tmp` 堆积。
 - AI 生成脚本默认保存到当前题目目录 `gen.py`，并按原子写落盘，避免不同题目互相覆盖、半文件中断。
 - `runner.compileCpp` 已改为异步 `execFile`，`judgeService` / `workbench.compileFor` / `verifier` 全部走 Promise，不再阻塞扩展事件循环。
+- `compileCache` 已用源码 SHA-1 内容哈希替代 mtime，避免 mtime 抖动导致无谓重编译。
 - `dataGen.runScript` 的 `.cpp` 编译也已是异步子进程，并清理编译产物。
 - `spark.ts` 已拆成 `sparkLifecycle.ts` + `spark.ts`，生命周期与脚本生成职责分离。
+- Spark 验证增加 stdout 8MB 上限，防止模型写出天文数字。
 - 测试新增 Tree/Graph/String 种子 golden 样例，当前冒烟 88 项通过。
 - tag Release 现在一次发布 VSIX + APK 两个资产。
 
 继续建议：
 
-- `compileCache` 键可再增加源码 hash（不止 mtime），进一步减少重编译。
 - `cfContest` / `fetchers` 的串行抓取可以增加有界并发（如 2~3）并保留 800ms 防风控；不要让并发数无上限。
 - `statementHtml` / `translate` 长文本处理已有缓存；可对翻译段落做并发请求但保持结果顺序稳定。
 - Webview 前端大量 DOM 重建，建议引入虚拟列表/增量渲染，尤其记录页与比赛榜单。
@@ -55,7 +56,7 @@ src/
 1. **语法预检**：先用 `python -m py_compile` 或 `ast.parse` 快速排除语法错误，再执行耗时运行，可省一轮模型调用。
 2. **输入形状校验**：根据样例/题目抽取首行 `n` 等变量，验证生成数据的第一段与格式假设一致（至少检查非空、行数稳定）。
 3. **可复现性**：在脚本头部注入可选 `--seed` / `SEED` 环境变量，让同一随机种子可复现，便于 debug 与对拍。
-4. **输出上限**：为生成数据设置最大 stdout 字节（如 8MB），防止模型写出天文数字导致前端卡死。
+4. **输出上限**：已落地 8MB stdout 上限，超出即终止并报错。
 5. **失败分类**：把“语法错误/运行错误/无输出/超时”分开提示，给用户更精确的修复方向。
 6. **模型参数**：`temperature 0.3` 适合稳定生成；若脚本风格单一可提供 `top_p` 配置项。
 

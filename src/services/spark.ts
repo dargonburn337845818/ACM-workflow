@@ -28,6 +28,7 @@ export { stopSparkServer } from './sparkLifecycle';
 const DEFAULT_SCRIPT_PATH = '';
 const MAX_REPAIR_ATTEMPTS = 3;
 const REPAIR_DELAY_MS = 500;
+const MAX_SCRIPT_STDOUT_BYTES = 8 * 1024 * 1024;
 
 function getScriptPath(): string {
   return normalizePath(cfg('sparkScriptPath', DEFAULT_SCRIPT_PATH));
@@ -97,6 +98,7 @@ function runPythonCode(code: string, timeoutMs = 15000): Promise<{ ok: boolean; 
     let stdout = '';
     let stderr = '';
     let settled = false;
+    let capped = false;
     const finish = (r: { ok: boolean; stdout: string; stderr: string }) => {
       if (settled) return;
       settled = true;
@@ -108,12 +110,22 @@ function runPythonCode(code: string, timeoutMs = 15000): Promise<{ ok: boolean; 
       try { child.kill('SIGKILL'); } catch { /* ignore */ }
       finish({ ok: false, stdout, stderr: stderr || '生成脚本运行超时（>15s）' });
     }, timeoutMs);
-    child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
+    child.stdout.on('data', (d: Buffer) => {
+      stdout += d.toString();
+      if (!capped && Buffer.byteLength(stdout, 'utf8') > MAX_SCRIPT_STDOUT_BYTES) {
+        capped = true;
+        try { child.kill('SIGKILL'); } catch { /* ignore */ }
+      }
+    });
     child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
     child.on('error', (e) => {
       finish({ ok: false, stdout, stderr: `无法运行 Python：${e.message}` });
     });
     child.on('close', (code) => {
+      if (capped) {
+        finish({ ok: false, stdout: stdout.slice(0, 200), stderr: '生成脚本输出超过 8MB，为防止前端卡死已终止' });
+        return;
+      }
       finish({ ok: code === 0 && stdout.trim().length > 0, stdout, stderr });
     });
   });

@@ -7,7 +7,9 @@
 - 随机图生成改为边编号无放回抽样：不再构造 O(n²) 全边数组，大 n 内存从 O(n²) 降到 O(m)
 - 长字符串使用数组 `join` 生成；`.cpp` 造数据脚本编译改为异步，避免阻塞扩展事件循环
 - `runner.compileCpp` 全链路异步化：`judgeService` / `workbench.compileFor` / `verifier` 改为 Promise，不再同步阻塞事件循环
+- 编译缓存改用源码 SHA-1 内容哈希，避免 mtime 抖动导致无谓重编译
 - `spark.ts` 拆出 `sparkLifecycle.ts`，服务器生命周期与脚本生成/验证职责分离
+- Spark 验证输出增加 8MB 上限，防止生成天文数字数据
 - AI 造数据脚本默认保存到当前题目目录 `gen.py`（可用 `sparkScriptPath` 覆盖为全局路径），避免不同题目互相覆盖
 - Spark 验证临时文件运行后清理；生成脚本保存使用原子写（临时文件 + rename）
 - 提示词增加“禁止 `input()`、控制数据规模、脚本快速运行”约束

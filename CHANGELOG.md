@@ -5,8 +5,8 @@
 
 ## Unreleased
 
-- 性能：随机图生成改用边编号无放回抽样，内存从 O(n²) 降为 O(m)，大 n 不再构造全边数组；长字符串用数组 join；`.cpp` 造数据脚本编译改为异步；`runner.compileCpp` 全链路异步化，不再阻塞扩展事件循环。
-- AI 造数据：生成脚本默认保存到当前题目目录 `gen.py`（可被 `sparkScriptPath` 覆盖），不再绑定个人盘符路径；保存改为原子写；验证临时文件运行后即清理；提示词新增“不用 input()、控制数据规模、快速运行”约束；`spark.ts` 拆出 `sparkLifecycle.ts` 分离服务器生命周期。
+- 性能：随机图生成改用边编号无放回抽样，内存从 O(n²) 降为 O(m)，大 n 不再构造全边数组；长字符串用数组 join；`.cpp` 造数据脚本编译改为异步；`runner.compileCpp` 全链路异步化，不再阻塞扩展事件循环；编译缓存改用源码 SHA-1 内容哈希，减少 mtime 抖动导致的重编译。
+- AI 造数据：生成脚本默认保存到当前题目目录 `gen.py`（可被 `sparkScriptPath` 覆盖），不再绑定个人盘符路径；保存改为原子写；验证临时文件运行后即清理；提示词新增“不用 input()、控制数据规模、快速运行”约束；`spark.ts` 拆出 `sparkLifecycle.ts` 分离服务器生命周期；验证输出增加 8MB 上限。
 - 测试：新增 Tree/Graph/String 种子 golden 样例，冒烟升至 88 项。
 - 仓库设计：移除 `knowledge-ladder` 内不生效的嵌套 workflows，改为根目录统一 monorepo Actions；新增 SECURITY / CONTRIBUTING / docs/DEVELOPMENT / Issue 与 PR 模板 / Dependabot / Gitleaks 安全扫描；`knowledge-ladder` 生成产物（`mobile/www/data.js`、`reports/`）不再跟踪；tag Release 现在同时发布 VSIX + APK。
 - 隐私：README 与配置文档明确密钥只存 SecretStorage、默认数据目录、本地路径仅为示例；CI 增加“跟踪到私有产物立即失败”检查。

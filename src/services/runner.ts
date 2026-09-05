@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { createHash } from 'crypto';
 
 const execFileAsync = promisify(execFile);
 
@@ -44,15 +45,19 @@ export function findCompiler(): string | null {
 
 interface CompileCacheEntry {
   srcPath: string;
-  srcMtime: number;
+  srcHash: string;
   exePath: string;
 }
 
 let compileCache: CompileCacheEntry | null = null;
 
+function sourceHash(srcPath: string): string {
+  return createHash('sha1').update(fs.readFileSync(srcPath)).digest('hex');
+}
+
 /**
  * 编译 cpp；exe 输出到系统临时目录，避免污染题目目录。
- * 同一源码（mtime 未变）复用上次编译结果，单用例/连续运行不再重复编译。
+ * 同一源码（内容 hash 未变）复用上次编译结果，单用例/连续运行不再重复编译。
  */
 export async function compileCpp(srcPath: string): Promise<{ ok: boolean; exePath?: string; message: string }> {
   const compiler = findCompiler();
@@ -62,18 +67,18 @@ export async function compileCpp(srcPath: string): Promise<{ ok: boolean; exePat
       : '未找到 g++ 编译器。请安装 g++（如 sudo apt install g++）或把 g++ 加入 PATH。' };
   }
 
-  let srcMtime = 0;
+  let srcHash: string;
   try {
-    srcMtime = fs.statSync(srcPath).mtimeMs;
+    srcHash = sourceHash(srcPath);
   } catch {
     return { ok: false, message: '无法读取源码文件：' + srcPath };
   }
 
-  // 命中缓存：源码未变且 exe 仍在
+  // 命中缓存：源码内容未变且 exe 仍在
   if (
     compileCache &&
     compileCache.srcPath === srcPath &&
-    compileCache.srcMtime === srcMtime &&
+    compileCache.srcHash === srcHash &&
     fs.existsSync(compileCache.exePath)
   ) {
     return { ok: true, exePath: compileCache.exePath, message: '编译成功（缓存）' };
@@ -88,7 +93,7 @@ export async function compileCpp(srcPath: string): Promise<{ ok: boolean; exePat
       timeout: 60000,
       windowsHide: true
     });
-    compileCache = { srcPath, srcMtime, exePath };
+    compileCache = { srcPath, srcHash, exePath };
     return { ok: true, exePath, message: '编译成功' };
   } catch (e: any) {
     return { ok: false, message: String(e?.stderr || e?.message || '编译失败').trim() };
