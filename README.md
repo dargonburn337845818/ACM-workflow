@@ -2,31 +2,35 @@
 
 > 在 VS Code 内完成 Codeforces 刷题的本地工作台：选题、翻译、测试、对拍、造数据、比赛管理与刷题记录。
 
+**中文** | [English](README.en.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## 简介
 
-ACM Workflow 是一个 VS Code 扩展，把 Codeforces 刷题需要的常见操作收进一个工作台：
-
-- 在编辑器内按难度、标签选择题目
-- 自动创建题目文件、抓取样例与题面
-- 运行测试、对拍、生成测试数据
-- 管理比赛、关注选手榜单
-- 本地记录 AC 历史和统计
+ACM Workflow 是一个 VS Code 扩展，把 Codeforces 刷题相关的常见操作集中到一个工作台里。它不要求你在浏览器、终端和编辑器之间反复切换。
 
 运行时数据默认保存在本机，不调用云端 AI 作为核心依赖；本地翻译与造数据模型均为可选配置。
 
 ## 功能
 
+- 在编辑器内按难度或算法标签选题，支持随机推荐与薄弱点推荐
+- 自动创建题目文件，抓取题面与样例
+- 运行测试、对拍、生成测试数据
+- 管理比赛与选手榜单，关注指定 Handle
+- 本地记录 AC 历史与统计
+- 兼容 Competitive Companion 协议（端口 27121），支持从浏览器一键导入
+
+具体能力包括：
+
 - **CF 选题**：按难度区间（800–3500）与算法标签过滤、随机推荐、薄弱点推荐。
 - **URL 导入**：支持 `problemset`、`contest`、`gym` 三类 Codeforces 链接。
 - **比赛管理**：Round 列表、题目列表、前 20 榜单、关注 Handle、一键创建整场比赛。
-- **题面与翻译**：抓取题面并排版；支持 MyMemory、LibreTranslate、DeepSeek、本地 llama.cpp 多后端；三级缓存。
-- **内置测试器**：自动编译、逐用例运行、超时/错误标记、全过自动记录 AC。
+- **题面与翻译**：抓取题面并排版；支持 MyMemory、LibreTranslate、DeepSeek、本地 llama.cpp 多后端；带三级缓存。
+- **内置测试器**：自动编译、逐用例运行、超时/错误标记，全过自动记录 AC。
 - **通用对拍器**：正解对暴力，支持精确、Token、浮点误差、Special Judge。
 - **造数据机器**：流水线式生成数据，支持变量联动、脚本生成、按样例生成。
 - **刷题记录**：SQLite 本地存储；统计标签、难度分布、连续天数；支持 CF 历史导入。
-- **浏览器推送**：兼容 Competitive Companion 协议（端口 27121）。
 - **环境配置与诊断**：自动检测本地翻译模型、工具链；产出脱敏后的诊断报告。
 - **主题与美化**：自带两套 VS Code 颜色主题，可选玻璃拟态背景并联动 [VSCode Background](https://github.com/caoge5524/vscode-background)。
 
