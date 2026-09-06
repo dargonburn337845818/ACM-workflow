@@ -16,13 +16,13 @@
 | `acmWorkflow.translateProvider` | enum | `"auto"` | 题面翻译后端：<br>• `auto` — MyMemory（国内可达、无需 key）+ Google 兜底，零配置<br>• `libre` — LibreTranslate，端点用 `libreEndpoint` 配置（可自建）<br>• `local` — 本地 llama.cpp `hy-mt2:latest`，端点用 `localEndpoint` 配置（推荐，见 `tools/`）<br>• `deepseek` — DeepSeek API，密钥存系统密钥链（见下） |
 | `acmWorkflow.libreEndpoint` | string | `https://libretranslate.com/translate` | LibreTranslate 翻译端点。自建实例填 `http://localhost:5000/translate`。 |
 | `acmWorkflow.localEndpoint` | string | `http://127.0.0.1:11434` | 本地翻译端点。默认直接使用 llama.cpp `hy-mt2:latest`；也可填兼容 LibreTranslate 的自建服务地址（如 `http://127.0.0.1:5000/translate`）。 |
-| `acmWorkflow.localAutoStart` | boolean | `true` | 使用 `local` 后端时，若 llama-server 或本地翻译服务未启动，扩展自动拉起（默认拉起 Windows 侧 `D:\llama\llama-server.exe`）。 |
-| `acmWorkflow.llamaDir` | string | `D:\llama` | llama.cpp 目录（含 llama-server.exe 与 GGUF 模型；WSL 下也可写 `/mnt/d/llama`）。 |
+| `acmWorkflow.localAutoStart` | boolean | `true` | 使用 `local` 后端时，若 llama-server 或本地翻译服务未启动，扩展自动拉起（默认拉起 Windows 侧 `<LLAMA_DIR>/llama-server.exe`）。 |
+| `acmWorkflow.llamaDir` | string | `<LLAMA_DIR>` | llama.cpp 目录（含 llama-server.exe 与 GGUF 模型；WSL 下也可写 `<WSL_LLAMA_DIR>`）。 |
 | `acmWorkflow.llamaModel` | string | `Hy-MT2-1.8B-Q6_K.gguf` | 本地翻译 GGUF 模型文件名（位于 `acmWorkflow.llamaDir` 下）。 |
 | `acmWorkflow.llamaThreads` | number | `4` | llama-server CPU 线程数；默认 4 兼顾响应与低消耗。 |
 | `acmWorkflow.sparkEndpoint` | string | `http://127.0.0.1:8080` | Spark 本地模型端点（llama.cpp OpenAI 兼容接口）。 |
-| `acmWorkflow.sparkServerPath` | string | `D:\llama-spark\build\bin\llama-server.exe` | Spark 使用的 `llama-server.exe` 路径（含 CUDA DLL 的构建目录）。 |
-| `acmWorkflow.sparkModelPath` | string | `D:\llama\Spark-X2.5-4B-Q8_0\Spark-X2.5-4B-Q8_0.gguf` | Spark GGUF 模型文件路径。 |
+| `acmWorkflow.sparkServerPath` | string | `<SPARK_SERVER_PATH>` | Spark 使用的 `llama-server.exe` 路径（含 CUDA DLL 的构建目录）。 |
+| `acmWorkflow.sparkModelPath` | string | `<SPARK_MODEL_PATH>` | Spark GGUF 模型文件路径。 |
 | `acmWorkflow.sparkModelName` | string | `spark:latest` | Spark 在 llama-server 中的模型别名（`--alias`）。 |
 | `acmWorkflow.sparkAutoStart` | boolean | `true` | 规则模板未覆盖输入格式时自动拉起本地 4B 模型；简单格式不启动模型。 |
 | `acmWorkflow.sparkIdleTimeoutMs` | number | `180000` | Spark 空闲多少毫秒后自动停止并释放显存；0 表示不自动停止。 |
@@ -85,13 +85,13 @@
 
 **场景三：本地 llama.cpp 翻译（推荐，完全不走外网）**
 
-1. 检查/准备 D:\llama 下的 llama.cpp 与模型：
+1. 检查/准备 <LLAMA_DIR> 下的 llama.cpp 与模型：
    ```bash
    bash tools/setup_local_translate.sh
    ```
-   翻译模型为 `D:\llama\Hy-MT2-1.8B-Q6_K.gguf`（约 1.47 GB，纯 CPU 低消耗）。
+   翻译模型为 `<LLAMA_DIR>/Hy-MT2-1.8B-Q6_K.gguf`（约 1.47 GB，纯 CPU 低消耗）。
    Q6_K 为标准量化，使用官方预编译版 llama.cpp 即可直接加载。
-   扩展会在首次使用 `local` 翻译时自动拉起 Windows 侧 `D:\llama\llama-server.exe`。
+   扩展会在首次使用 `local` 翻译时自动拉起 Windows 侧 `<LLAMA_DIR>/llama-server.exe`。
 2. VS Code 设置：
    ```jsonc
    {

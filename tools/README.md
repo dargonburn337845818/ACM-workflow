@@ -16,7 +16,7 @@ Codeforces 题面翻译成简体中文。
 ### 快速开始
 
 ```bash
-# 1. 检查 D:\llama 下的 llama-server.exe 与 Hy-MT2 GGUF；缺失时尝试拉起服务
+# 1. 检查 <LLAMA_DIR> 下的 llama-server.exe 与 Hy-MT2 GGUF；缺失时尝试拉起服务
 bash tools/setup_local_translate.sh
 
 # 2. 只确保 llama-server 就绪（扩展默认会自动执行；手动执行也可）
@@ -37,7 +37,7 @@ bash tools/start_local_translate.sh --llama-only
 ```
 
 `localAutoStart` 默认为 `true`：打开 VS Code 后第一次翻译时会自动拉起 Windows 侧
-`D:\llama\llama-server.exe`，不需要手动启动；VS Code 关闭时会停止本次自动拉起的 llama-server
+`<LLAMA_DIR>/llama-server.exe`，不需要手动启动；VS Code 关闭时会停止本次自动拉起的 llama-server
 （不会误杀你自己手动启动的服务）。
 
 ## 文件说明
@@ -57,7 +57,7 @@ bash tools/start_local_translate.sh --llama-only
 ## 断网/占用说明
 
 - `Hy-MT2-1.8B-Q6_K.gguf` 约 1.47 GB，纯 CPU 运行；扩展按需拉起 llama-server。
-- `Q6_K` 是标准 GGUF 量化，当前 `D:\llama\llama-server.exe` 可直接加载；无需 PR #22836 / AngelSlim fork。
+- `Q6_K` 是标准 GGUF 量化，当前 `<LLAMA_DIR>/llama-server.exe` 可直接加载；无需 PR #22836 / AngelSlim fork。
 - 使用该模型时请保证 llama-server 带 `--jinja` 启动；1.8B / 7B 推荐采样参数：`temperature 0.7`、
   `top_p 0.6`、`top_k 20`、`repetition_penalty 1.05`、`max_tokens 4096`。
 - 启动参数已按题面段落翻译调优：`--ctx-size 4096`、`--batch-size 512`、`--threads 4`、
