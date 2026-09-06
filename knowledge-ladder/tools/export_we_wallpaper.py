@@ -12,14 +12,14 @@ import subprocess
 import sys
 import time
 
+OUTPUT_DIR = os.path.expanduser("~/wallpaper-vedio")
+
 
 def find_we_exe():
     candidates = [
         r"C:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine\wallpaper32.exe",
         r"C:\Program Files (x86)\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
         r"C:\Program Files\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
-        r"D:\Steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
-        r"D:\steam\steamapps\common\wallpaper_engine\wallpaper64.exe",
     ]
     for p in candidates:
         if os.path.isfile(p):
@@ -73,7 +73,7 @@ def run_we(we_exe, args, check=True):
 
 
 def export_wallpaper(wallpaper, width=1920, height=1080, seconds=15,
-                     framerate=60, output=r"D:\wallpaper-vedio\wallpaper_hd.mp4",
+                     framerate=60, output=os.path.join(OUTPUT_DIR, "wallpaper_hd.mp4"),
                      window_name="WE_HD_Export", upscale=None):
     we_exe = find_we_exe()
     if not we_exe:
@@ -156,7 +156,7 @@ def run_gui():
     height_var = tk.StringVar(value=str(sh))
     seconds_var = tk.StringVar(value="15")
     upscale_var = tk.StringVar(value="")
-    output_var = tk.StringVar(value=r"D:\wallpaper-vedio\wallpaper_hd.mp4")
+    output_var = tk.StringVar(value=os.path.join(OUTPUT_DIR, "wallpaper_hd.mp4"))
 
     # 顶部引导
     ttk.Label(
@@ -187,7 +187,7 @@ def run_gui():
     tk.Entry(root, textvariable=upscale_var, font=("Segoe UI", 10)).pack(fill="x", padx=18)
 
     # 输出目录
-    ttk.Label(root, text="输出目录：D:\\wallpaper-vedio").pack(anchor="w", padx=18, pady=(12, 2))
+    ttk.Label(root, text=f"输出目录：{OUTPUT_DIR}").pack(anchor="w", padx=18, pady=(12, 2))
     tk.Entry(root, textvariable=output_var, font=("Segoe UI", 10)).pack(fill="x", padx=18)
 
     status = ttk.Label(root, text="", foreground="#666", wraplength=580)
@@ -229,9 +229,9 @@ def run_gui():
 
     def open_output_dir():
         try:
-            os.startfile(r"D:\\wallpaper-vedio")
+            os.startfile(OUTPUT_DIR)
         except Exception:
-            messagebox.showinfo("输出目录", r"D:\wallpaper-vedio")
+            messagebox.showinfo("输出目录", OUTPUT_DIR)
 
     # 底部按钮，固定可见
     bottom = tk.Frame(root)
@@ -259,7 +259,7 @@ def main():
     ap.add_argument("--height", type=int, default=0)
     ap.add_argument("--seconds", type=int, default=15)
     ap.add_argument("--framerate", type=int, default=60)
-    ap.add_argument("--output", default=r"D:\wallpaper-vedio\wallpaper_hd.mp4")
+    ap.add_argument("--output", default=os.path.join(OUTPUT_DIR, "wallpaper_hd.mp4"))
     ap.add_argument("--window-name", default="WE_HD_Export")
     ap.add_argument("--upscale", default=None, help="输出放大尺寸，如 3840x2160 / 7680x4320")
     args = ap.parse_args()

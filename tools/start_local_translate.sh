@@ -2,7 +2,7 @@
 #
 # 启动 ACM Workflow 本地翻译服务（llama.cpp / Windows 侧 llama-server.exe + Hy-MT2 GGUF）。
 #
-# 如果 llama-server 未启动，会尝试拉起 Windows 里的 D:\llama\llama-server.exe；
+# 如果 llama-server 未启动，会尝试拉起配置目录（$LLAMA_DIR）下的 llama-server.exe；
 # 扩展默认直接调用其 OpenAI 兼容接口（/v1/chat/completions）。
 # 本脚本也保留 --port 模式：启动轻量 Python HTTP 服务，把 LibreTranslate 风格
 # /translate 请求转发给 llama-server。
@@ -11,7 +11,7 @@
 #   bash tools/start_local_translate.sh [--llama-only] [--port 5000]
 #
 # 环境变量：
-#   LLAMA_DIR         llama.cpp 目录（默认 /mnt/d/llama，Windows 原生默认 D:\llama）
+#   LLAMA_DIR         llama.cpp 目录（默认 $HOME/llama）
 #   LLAMA_SERVER      llama-server.exe 路径（默认 $LLAMA_DIR/llama-server.exe）
 #   LLAMA_MODEL       GGUF 模型路径（默认 $LLAMA_DIR/Hy-MT2-1.8B-Q6_K.gguf）
 #   LLAMA_MODEL_ALIAS 对外模型名（默认 hy-mt2:latest，保持旧配置兼容）
@@ -28,12 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT="${PORT:-5000}"
 LLAMA_PORT="${LLAMA_PORT:-11434}"
 LLAMA_URL="${LLAMA_URL:-http://127.0.0.1:${LLAMA_PORT}}"
-if [ -d /mnt/d/llama ]; then
-  DEFAULT_LLAMA_DIR="/mnt/d/llama"
-else
-  DEFAULT_LLAMA_DIR="D:\\llama"
-fi
-LLAMA_DIR="${LLAMA_DIR:-$DEFAULT_LLAMA_DIR}"
+LLAMA_DIR="${LLAMA_DIR:-$HOME/llama}"
 LLAMA_SERVER="${LLAMA_SERVER:-$LLAMA_DIR/llama-server.exe}"
 LLAMA_MODEL="${LLAMA_MODEL:-$LLAMA_DIR/Hy-MT2-1.8B-Q6_K.gguf}"
 LLAMA_MODEL_ALIAS="${LLAMA_MODEL_ALIAS:-hy-mt2:latest}"
@@ -105,8 +100,8 @@ start_llama_windows() {
   # WSL 里启动 Windows 侧 llama-server。
   # 使用 PowerShell Start-Process 启动独立的 Windows 进程，能正常返回且进程可存活。
   local exe="${LLAMA_SERVER:-}"
-  if [ -z "$exe" ] && [ -x "/mnt/d/llama/llama-server.exe" ]; then
-    exe="/mnt/d/llama/llama-server.exe"
+  if [ -z "$exe" ] && [ -x "$HOME/llama/llama-server.exe" ]; then
+    exe="$HOME/llama/llama-server.exe"
   fi
   if [ -n "$exe" ] && [ -x "$exe" ]; then
     local win_exe win_model win_log_file
@@ -166,7 +161,7 @@ ensure_llama() {
     sleep 1
   done
   echo "错误：llama-server 服务仍不可用（$LLAMA_URL）。" >&2
-  echo "请确认 D:\\llama 下存在 llama-server.exe 与 Hy-MT2-1.8B-Q6_K.gguf。" >&2
+  echo "请确认 $LLAMA_DIR 下存在 llama-server.exe 与 Hy-MT2-1.8B-Q6_K.gguf。" >&2
   echo "如仍失败，请查看 llama-server 日志：$LLAMA_LOG_FILE" >&2
   exit 1
 }

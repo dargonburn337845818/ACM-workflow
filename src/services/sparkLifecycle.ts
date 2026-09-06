@@ -20,8 +20,8 @@ import { resolveLocalEndpoint } from '../utils/wsl';
 
 const DEFAULT_ENDPOINT = 'http://127.0.0.1:8080';
 const DEFAULT_MODEL_NAME = 'spark:latest';
-const DEFAULT_SERVER_PATH = 'D:\\llama-spark\\build\\bin\\llama-server.exe';
-const DEFAULT_MODEL_PATH = 'D:\\llama\\Spark-X2.5-4B-Q8_0\\Spark-X2.5-4B-Q8_0.gguf';
+const DEFAULT_SERVER_PATH = process.env.SPARK_SERVER_PATH || '';
+const DEFAULT_MODEL_PATH = process.env.SPARK_MODEL_PATH || '';
 const DEFAULT_CTX_SIZE = 8192;
 const DEFAULT_BATCH_SIZE = 256;
 const DEFAULT_THREADS = 8;
@@ -64,11 +64,11 @@ export function getModelName(): string {
 }
 
 function getServerPath(): string {
-  return normalizePath(cfg('sparkServerPath', DEFAULT_SERVER_PATH));
+  return normalizePath(cfg('sparkServerPath', DEFAULT_SERVER_PATH) || process.env.SPARK_SERVER_PATH || '');
 }
 
 function getModelPath(): string {
-  return normalizePath(cfg('sparkModelPath', DEFAULT_MODEL_PATH));
+  return normalizePath(cfg('sparkModelPath', DEFAULT_MODEL_PATH) || process.env.SPARK_MODEL_PATH || '');
 }
 
 function getLogPath(): string {

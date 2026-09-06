@@ -13,13 +13,22 @@
  * 输出与原文段落一一对应的数组：null 表示该段不翻译/翻译失败（前端只渲染原文）。
  */
 
+import * as vscode from 'vscode';
+import * as cheerio from 'cheerio';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { spawn, type ChildProcess } from 'child_process';
+import { applyGlossary } from './glossary';
+import { resolveLocalEndpoint } from '../utils/wsl';
+
 const MYMEMORY = 'https://api.mymemory.translated.net/get';
 const GOOGLE = 'https://translate.googleapis.com/translate_a/single';
 const DEEPSEEK_API = 'https://api.deepseek.com/chat/completions';
 const DEFAULT_LIBRE = 'https://libretranslate.com/translate';
 const DEFAULT_LOCAL = 'http://127.0.0.1:11434';
 const DEFAULT_LOCAL_MODEL = 'hy-mt2:latest';
-const DEFAULT_LLAMA_DIR = process.env.LLAMA_DIR || (process.platform === 'win32' ? 'D:\\llama' : '/mnt/d/llama');
+const DEFAULT_LLAMA_DIR = process.env.LLAMA_DIR || path.join(os.homedir(), 'llama');
 const DEFAULT_LLAMA_MODEL_FILE = 'Hy-MT2-1.8B-Q6_K.gguf';
 const CONCURRENCY = 4;
 const LOCAL_CONCURRENCY = 1;   // 本地 llama-server 默认单 slot，串行请求更稳、更低消耗
@@ -32,14 +41,6 @@ const RETRY_DELAY_MS = 1000;      // 重试间隔（Bug1）
 const cache = new Map<string, string>();
 
 /** 翻译后端（V0.22）：auto=MyMemory+Google 兜底 / libre=LibreTranslate（端点可配）/ deepseek=DeepSeek API（密钥存 SecretStorage）/ local=本地 llama.cpp hy-mt2:latest（端点可配） */
-import * as vscode from 'vscode';
-import * as cheerio from 'cheerio';
-import * as fs from 'fs';
-import * as path from 'path';
-import { spawn, type ChildProcess } from 'child_process';
-import { applyGlossary } from './glossary';
-import { resolveLocalEndpoint } from '../utils/wsl';
-
 export type TranslateProvider = 'auto' | 'libre' | 'deepseek' | 'local';
 
 export const DEEPSEEK_SECRET_KEY = 'acmWorkflow.deepseekKey';

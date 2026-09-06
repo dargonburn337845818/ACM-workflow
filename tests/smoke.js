@@ -198,10 +198,10 @@ console.log('== 6. WSL 路径适配 ==');
 {
   const { normalizePath } = require(out('utils/paths.js'));
   if (process.platform === 'linux') {
-    assert(normalizePath('D:\\CF\\work') === '/mnt/d/CF/work', 'Windows 盘符路径转 WSL /mnt');
+    assert(normalizePath('C:\\work') === '/mnt/c/work', 'Windows 盘符路径转 WSL /mnt');
     assert(normalizePath('C:/Program Files/Edge/msedge.exe') === '/mnt/c/Program Files/Edge/msedge.exe', '正斜杠 Windows 路径转 WSL');
   } else {
-    assert(normalizePath('D:\\CF\\work') === path.resolve('D:\\CF\\work'), 'Windows 平台保留原路径');
+    assert(normalizePath('C:\\work') === path.resolve('C:\\work'), 'Windows 平台保留原路径');
   }
 }
 

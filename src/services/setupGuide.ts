@@ -19,8 +19,8 @@ export interface LocalTranslationStatus {
 }
 
 const MIRROR_LINES = [
-  '模型文件: D:\\llama\\Hy-MT2-1.8B-Q6_K.gguf',
-  '启动服务: D:\\llama\\llama-server.exe -m D:\\llama\\Hy-MT2-1.8B-Q6_K.gguf --host 0.0.0.0 --port 11434 --ctx-size 4096 --no-webui --jinja --alias hy-mt2:latest',
+  '模型文件: <LLAMA_DIR>/Hy-MT2-1.8B-Q6_K.gguf',
+  '启动服务: <LLAMA_DIR>/llama-server.exe -m <LLAMA_DIR>/Hy-MT2-1.8B-Q6_K.gguf --host 0.0.0.0 --port 11434 --ctx-size 4096 --no-webui --jinja --alias hy-mt2:latest',
   '自动检查: bash tools/setup_local_translate.sh'
 ];
 

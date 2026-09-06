@@ -170,12 +170,12 @@
         "acmWorkflow.localAutoStart": {
           "type": "boolean",
           "default": true,
-          "description": "使用 local 翻译后端时，如果 llama-server 或本地翻译服务未启动，扩展自动拉起（默认拉起 D:\\llama\\llama-server.exe + Hy-MT2）。"
+          "description": "使用 local 翻译后端时，如果 llama-server 或本地翻译服务未启动，扩展自动拉起配置目录下的 llama-server.exe（acmWorkflow.llamaDir 或 $LLAMA_DIR）。"
         },
         "acmWorkflow.llamaDir": {
           "type": "string",
-          "default": "D:\\llama",
-          "description": "本地 llama.cpp 目录（含 llama-server.exe 与 GGUF 模型；WSL 下也可写 /mnt/d/llama）。"
+          "default": "",
+          "description": "本地 llama.cpp 目录；留空时使用 $LLAMA_DIR，再回退到 ~/llama。"
         },
         "acmWorkflow.llamaModel": {
           "type": "string",
@@ -194,13 +194,13 @@
         },
         "acmWorkflow.sparkServerPath": {
           "type": "string",
-          "default": "D:\\llama-spark\\build\\bin\\llama-server.exe",
-          "description": "Spark 使用的 llama-server.exe 路径（优先使用 D:\\llama-spark 的构建，含 CUDA DLL）。"
+          "default": "",
+          "description": "Spark 使用的 llama-server.exe 路径；留空时使用 $SPARK_SERVER_PATH 或手动指定。"
         },
         "acmWorkflow.sparkModelPath": {
           "type": "string",
-          "default": "D:\\llama\\Spark-X2.5-4B-Q8_0\\Spark-X2.5-4B-Q8_0.gguf",
-          "description": "Spark GGUF 模型文件路径。"
+          "default": "",
+          "description": "Spark GGUF 模型文件路径；留空时使用 $SPARK_MODEL_PATH 或手动指定。"
         },
         "acmWorkflow.sparkModelName": {
           "type": "string",

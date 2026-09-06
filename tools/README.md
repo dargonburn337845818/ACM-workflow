@@ -30,7 +30,7 @@ bash tools/start_local_translate.sh --llama-only
   "acmWorkflow.translateProvider": "local",
   "acmWorkflow.localEndpoint": "http://127.0.0.1:11434",
   "acmWorkflow.localAutoStart": true,
-  "acmWorkflow.llamaDir": "D:\\llama",
+  "acmWorkflow.llamaDir": "<LLAMA_DIR>",
   "acmWorkflow.llamaModel": "Hy-MT2-1.8B-Q6_K.gguf",
   "acmWorkflow.llamaThreads": 4
 }

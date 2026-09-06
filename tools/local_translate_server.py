@@ -18,7 +18,7 @@ ACM Workflow 本地翻译服务（llama.cpp Hy-MT2）
 
 依赖：
   - Python 3（仅标准库）
-  - Windows 侧 llama-server.exe（D:\\llama）已启动并加载 Hy-MT2 GGUF
+  - Windows 侧 llama-server.exe（$LLAMA_DIR）已启动并加载 Hy-MT2 GGUF
 """
 
 from __future__ import annotations
@@ -186,8 +186,8 @@ def main() -> int:
     if not llama_available(args.llama_url, args.model):
         print(
             f"错误：无法连接 llama-server 或未找到模型别名 {args.model}。\n"
-            f"请先启动 Windows 侧 D:\\llama\\llama-server.exe，并确认模型已加载：\n"
-            f"  llama-server.exe -m D:\\llama\\Hy-MT2-1.8B-Q6_K.gguf --alias {args.model}\n"
+            f"请先启动 Windows 侧 $LLAMA_DIR/llama-server.exe，并确认模型已加载：\n"
+            f"  llama-server.exe -m $LLAMA_DIR/Hy-MT2-1.8B-Q6_K.gguf --alias {args.model}\n"
             f"或运行 tools/setup_local_translate.sh 自动检查。",
             file=sys.stderr,
         )

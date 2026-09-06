@@ -7,8 +7,8 @@
 #   bash tools/start_spark.sh
 #
 # 环境变量：
-#   SPARK_SERVER       llama-server.exe 路径（默认 /mnt/d/llama-spark/build/bin/llama-server.exe 或 D:\llama-spark\build\bin\llama-server.exe）
-#   SPARK_MODEL        GGUF 模型路径（默认 D:\llama\Spark-X2.5-4B-Q8_0\Spark-X2.5-4B-Q8_0.gguf）
+#   SPARK_SERVER       llama-server.exe 路径（默认 $HOME/llama-spark/build/bin/llama-server.exe）
+#   SPARK_MODEL        GGUF 模型路径（默认 $HOME/llama/Spark-X2.5-4B-Q8_0/Spark-X2.5-4B-Q8_0.gguf）
 #   SPARK_MODEL_ALIAS  对外模型名（默认 spark:latest）
 #   SPARK_PORT         服务端口（默认 8080）
 #   SPARK_CTX          上下文长度（默认 8192）
@@ -32,16 +32,8 @@ SPARK_CACHE_TYPE="${SPARK_CACHE_TYPE:-q4_0}"
 SPARK_PID_FILE="${SPARK_PID_FILE:-$SCRIPT_DIR/.spark-server.pid}"
 SPARK_LOG_FILE="${SPARK_LOG_FILE:-$SCRIPT_DIR/spark-server.log}"
 
-if [ -d /mnt/d/llama-spark/build/bin ]; then
-  DEFAULT_SPARK_SERVER="/mnt/d/llama-spark/build/bin/llama-server.exe"
-else
-  DEFAULT_SPARK_SERVER="D:\\llama-spark\\build\\bin\\llama-server.exe"
-fi
-if [ -f /mnt/d/llama/Spark-X2.5-4B-Q8_0/Spark-X2.5-4B-Q8_0.gguf ]; then
-  DEFAULT_SPARK_MODEL="/mnt/d/llama/Spark-X2.5-4B-Q8_0/Spark-X2.5-4B-Q8_0.gguf"
-else
-  DEFAULT_SPARK_MODEL="D:\\llama\\Spark-X2.5-4B-Q8_0\\Spark-X2.5-4B-Q8_0.gguf"
-fi
+DEFAULT_SPARK_SERVER="$HOME/llama-spark/build/bin/llama-server.exe"
+DEFAULT_SPARK_MODEL="$HOME/llama/Spark-X2.5-4B-Q8_0/Spark-X2.5-4B-Q8_0.gguf"
 SPARK_SERVER="${SPARK_SERVER:-$DEFAULT_SPARK_SERVER}"
 SPARK_MODEL="${SPARK_MODEL:-$DEFAULT_SPARK_MODEL}"
 
