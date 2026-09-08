@@ -1,0 +1,20 @@
+# 由 gh-automation/scripts/install-repo-config.py 生成；改这里而不是改脚本。
+# 说明：ghp.py 读取本文件；字段含义见 gh-automation/templates/release.yml。
+repo: ACM-workflow
+default_branch: main
+version_source: package.json#version
+build: npm ci && npm run compile
+artifacts:
+- out/**
+checks:
+- privacy
+- style
+ci_required: false
+release:
+  enabled: true
+  tag_prefix: v
+  notes_from: CHANGELOG.md
+allow_dirty: false
+timeout_seconds: 300
+retries: 2
+local_dir: ACM-workflow-build
