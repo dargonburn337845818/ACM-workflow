@@ -360,14 +360,27 @@ function toWslFriendlyPath(p: string): string {
   return toWslPath(p) || p;
 }
 
+/**
+ * 本地 llama.cpp 的路径类环境变量（acmWorkflow.llamaDir → $LLAMA_DIR → ~/llama）。
+ * wsl=true 时把 Windows 路径转成 /mnt/...，供 WSL 内的 bash 脚本/终端使用；
+ * wsl=false 时保留原生路径（WSL 内运行或 Git Bash）。
+ */
+export function llamaPathEnv(wsl = true): Record<string, string> {
+  const dir = getLlamaDir();
+  const model = getLlamaModelPath();
+  return {
+    LLAMA_DIR: wsl ? toWslFriendlyPath(dir) : dir,
+    LLAMA_MODEL: wsl ? toWslFriendlyPath(model) : model,
+    LLAMA_MODEL_ALIAS: DEFAULT_LOCAL_MODEL,
+    LLAMA_THREADS: String(getLlamaThreads())
+  };
+}
+
 /** 供 WSL 内 bash 脚本使用的 llama 环境变量（把 Windows 路径转成 /mnt/...）。 */
 function buildWslLlamaEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
-    LLAMA_DIR: toWslFriendlyPath(getLlamaDir()),
-    LLAMA_MODEL: toWslFriendlyPath(getLlamaModelPath()),
-    LLAMA_MODEL_ALIAS: DEFAULT_LOCAL_MODEL,
-    LLAMA_THREADS: String(getLlamaThreads()),
+    ...llamaPathEnv(true),
     LLAMA_LOG_FILE: toWslFriendlyPath(getLlamaLogPath())
   };
 }

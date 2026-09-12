@@ -10,6 +10,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { getFetchDispatcher } from './fetchers/codeforces';
 import { resolveLocalEndpoint } from '../utils/wsl';
+import { llamaPathEnv } from './translate';
 
 export interface LocalTranslationStatus {
   ok: boolean;
@@ -92,21 +93,30 @@ function toWslPath(p: string): string | null {
   return null;
 }
 
-/** 打开一个终端，给出可直接运行的本地翻译检查/安装命令。 */
+/** bash 环境变量前缀：KEY='value'（值内单引号按 bash 规则转义）。 */
+function shellAssignments(env: Record<string, string>): string {
+  return Object.entries(env)
+    .map(([k, v]) => `${k}='${v.replace(/'/g, "'\\''")}'`)
+    .join(' ');
+}
+
+/**
+ * 打开一个终端，给出可直接运行的本地翻译检查/安装命令。
+ * 环境变量与扩展实际使用的目录一致（acmWorkflow.llamaDir → $LLAMA_DIR → ~/llama），
+ * 否则脚本会退回它自己的内置默认值，整理过目录后就会找不到模型。
+ */
 export function openSetupTerminal(context: vscode.ExtensionContext): void {
   const script = path.join(context.extensionPath, 'tools', 'setup_local_translate.sh');
-  const env = [
-    'LLAMA_MODEL_ALIAS=hy-mt2:latest'
-  ].join(' ');
+  const envFor = (wsl: boolean) => shellAssignments(llamaPathEnv(wsl));
 
   let cmd: string;
   if (process.platform === 'win32') {
     const wslScript = toWslPath(script);
     cmd = wslScript
-      ? `wsl.exe bash -lc "${env} bash '${wslScript}'"`
-      : `bash -lc "${env} bash '${script}'"`;
+      ? `wsl.exe bash -lc "${envFor(true)} bash '${wslScript}'"`
+      : `bash -lc "${envFor(false)} bash '${script}'"`;
   } else {
-    cmd = `bash -lc "${env} bash '${script}'"`;
+    cmd = `bash -lc "${envFor(false)} bash '${script}'"`;
   }
 
   const terminal = vscode.window.createTerminal({
