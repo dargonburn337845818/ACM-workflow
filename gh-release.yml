@@ -9,9 +9,12 @@ artifacts:
 checks:
 - privacy
 - style
-ci_required: false
+ci_required: true
 release:
-  enabled: true
+  # Release 与资产（acm-workflow-<ver>.vsix + app-debug.apk）由仓库内
+  # .github/workflows/release.yml 在推送 v* tag 时构建创建（沿用 v0.23.0 以来的形态）。
+  # 本管道负责门禁 + push + tag；tag 推送后等 CI 建完 Release，再重跑本管道做远端回读（幂等）。
+  enabled: false
   tag_prefix: v
   notes_from: CHANGELOG.md
 allow_dirty: false
