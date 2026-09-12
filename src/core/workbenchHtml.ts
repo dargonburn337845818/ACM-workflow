@@ -84,6 +84,16 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
   const scriptUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, 'media', 'main.js')
   );
+  // V0.25.2：KaTeX 随扩展本地打包（v0.24 起 CDN 被移除后没补本地版，公式只剩 LaTeX 源码）
+  const katexUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'node_modules', 'katex', 'dist', 'katex.min.js')
+  );
+  const katexAutoRenderUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'node_modules', 'katex', 'dist', 'contrib', 'auto-render.min.js')
+  );
+  const katexCssUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'node_modules', 'katex', 'dist', 'katex.min.css')
+  );
 
   // 可选的玻璃拟态背景：支持 Wallpaper Engine 动态壁纸（视频）和静态图片
   const glassBackground = vscode.workspace.getConfiguration('acmWorkflow').get<string>('glassBackground', '').trim();
@@ -112,6 +122,7 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}' ${webview.cspSource}; style-src 'nonce-${nonce}' ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; img-src ${webview.cspSource} data: https: file:; media-src ${webview.cspSource} data: https: file: blob:;">
   <link rel="stylesheet" href="${styleUri}">
+  <link rel="stylesheet" href="${katexCssUri}">
   ${glassBgStyle}
   <title>ACM Workflow</title>
 </head>
@@ -336,6 +347,8 @@ export function getWorkbenchHtml(webview: vscode.Webview, extensionUri: vscode.U
       </div>
     </main>
   </div>
+  <script src="${katexUri}" nonce="${nonce}"></script>
+  <script src="${katexAutoRenderUri}" nonce="${nonce}"></script>
   <script src="${scriptUri}" nonce="${nonce}"></script>
   <div id="confirm-modal">
     <div class="confirm-box">

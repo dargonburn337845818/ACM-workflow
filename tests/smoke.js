@@ -249,6 +249,23 @@ console.log('== 8. 题面 LaTeX 排版（CF $$$ 行内公式） ==');
     assert(res2.html.includes('<span class="acm-math">10^{5}</span>'), 'tex-span 的 <sup> 转 LaTeX 上标');
     assert(res2.html.includes('<span class="acm-math">x_{i}</span>'), 'tex-span 的 <sub> 转 LaTeX 下标');
 
+    // 0.25.2：CF 块级公式用六个 $ 定界；不能被 $$$ 规则吃成「空行内公式」导致公式体裸奔
+    const htmlBlockMath = '<div class="problem-statement"><div class="header"><div class="title">T</div></div><div class="note"><p>Sequence: $$$$$$ a + b = c $$$$$$ (bold)</p></div></div>';
+    const res3 = await parseCfStatementHtml(htmlBlockMath, async () => null);
+    assert(res3.html.includes('<div class="acm-math acm-math-block">a + b = c</div>'),
+      'CF $$$$$$ 块级公式解析为 acm-math-block', res3.html);
+    assert(!res3.html.includes('class="acm-math"></span>'), '不产生空公式标签', res3.html);
+    assert(!res3.html.includes('$$$'), '块级公式定界符不泄漏到正文', res3.html);
+
+    // 0.25.2：样例每行包在 div.test-example-line 里，换行必须保留（否则 "5"+"3 2 4" 粘成 "53 2 4"）
+    const htmlSampleLines = '<div class="problem-statement"><div class="header"><div class="title">T</div></div><div class="sample-tests"><div class="sample-test"><div class="input"><pre>\n'
+      + '<div class="test-example-line test-example-line-even test-example-line-0">5</div>'
+      + '<div class="test-example-line test-example-line-odd test-example-line-1">3 2 4</div></pre></div>'
+      + '<div class="output"><pre>\n<div class="test-example-line test-example-line-odd test-example-line-0">2</div></pre></div></div></div></div>';
+    const res4 = await parseCfStatementHtml(htmlSampleLines, async () => null);
+    assert(res4.html.includes('<pre>5\n3 2 4</pre>'), '样例输入按 test-example-line 保留换行', res4.html);
+    assert(res4.html.includes('<pre>2</pre>'), '样例输出保留单行内容', res4.html);
+
     // 0.20.1：题面页不再重复展示样例（样例只保留在「样例」页的可编辑用例中）
     const { stripSamplesFromStatementHtml } = require(out('services/statementHtml.js'));
     const stripped = stripSamplesFromStatementHtml(res.html);
@@ -260,6 +277,26 @@ console.log('== 8. 题面 LaTeX 排版（CF $$$ 行内公式） ==');
     assert(false, '题面 LaTeX 排版', e.message);
   }
 })();
+
+console.log('== 8c. 题面 Markdown 落盘（列表/样例行结构） ==');
+{
+  const os = require('os');
+  const fs = require('fs');
+  const { writeStatementFiles, statementFilePaths, HTML_CACHE_MARK } = require(out('services/statementFiles.js'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'acm-stmt-'));
+  const cpp = path.join(dir, 'C.cpp');
+  const html = '<h1 class="st-title">T</h1><h2 class="st-h">提示</h2>'
+    + '<div class="st-block st-p"><div class="st-en"><ul><li>one <span class="acm-math">a</span></li><li>two</li></ul></div></div>'
+    + '<div class="st-sample"><div class="st-sample-title">样例输入 1</div><pre>5' + '\n' + '3 2 4</pre></div>';
+  writeStatementFiles(cpp, html, null);
+  const md = fs.readFileSync(statementFilePaths(cpp).md, 'utf8');
+  assert(md.includes('- one $a$'), 'Markdown 列表项转为 "- " 行', md);
+  assert(md.includes('- two'), 'Markdown 保留第二个列表项', md);
+  assert(md.includes('\n5\n') && md.includes('3 2 4'), 'Markdown 样例保留换行', md);
+  const written = fs.readFileSync(statementFilePaths(cpp).html, 'utf8');
+  assert(written.startsWith(HTML_CACHE_MARK + '\n'), 'HTML 落盘带当前缓存版本标记', HTML_CACHE_MARK);
+  fs.rmSync(dir, { recursive: true, force: true });
+}
 
 console.log('== 8b. 题面 viewHtml 缓存 ==');
 {

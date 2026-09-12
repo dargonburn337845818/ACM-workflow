@@ -58,12 +58,29 @@ function isTranslatable(raw: string): boolean {
   return true;
 }
 
+/**
+ * 取段落 .st-en 的纯文本，保留行结构（<li> / <br> / 块级元素 → 换行）。
+ * 直接 .text() 会把 <ul><li>…</li><li>…</li></ul> 压成一整行：
+ * 译文与英文侧结构不一致，列表型提示（操作过程等）在译文里变成一长串（V0.25.2）。
+ */
+function blockPlainText($: cheerio.CheerioAPI, $block: cheerio.Cheerio<any>): string {
+  const $clone = $block.clone();
+  $clone.find('li').each((_i, li) => { $(li).prepend('\n'); });
+  $clone.find('br').replaceWith('\n');
+  $clone.find('p, div, ul, ol, table, tr, blockquote').each((_i, n) => { $(n).append('\n'); });
+  return $clone.text()
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line) => line.length > 0)
+    .join('\n');
+}
+
 /** 统计排版 HTML 中可翻译的段落数（Bug1：区分「翻译失败」与「无可翻译内容」） */
 export function countTranslatableParagraphs(html: string): number {
   try {
     const $ = loadHtml(html);
     return $('.st-block.st-p').toArray().filter((el) => {
-      const t = $(el).find('.st-en').first().text().replace(/\s+/g, ' ').trim();
+      const t = blockPlainText($, $(el).find('.st-en').first());
       return isTranslatable(t);
     }).length;
   } catch {
@@ -116,31 +133,37 @@ export async function resolveProvider(context?: import('vscode').ExtensionContex
 async function translateOne(text: string, provider: TranslateProvider = 'auto', apiKey?: string): Promise<string | null> {
   const key = text;
   if (cache.has(key)) return cache.get(key) || null;
-  const segs = splitSentences(text);
+  // 逐行翻译：行内再按句子拆分，最后按 \n 拼回，保住列表/换行结构
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   for (let attempt = 1; attempt <= MAX_TRANSLATE_ATTEMPTS; attempt++) {
     if (attempt > 1) {
       console.warn(`[ACM-Workflow][翻译] 第 ${attempt - 1} 次尝试失败，${RETRY_DELAY_MS / 1000}s 后重试（段长 ${text.length}）`);
       await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
     }
     try {
-      const parts: string[] = [];
+      const outLines: string[] = [];
       let ok = true;
-      for (const seg of segs) {
-        let zh: string | null = null;
-        if (provider === 'libre') {
-          zh = await libreTranslate(seg) || await mymemoryTranslate(seg) || await googleTranslate(seg);
-        } else if (provider === 'local') {
-          zh = await localTranslate(seg);
-        } else if (provider === 'deepseek' && apiKey) {
-          zh = await deepseekTranslate(seg, apiKey) || await mymemoryTranslate(seg) || await googleTranslate(seg);
-        } else {
-          zh = await mymemoryTranslate(seg) || await googleTranslate(seg);
+      for (const line of lines) {
+        const parts: string[] = [];
+        for (const seg of splitSentences(line)) {
+          let zh: string | null = null;
+          if (provider === 'libre') {
+            zh = await libreTranslate(seg) || await mymemoryTranslate(seg) || await googleTranslate(seg);
+          } else if (provider === 'local') {
+            zh = await localTranslate(seg);
+          } else if (provider === 'deepseek' && apiKey) {
+            zh = await deepseekTranslate(seg, apiKey) || await mymemoryTranslate(seg) || await googleTranslate(seg);
+          } else {
+            zh = await mymemoryTranslate(seg) || await googleTranslate(seg);
+          }
+          if (!zh) { ok = false; break; } // null/空串 → 失败，进入重试
+          parts.push(zh);
         }
-        if (!zh) { ok = false; break; } // null/空串 → 失败，进入重试
-        parts.push(zh);
+        if (!ok) break;
+        outLines.push(parts.join(' '));
       }
       if (ok) {
-        const joined = parts.join(' ').trim();
+        const joined = outLines.join('\n').trim();
         if (joined) {
           const withGlossary = applyGlossary(text, joined);
           cache.set(key, withGlossary);
@@ -674,7 +697,7 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
       $m.replaceWith(`MATH${math.length}`);
       math.push({ src, block });
     });
-    const text = $el.find('.st-en').first().text().replace(/\s+/g, ' ').trim();
+    const text = blockPlainText($, $el.find('.st-en').first());
     if (isTranslatable(text)) {
       jobs.push({ index: i, text, math });
       if (jobs.length >= MAX_PARAS) return;

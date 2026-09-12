@@ -17,8 +17,8 @@ export interface StatementFiles {
   zh: (string | null)[] | null;
 }
 
-/** 排版 HTML 缓存版本标记：旧版（V0.20 逐碎片分块/MATH 占位符泄漏/V0.24 $$$ 公式误判/V0.25 tex-span sup/sub 未转 LaTeX）缓存直接失效重抓 */
-export const HTML_CACHE_MARK = '<!-- acm-workflow-html-v5 -->';
+/** 排版 HTML 缓存版本标记：旧版（V0.20 逐碎片分块/MATH 占位符泄漏/V0.24 $$$ 公式误判/V0.25 tex-span sup/sub 未转 LaTeX/V0.25.2 $$$$$$ 块级公式与样例行结构）缓存直接失效重抓 */
+export const HTML_CACHE_MARK = '<!-- acm-workflow-html-v6 -->';
 
 /** 题目文件夹内题面文件的路径（与 cpp 同级） */
 export function statementFilePaths(filePath: string): { html: string; md: string; zh: string } {
@@ -97,17 +97,28 @@ function htmlToMarkdown(html: string): string {
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
 }
 
-/** 把 .st-block 段落转成 Markdown 文本：公式还原为 $..$ / $$..$$，br 转行 */
+/**
+ * 把 .st-block 段落转成 Markdown 文本：公式还原为 $..$ / $$..$$，列表与换行保留结构。
+ * 之前用 $el.text().replace(/\s+/g,' ') 会把 <li>、<br> 全部压成一行，
+ * 列表型提示（如 2231C 的操作表）在 md 里变成一长串，翻译也失去行边界。
+ */
 function blockToMarkdown($: cheerio.CheerioAPI, el: cheerio.Cheerio<any>): string {
   const $el = $(el).clone();
   $el.find('.acm-math').each((_i, m) => {
     const $m = $(m);
     const src = $m.text().replace(/\s+/g, ' ').trim();
+    if (!src) { $m.remove(); return; }
     const block = $m.hasClass('acm-math-block');
     $m.replaceWith((block ? '$$' : '$') + src + (block ? '$$' : '$'));
   });
+  $el.find('li').each((_i, li) => { $(li).prepend('\n- '); });
   $el.find('br').replaceWith('\n');
-  return $el.text().replace(/\s+/g, ' ').trim();
+  $el.find('p, div, ul, ol, table, tr, blockquote').each((_i, n) => { $(n).append('\n'); });
+  return $el.text()
+    .split('\n')
+    .map((line) => line.replace(/[ \t\u00a0\u2009\u200a\u202f]+/g, ' ').trim())
+    .filter((line) => line.length > 0)
+    .join('\n');
 }
 
 /** 把排版后的 HTML（和可选译文）写入题目文件夹；失败只警告，不影响主流程 */

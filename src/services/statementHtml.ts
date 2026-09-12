@@ -47,10 +47,11 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** 去掉 LaTeX 定界符（$$$..$$$ / $$..$$ / \[..\] / \(..\) / $..$），供 KaTeX 直接渲染 */
+/** 去掉 LaTeX 定界符（$$$$$$..$$$$$$ / $$$..$$$ / $$..$$ / \[..\] / \(..\) / $..$），供 KaTeX 直接渲染 */
 function stripMathDelimiters(src: string): string {
   const s = src.trim();
   const pairs: [string, string][] = [
+    ['$$$$$$', '$$$$$$'],
     ['$$$', '$$$'],
     ['$$', '$$'],
     ['\\[', '\\]'],
@@ -65,8 +66,13 @@ function stripMathDelimiters(src: string): string {
   return s;
 }
 
-/** 文本中的 LaTeX 边界：$$$..$$$ | $$..$$ | \[..\] | \(..\) | $..$（按此顺序匹配，互不拆分） */
-const MATH_TEXT_RE = /\$\$\$[\s\S]*?\$\$\$|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]+\$/g;
+/**
+ * 文本中的 LaTeX 边界（按此顺序匹配，互不拆分）：
+ *   $$$$$$..$$$$$$（CF 块级公式）| $$$..$$$（CF 行内公式）| $$..$$ | \[..\] | \(..\) | $..$
+ * CF 的块级公式用六个 $ 定界；若不先匹配，$$$ 规则会把开头/结尾各三个 $ 吃成「空行内公式」，
+ * 公式体则以裸文本泄漏（V0.25.2 修复）。
+ */
+const MATH_TEXT_RE = /\$\$\$\$\$\$[\s\S]*?\$\$\$\$\$\$|\$\$\$[\s\S]*?\$\$\$|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\)|\$[^$\n]+\$/g;
 
 /**
  * 把纯文本中的公式片段替换为 acm-math 标签（其余部分做 HTML 转义）。
@@ -80,12 +86,14 @@ function protectMathText(text: string): string {
   while ((m = re.exec(text))) {
     parts.push(escapeHtml(text.slice(last, m.index)));
     const raw = m[0];
-    // CF 题面用 $$$..$$$ 表示行内公式，必须先于 $$..$$ 识别，且按行内处理
-    const triple = raw.startsWith('$$$');
-    const block = !triple && (raw.startsWith('$$') || raw.startsWith('\\['));
-    // 定界符长度：$$$..$$$ 是 3 字符；$$..$$ / \[..\] / \(..\) 都是 2 字符；$..$ 是 1 字符
-    const dbl = block || raw.startsWith('\\(');
-    const inner = raw.slice(triple ? 3 : (dbl ? 2 : 1), raw.length - (triple ? 3 : (dbl ? 2 : 1))).trim();
+    // CF 题面：$$$$$$..$$$$$$ 是块级公式，$$$..$$$ 是行内公式，两者都必须先于 $$..$$ 识别
+    const six = raw.startsWith('$$$$$$');
+    const triple = !six && raw.startsWith('$$$');
+    const block = six || (!triple && (raw.startsWith('$$') || raw.startsWith('\\[')));
+    // 定界符长度：$$$$$$ 是 6 字符；$$$ 是 3 字符；$$..$$ / \[..\] / \(..\) 都是 2 字符；$..$ 是 1 字符
+    const delim = six ? 6 : (triple ? 3 : (block || raw.startsWith('\\(') ? 2 : 1));
+    const inner = raw.slice(delim, raw.length - delim).trim();
+    if (!inner) { last = m.index + raw.length; continue; } // 空公式（定界符残留）不产出空标签，也不吞掉后续文本
     parts.push(block
       ? `<div class="acm-math acm-math-block">${escapeHtml(inner)}</div>`
       : `<span class="acm-math">${escapeHtml(inner)}</span>`);
@@ -325,13 +333,26 @@ function renderBlockNode($: cheerio.CheerioAPI, node: AnyNode, ctx: BuildCtx): s
 
 /* ---------------- 样例 ---------------- */
 
+/**
+ * 取样例 <pre> 的纯文本，保留行结构。
+ * CF 现在把每行包成 <div class="test-example-line ...">（老题是 <pre> 内的真实换行），
+ * 直接 .text() 会把所有行拼成一串（如 "5" + "3 2 4" → "53 2 4"）。
+ */
+function samplePreText($: cheerio.CheerioAPI, $pre: cheerio.Cheerio<AnyNode>): string {
+  const $lines = $pre.find('.test-example-line');
+  const raw = $lines.length
+    ? $lines.toArray().map((el) => $(el).text()).join('\n')
+    : ($pre.text() || '').replace(/\r/g, '');
+  return raw.replace(/\n+$/, '');
+}
+
 function renderSampleTests($: cheerio.CheerioAPI, $root: cheerio.Cheerio<AnyNode>): string {
   let out = '';
   let idx = 0;
   $root.find('.sample-test').each((_i, st) => {
     idx++;
-    const input = ($(st).find('.input pre').first().text() || '').replace(/\n$/, '').replace(/\r/g, '');
-    const output = ($(st).find('.output pre').first().text() || '').replace(/\n$/, '').replace(/\r/g, '');
+    const input = samplePreText($, $(st).find('.input pre').first());
+    const output = samplePreText($, $(st).find('.output pre').first());
     if (input.trim()) out += `<div class="st-sample"><div class="st-sample-title">样例输入 ${idx}</div><pre>${escapeHtml(input)}</pre></div>`;
     if (output.trim()) out += `<div class="st-sample"><div class="st-sample-title">样例输出 ${idx}</div><pre>${escapeHtml(output)}</pre></div>`;
   });
