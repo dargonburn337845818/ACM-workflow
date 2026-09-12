@@ -47,6 +47,9 @@
       if (window.katex) {
         root.querySelectorAll('.acm-math').forEach((el) => {
           try {
+            // V0.25.3：渲染后 textContent 就是排版结果，不再是 LaTeX 源码；
+            // 先把源码存进 dataset.tex，供下面的 MATHn 兜底按索引取回真实公式
+            if (!el.dataset.tex) el.dataset.tex = el.textContent;
             katex.render(el.textContent, el, {
               throwOnError: false,
               displayMode: el.classList.contains('acm-math-block')
@@ -63,6 +66,8 @@
             { left: '$$', right: '$$', display: true },
             { left: '$', right: '$', display: false }
           ],
+          // 已经由 katex.render 处理过的英文公式不要被 auto-render 二次扫描
+          ignoredClasses: ['acm-math', 'katex'],
           throwOnError: false
         });
       }
@@ -94,7 +99,7 @@
             const me = mathEls[Number(n)];
             if (!me) return m;
             const block = me.classList.contains('acm-math-block');
-            return (block ? '$$' : '$') + me.textContent + (block ? '$$' : '$');
+            return (block ? '$$' : '$') + (me.dataset.tex || me.textContent) + (block ? '$$' : '$');
           });
         }
         zhDiv.textContent = zh; // 含 $..$ / $$..$$ 公式标记；textContent 防止译文 HTML 注入
@@ -211,6 +216,15 @@
     // V0.20.5：样例页切换为适应性窗口（占满可用宽度），题面页保持 720px 居中
     const testView = document.getElementById('view-test');
     if (testView) testView.classList.toggle('mode-samples', page === 'samples');
+  }
+
+  /**
+   * V0.25.3：打开新题目时回到「单测 + 题面」。
+   * 对拍/样例是上一题的工作状态，之前会带到新题（表现为「题面界面显示对拍界面内容」）。
+   */
+  function resetTestPanels() {
+    switchTestMode('single');
+    switchTestPage('statement');
   }
 
   let testRunning = false;
@@ -1409,7 +1423,7 @@
             const me = mathEls[Number(n)];
             if (!me) return m;
             const block = me.classList.contains('acm-math-block');
-            return (block ? '$$' : '$') + me.textContent + (block ? '$$' : '$');
+            return (block ? '$$' : '$') + (me.dataset.tex || me.textContent) + (block ? '$$' : '$');
           });
         }
         const zhDiv = document.createElement('div');
@@ -1430,10 +1444,8 @@
         vscode.postMessage({ type: 'contestListReady' });
       });
     }
-    if (!contestLoaded) {
-      contestListEl.innerHTML = '<div class="muted chart-empty">加载中…</div>';
-      vscode.postMessage({ type: 'contestListReady' });
-    }
+    // V0.25.3：不再在 webview 加载时预拉比赛列表（会白跑 CF 请求、且像「比赛界面自动打开」）；
+    // 改为首次点击「比赛」标签时才拉（见主导航的 contestListReady）
     contestListEl.addEventListener('click', (e) => {
       const expandBtn = e.target.closest('.contest-expand-btn');
       const createBtn = e.target.closest('.contest-create-btn');
@@ -2223,6 +2235,7 @@
         break;
       case 'openStatementView': {
         // V0.10：记录「打开题目」→ 切到测试视图（题面整合在此）
+        resetTestPanels(); // V0.25.3：新题目从「单测 + 题面」开始
         const stNav = document.querySelector('.nav-item[data-view="test"]');
         if (stNav) stNav.click();
         break;
@@ -2241,6 +2254,7 @@
       }
       case 'fileCreated':
         setStatus(msg.message || '已生成');
+        resetTestPanels(); // V0.25.3：新建题目 → 回到单测/题面
         const testNav = document.querySelector('.nav-item[data-view="test"]');
         if (testNav) testNav.click();
         break;
@@ -2269,7 +2283,9 @@
         break;
       }
       case 'testState': {
+        const fileChanged = !!msg.filePath && msg.filePath !== testFilePath;
         testFilePath = msg.filePath || '';
+        if (fileChanged) resetTestPanels(); // V0.25.3：换了题目文件 → 回到题面页
         testCases = (msg.cases || []).map((c) => ({ id: c.id, input: c.input, output: c.output }));
         // Bug6：共用「当前题目」指示器（题面未到时用文件名兜底）
         if (stData && stData.id) {

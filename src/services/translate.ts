@@ -716,33 +716,54 @@ export async function translateStatementHtml(html: string, opts?: { context?: im
 
   jobs.forEach((j, k) => {
     if (!results[k]) { out[j.index] = null; return; }
-    let zh = results[k];
-    const used = new Set<number>();
-    // V0.26：用 MATH{n} 占位符（Ollama hy-mt2:latest 实测可原样保留）；同时兼容旧 ☃、{n}}、XQn☃ 等被本地模型改写的形式
-    const restoreMath = (_m: string, n: string) => {
-      const mi = Number(n);
-      used.add(mi);
-      const math = j.math[mi];
-      if (!math) return _m;
-      return (math.block ? '$$' : '$') + math.src + (math.block ? '$$' : '$');
-    };
-    zh = zh
-      .replace(/\bMATH\s*(\d+)\b/g, restoreMath)
-      .replace(/\u0000?☃\s*(\d+)\s*☃\u0000?/g, restoreMath)
-      .replace(/\{(\d+)\}\}/g, restoreMath)
-      .replace(/\{(\d+)\}/g, restoreMath)
-      .replace(/(?:XQ|QQ|☃)?\s*(\d+)\s*☃/g, restoreMath)
-      .replace(/(?:XQ|QQ)\s*(\d+)\b/g, restoreMath);
-    // 翻译服务丢弃的公式占位符补回段尾（公式不应被翻译/丢失）
-    for (let mi = 0; mi < j.math.length; mi++) {
-      if (!used.has(mi)) {
-        const math = j.math[mi];
-        zh += ' ' + (math.block ? '$$' : '$') + math.src + (math.block ? '$$' : '$');
-      }
-    }
-    out[j.index] = zh;
+    out[j.index] = restoreMathPlaceholders(results[k], j.math);
   });
   return out;
+}
+
+/**
+ * 把译文里的公式占位符还原成 $..$ / $$..$$。
+ * - V0.26：占位符用 MATH{n}（本地 hy-mt2 实测可原样保留）；同时兼容被模型改写过的
+ *   ☃n☃、{n}}、{n}、XQn/QQn☃ 等形式。
+ * - V0.25.3：模型偶尔会整段丢掉某个占位符（如把 "contains n integers b_1..b_n" 里的 n 漏掉）。
+ *   旧实现一律把这些公式甩到段尾，会出现「…即阴影数组。 $n$」这种错位残留；
+ *   现在按源顺序插回：优先补在「源顺序在它之后、且已被还原」的公式之前，否则接在其后，最后才落到段尾。
+ */
+export function restoreMathPlaceholders(zh: string, math: { src: string; block: boolean }[]): string {
+  const wrap = (m: { src: string; block: boolean }) => (m.block ? '$$' : '$') + m.src + (m.block ? '$$' : '$');
+  // 与旧实现等价的匹配顺序：MATHn → ☃n☃ → {n}} → {n} → n☃ → XQn/QQn
+  const re = /\bMATH\s*(\d+)\b|\u0000?☃\s*(\d+)\s*☃\u0000?|\{(\d+)\}\}|\{(\d+)\}|(?:XQ|QQ|☃)?\s*(\d+)\s*☃|(?:XQ|QQ)\s*(\d+)\b/g;
+  const hits: { n: number; index: number; length: number }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(zh))) {
+    const n = Number(m[1] ?? m[2] ?? m[3] ?? m[4] ?? m[5] ?? m[6]);
+    if (Number.isInteger(n) && math[n]) hits.push({ n, index: m.index, length: m[0].length });
+  }
+  const done = new Set<number>();
+  let outText = '';
+  let last = 0;
+  /** 把源顺序排在这个位置之前、模型却丢掉的公式就地补上 */
+  const flushMissingBefore = (limit: number) => {
+    for (let i = 0; i < math.length && i < limit; i++) {
+      if (done.has(i) || hits.some((h) => h.n === i)) continue;
+      outText += wrap(math[i]) + ' ';
+      done.add(i);
+    }
+  };
+  for (const hit of hits) {
+    outText += zh.slice(last, hit.index); // 先吐出该公式之前的译文，再补被丢掉的公式
+    flushMissingBefore(hit.n);
+    outText += wrap(math[hit.n]);
+    done.add(hit.n);
+    last = hit.index + hit.length;
+  }
+  outText += zh.slice(last);
+  for (let i = 0; i < math.length; i++) {
+    if (done.has(i)) continue;
+    outText = outText.replace(/\s+$/, '') + ' ' + wrap(math[i]);
+    done.add(i);
+  }
+  return outText;
 }
 
 /** 仅供测试：清空翻译缓存 */

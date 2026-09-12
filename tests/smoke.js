@@ -278,6 +278,30 @@ console.log('== 8. 题面 LaTeX 排版（CF $$$ 行内公式） ==');
   }
 })();
 
+console.log('== 8d. 译文公式占位符还原（V0.25.3） ==');
+{
+  const { restoreMathPlaceholders } = require(out('services/translate.js'));
+  const inline = [{ src: 't', block: false }, { src: 'n', block: false }];
+  assert(restoreMathPlaceholders('含 MATH0 与 MATH1 个', inline) === '含 $t$ 与 $n$ 个',
+    'MATHn 占位符还原为 $..$');
+
+  // 2254D 现场：模型把 "n integers b_1..b_n (0≤b_i≤…)" 里的 n 丢了 → 不能再甩到段尾
+  const math3 = [{ src: 'n', block: false }, { src: 'b_1, \\dots, b_n', block: false }, { src: '0 \\le b_i', block: false }];
+  const restored = restoreMathPlaceholders('包含 MATH1 到 MATH2 之间的整数。', math3);
+  assert(restored.startsWith('包含 $n$ $b_1, \\dots, b_n$'),
+    '被丢掉的公式按源顺序插回原位（不再出现「…。 $n$」错位残留）', restored);
+
+  const tailOnly = restoreMathPlaceholders('没有占位符', [{ src: 'x', block: false }]);
+  assert(tailOnly === '没有占位符 $x$', '无处可锚定时才补到段尾', tailOnly);
+
+  assert(restoreMathPlaceholders('公式 MATH0', [{ src: 'n', block: true }]) === '公式 $$n$$',
+    '块级公式用 $$..$$ 还原');
+  assert(restoreMathPlaceholders('旧式 ☃0☃ 与 {1}}', inline) === '旧式 $t$ 与 $n$',
+    '兼容模型改写过的 ☃n☃ / {n}} 形态');
+  assert(restoreMathPlaceholders('重复 MATH0 与 MATH0', [{ src: 't', block: false }]) === '重复 $t$ 与 $t$',
+    '同一占位符出现多次都还原');
+}
+
 console.log('== 8c. 题面 Markdown 落盘（列表/样例行结构） ==');
 {
   const os = require('os');

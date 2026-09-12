@@ -90,7 +90,12 @@ export class WorkbenchSidebarProvider implements vscode.WebviewViewProvider, Wor
     this.disposables = [];
 
     const wallpaperCfg = vscode.workspace.getConfiguration('acmWorkflow').get<string>('glassBackground', '');
-    const localRoots = [vscode.Uri.joinPath(this.extensionUri, 'media')];
+    const localRoots = [
+      vscode.Uri.joinPath(this.extensionUri, 'media'),
+      // V0.25.3：KaTeX 随扩展分发在 node_modules/katex/dist；webview 只能加载
+      // localResourceRoots 内的资源，少这一行 KaTeX 会被拒（公式退回裸 LaTeX 源码）
+      vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'katex', 'dist')
+    ];
     if (wallpaperCfg && path.isAbsolute(wallpaperCfg)) {
       localRoots.push(vscode.Uri.file(path.dirname(wallpaperCfg)));
     }
